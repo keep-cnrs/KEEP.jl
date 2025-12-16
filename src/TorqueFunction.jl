@@ -2,7 +2,7 @@ module TorqueFunction
 
 using Logging
 
-export torque_function, set_torque_function!, reset_torque_function
+export torque_function, set_torque_function!, reset_torque_function!
 export DEFAULT_TORQUE, RATIONAL_TORQUE, LINEAR_TORQUE, CINFTY_TORQUE, CONTINUOUS_TORQUE, DISCONTINUOUS_TORQUE
 
 """

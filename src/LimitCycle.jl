@@ -30,8 +30,8 @@ using Setfield
 using Statistics: mean
 using QuasiMonteCarlo: sample, HaltonSample
 
-import keep: DEFAULT_TOLERANCE
-import keep.PointMass4 as PM4
+import KEEP: DEFAULT_TOLERANCE
+import KEEP.PointMass4 as PM4
 
 export TAU0,
     build_poincare_callback,

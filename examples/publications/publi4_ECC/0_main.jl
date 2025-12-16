@@ -1,0 +1,6 @@
+include("1_eight.jl")
+include("2_trajectories.jl")
+include("3_equilibria.jl")
+include("4_limit_cycles.jl")
+include("5_optimization.jl")
+include("6_parametrized_optimization.jl")

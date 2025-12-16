@@ -3,9 +3,9 @@ module PointMass6
 import LinearAlgebra: norm, normalize, ⋅, ×
 using StaticArrays
 
-using keep.PointMassPara
-using keep.TorqueFunction
-import keep.PointMass4: jacobian, scnd_deriv_sample
+using KEEP.PointMassPara
+using KEEP.TorqueFunction
+import KEEP.PointMass4: jacobian, scnd_deriv_sample
 
 function compute_OK(q, p)
     return nothing

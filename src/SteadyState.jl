@@ -20,8 +20,8 @@ using QuasiMonteCarlo: sample, HaltonSample
 using Statistics: mean
 using Clustering: dbscan
 
-import keep.PointMass4 as PM4
-using keep: DEFAULT_TOLERANCE
+import KEEP.PointMass4 as PM4
+using KEEP: DEFAULT_TOLERANCE
 
 export ddq, ddq_partial, steady_state, aligned_and_opposite_steady_states
 export all_steady_states, all_steady_states_halton

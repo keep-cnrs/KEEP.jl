@@ -1,27 +1,17 @@
-#=
-The `optimize` function(s) must have a standard signature:
- - `optimize(vbp, symbols, lower, upper)`
-
-A function `make_bounds` which, given a `p` (not VBPara), a vector `symbols` and a `multiplier` factor, computes `lower`, `upper` and `init`.
-=#
-
-module Optimization
-
 using StaticArrays: SA
-# using OrdinaryDiffEqTsit5
+using OrdinaryDiffEqTsit5
+using LinearAlgebra: norm
 using ADNLPModels, NLPModelsIpopt
 using Setfield: @set
 using Logging
-using LinearAlgebra: norm
 import ComponentArrays: ComponentArray as CA, getaxes
 
 using KEEP.PointMassPara
 import KEEP: DEFAULT_TOLERANCE
-import KEEP.PointMass4 as PM4
-using KEEP.LimitCycle: compute_limit_cycle, TAU0
+import KEEP.LimitCycle: compute_limit_cycle
+using KEEP.LimitCycle: compute_limit_cycle
 
-export make_bounds, compute_dims, optimize
-
+include("00_general_functions.jl")
 
 const MIN_TF = 1e-3
 const MAX_TF = 1e2
@@ -31,16 +21,17 @@ const MIN_ALPHA = -π
 const MAX_ALPHA = π
 const MIN_D_ALPHA = -100.0
 const MAX_D_ALPHA = 100.0
-const MIN_ABS_D_TAU = 0.0
-const MAX_ABS_D_TAU = 100.0
+const MIN_D_TAU = -100.0
+const MAX_D_TAU = 0.0  # Assuming dτ0 is negative.
 const CONSTRAINT_TOL_MULTIPLIER = 1.0
 
-"""
-Check verbosity of Logging
-"""
-function should_verbose()
-    return Logging.min_enabled_level(current_logger()) <= Info
-end
+#=
+p
+p -> vbp
+## make_bounds
+p -> [center, lower, upper]
+## optimize
+=#
 
 """
 Automatically builds the lower and upper bounds
@@ -58,47 +49,21 @@ function compute_dims(p, choosen_syms)
     p_adim = build_para(normalize_vbpara(vbp0))
     para_dims = collect((p ./ p_adim)[choosen_syms])
     state_dims = [1, 1, 1/T, 1/T, M * L^2 * T^-2]
-    power_dim = state_dims[5] / T
-    iterate_dims = [state_dims[[1, 3, 4]]..., T, power_dim, para_dims...]
-    return para_dims, state_dims, iterate_dims, power_dim
+    iterate_dims = [state_dims[[1, 3, 4]]..., T, state_dims[5], para_dims...]
+    return para_dims, state_dims, iterate_dims
 end
 
 """
-Performs optimization to find optimal limit cycle parameters using Ipopt.
-
-# Arguments
-- `p`: An initial `VBPara` (physical units) used to establish base parameters
-  and characteristic dimensions.
-- `optim_para_syms`: A vector of `Symbol`s for the `VBPara` parameters that will
-  be optimized.
-- `optim_para_lower`: A vector of `Float64` specifying the lower bounds for the
-  `optim_para_syms` *in their physical units*.
-- `optim_para_upper`: A vector of `Float64` specifying the upper bounds for the
-  `optim_para_syms` *in their physical units*.
-- `tol`: Absolute/relative tolerance for the ODE solver. The optimization
-  solver's tolerance will be `sqrt(tol)`.
-- `max_wall_time`: Maximum wall-clock time in seconds for the Ipopt solver.
-- `linear_solver`: The linear solver to use for the Ipopt solver, cf. https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_Linear_Solver. Defaults to "mumps".
-
-# Returns
-- `stats`: The statistics object from the Ipopt solver.
-- `model`: The `ADNLPModel` object used for the optimization.
-
-# Notes
-The optimization is performed in a normalized (dimensionless) space.
-The `optim_para_lower` and `optim_para_upper` inputs are in physical units,
-but they are converted to normalized units internally for the optimization.
-The `stats.solution` will be in normalized units.
+tol: tolerance (abs/rel) of the ODE solver, taking sqrt(tol) for the optimization problem
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=+, tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps")
-
+function optimize(p , optim_para_syms, optim_para_lower, optim_para_upper; tol=DEFAULT_TOLERANCE, max_wall_time=120.)
     function integrate(optim_vars::CA, vbp::VBPara)
         DType = eltype(optim_vars)
         vbp = DType.(vbp)
         (; α0, dα0, dτ0, tf, optim_params) = optim_vars
         vbp[keys(optim_params)] .= optim_params
         u0 = SA[α0, TAU0, dα0, dτ0, 0]
-        return PM4.integrate(u0, tf, vbp, tol=tol/10)
+        return PM4.integrate(u0, tf, vbp, tol=tol)
     end
 
     # convert optim_vars to CA
@@ -113,7 +78,7 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         α0, dα0, dτ0, tf, P, _ = optim_vars
         αf, τf, dαf, dτf, Wf = ode_sol.u[end]
         c[1] = αf - α0
-        c[2] = τf - TAU0 - sense(2π)
+        c[2] = τf - TAU0 + 2π
         c[3] = dαf - dα0
         c[4] = dτf - dτ0
         c[5] = 2(Wf - P * tf) / (Wf + P * tf + eps(Wf))
@@ -129,7 +94,7 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     
     # Initialisation d'un état sur le cycle limite
     @info "Computing limit cycle for the initial guess"
-    limit_cycle = compute_limit_cycle(vbp; sense=sense, tol=tol/10)
+    limit_cycle = compute_limit_cycle(vbp; sense=-, tol=tol)
     tf = limit_cycle.t[end]
     α0, _, dα0, dτ0, Wf = limit_cycle.u[end]
     
@@ -138,19 +103,15 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     OPT_VARS_AXES = getaxes(optim_vars)
 
     @info "Checking that constraints are satisfied for the initial guess"
-    guess_error = norm(cons(optim_vars, vbp))
-    if guess_error > tol
-      @warn "optimize: Initial guess breaks non-linear constraints : residuals = $guess_error > tol = $tol"
-    end
+    @assert all(abs.(cons(optim_vars, vbp)) .< sqrt(tol)) "Initial guess breaks non-linear constraints"
 
     lower_vbp = build_vbpara(@set p[optim_para_syms] = optim_para_lower)
     upper_vbp = build_vbpara(@set p[optim_para_syms] = optim_para_upper)
 
     ## Contraintes en boite
     # Boite arbitraire pour α, dα, dτ, tf, P
-    min_d_tau, max_d_tau = minmax(sense(MIN_ABS_D_TAU), sense(MAX_ABS_D_TAU))
-    lb = CA([MIN_ALPHA, MIN_D_ALPHA, min_d_tau, MIN_TF, MIN_POWER, lower_vbp[optim_para_syms]...], OPT_VARS_AXES)
-    ub = CA([MAX_ALPHA, MAX_D_ALPHA, max_d_tau, MAX_TF, MAX_POWER, upper_vbp[optim_para_syms]...], OPT_VARS_AXES)
+    lb = CA([MIN_ALPHA, MIN_D_ALPHA, MIN_D_TAU, MIN_TF, MIN_POWER, lower_vbp[optim_para_syms]...], OPT_VARS_AXES)
+    ub = CA([MAX_ALPHA, MAX_D_ALPHA, MAX_D_TAU, MAX_TF, MAX_POWER, upper_vbp[optim_para_syms]...], OPT_VARS_AXES)
 
     # Boite à ±10% de l'Initialisation
     # ε = .1
@@ -160,19 +121,14 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     ## Contraintes de raccordement en bout de cycle
     lc = uc = zero(cons(optim_vars, vbp))
 
-    symbols_not_in_bounds = [s for s in keys(optim_vars) if !(lb[s] < optim_vars[s] < ub[s])]
-    if length(symbols_not_in_bounds) > 0
-        s = first(symbols_not_in_bounds)
-        @assert false "Optimization variable $s with value $(optim_vars[s]) is not in bounds [$(lb[s]), $(ub[s])]."
-    end
+    @assert all(lb .<= optim_vars .<= ub) "Box does not contain initial guess"
     @assert all(lc .<= uc) "Non-linear constraints are not feasible"
 
     @info "Creating model"
     model = ADNLPModel!(
         x -> obj(x, vbp), collect(optim_vars), collect(lb), collect(ub), (c, x) -> cons!(c, x, vbp), collect(lc), collect(uc); minimize=false, backend=:generic)
     @info "Starting solve"
-    stats = ipopt(model; tol=tol, max_wall_time=max_wall_time, linear_solver=linear_solver, print_level=ifelse(should_verbose(), 5, 0))
-    @info "To remove logging, use a Logging level below Info"
+    stats = ipopt(model; tol=sqrt(tol), max_wall_time=max_wall_time, print_level=ifelse(should_verbose(), 5, 0))
 
     # sim = integrate(stats.solution, vbp)
     # @show sim.prob.p
@@ -181,4 +137,42 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
 end
 
 
-end  # module
+"""iterate : [α0, dα0, dτ0, tf, avg_P, params...]
+vbp0 : reference vbpara
+syms : ComponentArrays.getaxes(params)"""
+function simulation_from_iterate(iterate, vbp0, syms; tol=DEFAULT_TOLERANCE)
+    α0, dα0, dτ0, tf, _, params... = iterate
+    vbp = @set vbp0[syms] = params
+    u0 = SA[α0, TAU0, dα0, dτ0, 0.0]
+    return PM4.integrate(u0, tf, vbp; save_everystep=true, tol=tol)
+end
+
+"""build an iterate from a simulation"""
+function iterate_from_simulation(sim, syms)
+    vbp = sim.prob.p
+    L, M, T = lmt(vbp)
+    α0, dα0, dτ0 = sim.u[1][[1, 3, 4]] ./ SA[1, 1/T, 1/T]
+    Wf = sim.u[end][end] / (M * L^2 * T^-2)
+    tf = sim.t[end] / T
+    return [α0, dα0, dτ0, tf, Wf / tf, vbp[syms]...]
+end
+
+#=
+
+function make_bounds(p, choosen_syms)
+    vbp0 = build_vbpara(p)
+    L, M, T = lmt(vbp0)
+
+    # [:r, :I_eq, :Δθ, :Δφ, :Ωmin, :Ωmax, :Cmax]
+    DIMS = [L, M * L^2, 1, 1, T^-1, T^-1, M*L^2*T^-2]
+
+    inds = findall(s -> s ∈ choosen_syms, SYMS)
+    # inds = findfirst.(isequal.(choosen_syms), Ref(SYMS))
+    optim_para_syms = SYMS[inds]
+    optim_para_lower = LOWER[inds]
+    optim_para_upper = UPPER[inds]
+    optim_para_dims = DIMS[inds]
+    return (optim_para_syms, optim_para_lower, optim_para_upper), vbp0, optim_para_dims, (L, M, T)
+end
+
+=#

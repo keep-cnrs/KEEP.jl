@@ -4,7 +4,7 @@ function test_aqua()
             KEEP;
             ambiguities=false,
             #stale_deps=(ignore=[:SomePackage],),
-            deps_compat=(ignore=[:LinearAlgebra, :Unicode],),
+            deps_compat=(ignore=[:LinearAlgebra, :Unicode, :Test, :BenchmarkTools],),
             piracies=true,
         )
         # do not warn about ambiguities in dependencies

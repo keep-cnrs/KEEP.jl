@@ -10,11 +10,10 @@ using Logging: @warn
 using DiffEqCallbacks: ManifoldProjection
 using ADTypes: AutoForwardDiff
 using NonlinearSolve: NewtonRaphson
-
-using keep.PointMassPara
-using keep.TorqueFunction
-using keep.Integrate: _integrate
-import keep: DEFAULT_TOLERANCE
+using KEEP.PointMassPara
+using KEEP.TorqueFunction
+using KEEP.Integrate: _integrate
+import KEEP: DEFAULT_TOLERANCE
 
 export dynamics!, integrate, build_manifold_projection
 

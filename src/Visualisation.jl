@@ -16,10 +16,10 @@ using SplitApplyCombine
 using StrFormat
 using LaTeXStrings
 
-import keep.PointMass10 as PM10
-import keep.PointMass4 as PM4
-using keep.PointMassPara
-using keep.TorqueFunction: torque_function
+import KEEP.PointMass10 as PM10
+import KEEP.PointMass4 as PM4
+using KEEP.PointMassPara
+using KEEP.TorqueFunction: torque_function
 
 export plot_trajectory_10D
 export plot_trajectory_4D

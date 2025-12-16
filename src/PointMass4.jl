@@ -6,11 +6,11 @@ import NaNMath as nm
 import OrdinaryDiffEqTsit5: Tsit5
 import ForwardDiff
 
-import keep.PointMass4 as PM4
-using keep.PointMassPara
-using keep.TorqueFunction
-using keep.Integrate: _integrate
-import keep: DEFAULT_TOLERANCE
+import KEEP.PointMass4 as PM4
+using KEEP.PointMassPara
+using KEEP.TorqueFunction
+using KEEP.Integrate: _integrate
+import KEEP: DEFAULT_TOLERANCE
 
 export dynamics, integrate
 
