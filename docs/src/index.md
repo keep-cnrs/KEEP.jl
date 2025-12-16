@@ -1,6 +1,6 @@
-# CTAppTemplate
+# KEEP
 
-Documentation for [CTAppTemplate](https://github.com/control-toolbox/CTAppTemplate.jl).
+Documentation for [KEEP](https://github.com/abavoil/KEEP.jl).
 
 ## Reproducibility
 

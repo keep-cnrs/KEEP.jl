@@ -8,5 +8,5 @@ jobs:
   call:
     uses: control-toolbox/CTActions/.github/workflows/auto-assign.yml@main
     with:
-      assignees: ocots
+      assignees: abavoil
       numOfAssignee: 1

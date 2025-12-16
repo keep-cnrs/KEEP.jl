@@ -1,7 +1,7 @@
 ## Contributing
 
-[issue-url]: https://github.com/control-toolbox/CTAppTemplate.jl/issues
-[first-good-issue-url]: https://github.com/control-toolbox/CTAppTemplate.jl/contribute
+[issue-url]: https://github.com/abavoil/KEEP.jl/issues
+[first-good-issue-url]: https://github.com/abavoil/KEEP.jl/contribute
 
 If you think you found a bug or if you have a feature request / suggestion, feel free to open an [issue][issue-url].  
 Before opening a pull request, please start an issue or a discussion on the topic. 

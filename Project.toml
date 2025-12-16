@@ -1,7 +1,7 @@
-name = "CTAppTemplate"
-uuid = "eb604665-d64b-4d02-aa6d-8b42324a08dc"
-authors = ["Olivier Cots <olivier.cots@toulouse-inp.fr>"]
+name = "KEEP"
+uuid = "43413fff-ad5b-4266-9485-4ac3dd215f36"
 version = "0.1.0"
+authors = ["Antonin Bavoil <antonin.bavoil@univ-cotedazur.fr>"]
 
 [compat]
 julia = "1.11"

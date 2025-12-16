@@ -32,9 +32,9 @@ jobs:
     with:
       template_file: README.template.md
       output_file: README.md
-      package_name: CTAppTemplate                            # package for INSTALL.md
-      repo_name: control-toolbox/CTAppTemplate.jl            # repository for CONTRIBUTING.md links
-      doc_url: https://control-toolbox.org/CTAppTemplate.jl
+      package_name: KEEP                            # package for INSTALL.md
+      repo_name: abavoil/KEEP.jl            # repository for CONTRIBUTING.md links
+      doc_url: https://control-toolbox.org/KEEP.jl
       citation_badge: "[![DOI](https://zenodo.org/badge/541187171.svg)](https://zenodo.org/doi/10.5281/zenodo.16753152)" # example, can be empty
-      assignee: "ocots"
+      assignee: "abavoil"
     secrets: inherit

@@ -1,4 +1,4 @@
 # test_default
 function test_default()
-    @test CTAppTemplate.greet() isa Nothing
+    @test KEEP.greet() isa Nothing
 end
