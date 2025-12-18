@@ -10,7 +10,7 @@ import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
 using KEEP.TorqueFunction
 using KEEP.Integrate: _integrate
-import KEEP: DEFAULT_TOLERANCE
+import KEEP: DEFAULT_TOLERANCE, TAU0
 
 export dynamics, integrate
 

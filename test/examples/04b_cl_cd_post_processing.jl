@@ -7,7 +7,8 @@ using DelimitedFiles
 
 import KEEP.PointMass4 as PM4
 import KEEP.PointMassPara as PMP
-using KEEP.PointMass4: compute_αhat, compute_OK, compute_Rτ, val_deriv_scnd_deriv, scnd_deriv_sample, τ_to_θφ
+using KEEP.PointMass4: compute_αhat, compute_OK, compute_Rτ, scnd_deriv_sample, τ_to_θφ
+import KEEP.TorqueFunction: torque_function
 
 ## Une simulation
 
@@ -19,19 +20,20 @@ dτ0 = 2.
 dα0 = 0.
 dτ0 = 0.
 
-p = PMP.build_para()
+p_para = PMP.build_para()
+p_vb = PMP.build_vbpara(p_para)
 u0 = PM4.init_u(τ0, dα0, dτ0)
 tf = 20
 tol = 1e-7
 
-dynamics!(similar(u0), u0, p, 0)
+# dynamics!(similar(u0), u0, p, 0)
 # PM4.integrate uses out-of-place dynamics by default, but this example uses in-place.
 # We will switch to PM4.integrate which uses Generic solver internally, or keep it consistent if PM4 requires OOP.
 # Given PM4 is usually OOP (SVector), we should check if u0 is SVector. u0 is built with `init_u` which likely returns SVector or Vector.
 # Line 22: u0 = init_u(...) -> likely StaticArrays.
 # Line 26: dynamics!(...) -> suggests `dynamics!` exists.
 # However, PM4.integrate abstracts this. Let's try to usage PM4.integrate(u0, tf, p; ...)
-@time sol = PM4.integrate(u0, tf, p; abstol=tol, reltol=tol);
+@time sol = PM4.integrate(u0, tf, p_vb; abstol=tol, reltol=tol);
 
 function coeff_aero(u, p)
     begin
@@ -39,8 +41,11 @@ function coeff_aero(u, p)
         dα, _ = dq = u[3:4]
 
         # Compute values and derivatives
-        Rτ, D_Rτ, DD_Rτ = val_deriv_scnd_deriv(q_ -> compute_Rτ(q_, p), q, p.diffbackend)
-        OK, D_OK, DD_OK = val_deriv_scnd_deriv(Rτ_ -> compute_OK(Rτ_, p), Rτ, p.diffbackend)
+        Rτ = compute_Rτ(q, p)
+        OK = compute_OK(Rτ, p)
+        
+        D_Rτ = PM4.jacobian(q_ -> compute_Rτ(q_, p), q)
+        D_OK = PM4.jacobian(Rτ_ -> compute_OK(Rτ_, p), Rτ)
 
         # Compute unit vectors
         αhat = compute_αhat(α)
@@ -49,7 +54,7 @@ function coeff_aero(u, p)
 
         # Compute gravity force
         linear_density_l = π * p.ρ_l * (p.d_l^2) / 4
-        m_l = p.nb_l * linear_density_l * p.r / 2
+        m_l = PMP.NB_LINES * linear_density_l * p.r / 2
         Fgrav = SA[0, 0, -p.g*(p.m+m_l)]
 
         # Compute aerodynamical force
@@ -67,21 +72,26 @@ function coeff_aero(u, p)
 
         lift_k = 1 // 2 * p.S * p.ρ_air * norm(app_wind)^2 * p.C_L
         drag_k = lift_k * p.C_D / p.C_L
-        drag_l = 1 // 6 * p.nb_l * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
+        drag_l = 1 // 6 * PMP.NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
         Faero_on_kite = -drag_k * xw - lift_k * zw
         Faero_on_lines = drag_l .* ew
         Faero = Faero_on_kite + Faero_on_lines
 
         # torque with same sign as dα, the torque applied by the arm on the generator
-        torque = p.torque_func(dα, p)
+        torque = torque_function(dα, p)
         l_tension = rhat ⋅ (SA[0, 0, 1] × OA)
         A_tension = -p.I_eq / l_tension * rhat * SA[1, 0]'
         b_tension = -torque / l_tension * rhat
 
         A = p.m * D_OK * D_Rτ - A_tension
+        # Second derivatives
+        acc_Rτ = scnd_deriv_sample(q_ -> compute_Rτ(q_, p), q, dq, dq)
+        dL_Rτ = D_Rτ * dq
+        acc_OK = scnd_deriv_sample(Rτ_ -> compute_OK(Rτ_, p), Rτ, dL_Rτ, dL_Rτ)
+
         b = (
-            p.m * scnd_deriv_sample(DD_OK, D_Rτ * dq) +
-            p.m * D_OK * scnd_deriv_sample(DD_Rτ, dq) +
+            p.m * acc_OK +
+            p.m * D_OK * acc_Rτ +
             -b_tension - Fgrav - Faero
         )
         ddq = (D_OK' * A) \ (-D_OK' * b)
@@ -101,15 +111,17 @@ end
 
 period = 3.095  # trouvé à la main
 t = range(tf - period, tf, step=0.001)
-res = coeff_aero.(sol.(t), (p,))
+res = coeff_aero.(sol.(t), (p_para,))
 Fx, Fy, Fz, Cx, Cy, Cz = eachrow(reduce(hcat, res))
 α, τ, dα, dτ, P = eachrow(reduce(hcat, sol.(t)))
 
-θ, φ = eachrow(reduce(hcat, τ_to_θφ.(τ, Ref(p))))
+res_θφ = τ_to_θφ.(τ, Ref(p_para))
+θ = getindex.(res_θφ, 1)
+φ = getindex.(res_θφ, 2)
 
 ## Visualisation du sens de parcours.
 # En vert : le position, en orange : les positions futures.
-plot(φ, θ, xlim=(p.φ0 - 1.1p.Δφ, p.φ0 + 1.1p.Δφ), ylim=(p.θ0 - 1.1p.Δθ, p.θ0 + 1.1p.Δθ), label="")
+plot(φ, θ, xlim=(p_para.φ0 - 1.1p_para.Δφ, p_para.φ0 + 1.1p_para.Δφ), ylim=(p_para.θ0 - 1.1p_para.Δθ, p_para.θ0 + 1.1p_para.Δθ), label="")
 scatter!(φ[1:50], θ[1:50], markerstrokewidth=0, label="sens de parcours")
 scatter!(φ[1:1], θ[1:1], label="start")
 
