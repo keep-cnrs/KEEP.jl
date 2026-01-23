@@ -1,0 +1,121 @@
+\documentclass{standalone}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{3d}
+\usepackage{tikz-3dplot}
+
+\begin{document}
+
+% Set main 3D view (z-up, y-in)
+\tdplotsetmaincoords{70}{-10}
+
+\begin{tikzpicture}[tdplot_main_coords, scale=2]
+
+% ==== ORIGIN AND AXES ====
+\coordinate (O) at (0,0,0);
+\node[circle,fill,inner sep=1pt] at (O) {};
+\node[below] at (O) {O};
+
+\draw[->] (0,0,0) -- (3,0,0) node[anchor=west]{$x$};
+\draw[->] (0,0,0) -- (0,1,0) node[anchor=south]{$y$};
+\draw[->] (0,0,0) -- (0,0,2) node[anchor=west]{$z$};
+
+% ==== POINT A IN XY-PLANE ====
+\def\a{2}
+\def\alphaA{20}
+\pgfmathsetmacro{\xA}{\a*cos(\alphaA)}
+\pgfmathsetmacro{\yA}{\a*sin(\alphaA)}
+\coordinate (A) at (\xA, \yA, 0);
+\node[circle,fill,inner sep=1pt] at (A) {};
+\node[below] at (A) {A};
+
+% Projections of A
+\coordinate (Ax) at (\xA, 0, 0);
+\coordinate (Ay) at (0, \yA, 0);
+
+% Lines from O
+\draw (O) -- (A) node[midway, sloped, above] {$a$};
+\draw (O) -- (Ax);
+\draw (O) -- (Ay);
+
+% ==== POINT K ====
+\def\l{2}
+\def\thetaZero{70}
+\def\DeltaTheta{5}
+\def\DeltaPhi{30}
+\def\tauK{90}
+
+\pgfmathdeclarefunction{thetaFunc}{1}{\pgfmathparse{\thetaZero + \DeltaTheta * sin(2*#1)}}
+\pgfmathdeclarefunction{phiFunc}{1}  {\pgfmathparse{\DeltaPhi * sin(#1)}}
+\pgfmathdeclarefunction{xTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * cos(phiFunc(#1))}}
+\pgfmathdeclarefunction{yTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * sin(phiFunc(#1))}}
+\pgfmathdeclarefunction{zTauFunc}{1} {\pgfmathparse{cos(thetaFunc(#1))}}
+
+\pgfmathsetmacro{\dotprod}{\xA * xTauFunc(\tauK) + \yA * yTauFunc(\tauK)}
+\pgfmathsetmacro{\rK}{\dotprod + sqrt(\dotprod * \dotprod + \l^2 - \a^2)}
+
+\pgfmathsetmacro{\xK}{\rK * xTauFunc(\tauK)}
+\pgfmathsetmacro{\yK}{\rK * yTauFunc(\tauK)}
+\pgfmathsetmacro{\zK}{\rK * zTauFunc(\tauK)}
+
+\coordinate (K) at (\xK, \yK, \zK);
+\coordinate (K_xy) at (\xK, \yK, 0);
+
+% Helper points from A
+\pgfmathsetmacro{\xAel}{\xA}
+\pgfmathsetmacro{\yAel}{\yA}
+\pgfmathsetmacro{\zAel}{1.5}
+\coordinate (A_el) at (\xAel, \yAel, \zAel);
+
+\pgfmathsetmacro{\xAext}{1.5*\xA}
+\pgfmathsetmacro{\yAext}{1.5*\yA}
+\coordinate (A_ext) at (\xAext, \yAext, 0);
+
+% Draw K and lines
+\node[circle,fill,inner sep=1pt] at (K) {};
+\node[above] at (K) {K};
+
+\draw (A) -- (K) node[midway, sloped, below] {$\ell$};
+\draw[dotted, blue] (O) -- (K) node[pos=0.5, sloped, above] {$r(\alpha, \tau)$};
+
+%\draw[dotted] (A) -- (A_ext);
+\draw[dotted] (K) -- (K_xy) -- (A);
+\draw[dotted, blue] (K_xy) -- (O);
+%\draw[dotted] (A) -- (A_el);
+
+% ==== ANGLES ====
+% alpha
+\tdplotdefinepoints(0,0,0)(1,0,0)(\xA,\yA,0)
+\tdplotdrawpolytopearc[->, OrangeRed, thick]{1.3}{right, OrangeRed}{$\alpha$}
+
+% phi
+\tdplotdefinepoints(0,0,0)(1,0,0)(\xK,\yK,0)
+\tdplotdrawpolytopearc[->, blue, thick]{2.7}{above right, blue}{$\phi(\tau)$}
+
+% theta
+\tdplotdefinepoints(0,0,0)(0,0,1)(\xK,\yK,\zK)
+\tdplotdrawpolytopearc[->, blue, thick]{1}{above, blue}{$\theta(\tau)$}
+
+% % phi_ℓ
+% \tdplotdefinepoints(\xA,\yA,0)(\xAext,\yAext,0)(\xK,\yK,0)
+% \tdplotdrawpolytopearc[->]{1}{anchor=south west}{$\phi_\ell$}
+
+% % theta_ℓ
+% \tdplotdefinepoints(\xA,\yA,0)(\xAel,\yAel,\zAel)(\xK,\yK,\zK)
+% \tdplotdrawpolytopearc[->]{0.8}{anchor=north}{$\theta_\ell$}
+
+\newcommand{\KCoord}[2]{({#1 * xTauFunc(#2)}, {#1 * yTauFunc(#2)}, {#1 * zTauFunc(#2)})}
+
+% tau and eight
+\draw[domain = 0:360, samples = 20, smooth, dashed, variable = \t]
+    plot (\KCoord{\rK}{\t});
+\draw[->, domain = 0:\tauK, samples = 10, smooth, OrangeRed, thick, variable = \t]
+    plot (\KCoord{\rK}{\t});
+
+
+\node[below, OrangeRed] at \KCoord{\rK}{\tauK/2} {$\tau$};
+
+
+\end{tikzpicture}
+
+\end{document}
