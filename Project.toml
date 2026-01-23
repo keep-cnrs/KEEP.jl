@@ -1,7 +1,7 @@
 name = "KEEP"
 uuid = "43413fff-ad5b-4266-9485-4ac3dd215f36"
-authors = ["Antonin Bavoil <antonin.bavoil@univ-cotedazur.fr>"]
 version = "0.1.0"
+authors = ["Antonin Bavoil <antonin.bavoil@univ-cotedazur.fr>"]
 
 [deps]
 ADNLPModels = "54578032-b7ea-4c30-94aa-7cbd1cce6c9a"

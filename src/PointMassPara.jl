@@ -74,7 +74,7 @@ function build_vbpara(p::Para=DEFAULT_PARA)::VBPara
         Ωmin=p.Ωmin * T,
         Ωmax=p.Ωmax * T,
         Ωlim=p.Ωlim * T,
-        torque_slope = p.torque_slope * T / (M * L^2),
+        torque_slope=p.torque_slope * T / (M * L^2),
         n_wind=p.n_wind,
         θ0=p.θ0,
         φ0=p.φ0,
@@ -114,7 +114,7 @@ function build_para(p::VBPara; S=DEFAULT_PARA.S, ρ_air=DEFAULT_PARA.ρ_air, d_l
         Ωmin=p.Ωmin / T,
         Ωmax=p.Ωmax / T,
         Ωlim=p.Ωlim / T,
-        torque_slope = p.torque_slope * M * L^2 / T,
+        torque_slope=p.torque_slope * M * L^2 / T,
         θ0=p.θ0,
         φ0=p.φ0,
         Δθ=p.Δθ,
@@ -146,7 +146,7 @@ Obtained by a gross approximation of the cycle period. During one cycle, the kit
 The length of this approximated path is r * (2Δφ + 4Δθ), and we assume its speed is constant equal to the speed of the wind at the reference height, v_ref.
 """
 function get_char_time(p)
-    return p.r/p.v_ref * (2p.Δφ + 4p.Δθ)
+    return p.r / p.v_ref * (2p.Δφ + 4p.Δθ)
 end
 
 @doc raw"""
@@ -169,7 +169,7 @@ end
 vbp : VBPara -> Para -> set new values -> VBPara
 
 kwargs: kwargs to build_para (parameters that are lost when building VBPara, eg. S, ρ_air, d_l)"""
-function vbpara_set_params(vbp::VBPara, new_params::ComponentArray = ComponentArray(); kwargs...)::VBPara
+function vbpara_set_params(vbp::VBPara, new_params::ComponentArray=ComponentArray(); kwargs...)::VBPara
     # p = build_para(vbp; kwargs...)
     # p[keys(new_params)] = new_params
 

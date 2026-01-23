@@ -54,7 +54,7 @@ end
 
 """
 Find a steady state starting from q = [α_init, τ_init]"""
-function steady_state(α_init::T1, τ_init::T2, p; tol=DEFAULT_TOLERANCE) where {T1, T2}
+function steady_state(α_init::T1, τ_init::T2, p; tol=DEFAULT_TOLERANCE) where {T1,T2}
     T = promote_type(T1, T2)  # couldn't convert IrrationalConstant.fourπ to some reversediff thing
     root = solve(NonlinearProblem(ddq_partial, T[α_init, τ_init], p); abstol=tol, reltol=tol).u
     return rem2pi.(root, RoundNearest)
@@ -87,7 +87,7 @@ From a list of steady states, find the unique steady states using clustering."""
 function unique_steady_states(steady_states; tol=DEFAULT_TOLERANCE)
     ss_yx = [flatten(sincos.(ss)) for ss in steady_states]
     clustering = dbscan(reduce(hcat, ss_yx), 10tol)
-    
+
     by((y1, x1, y2, x2)) = x1 + tol * y1
     centroids_yx = sort([mean(ss_yx[c.core_indices]) for c in clustering.clusters], by=by)
     centroids = [[atan(c[1], c[2]), atan(c[3], c[4])] for c in centroids_yx]
@@ -106,7 +106,7 @@ end
 """
 Find all steady states using `aligned_and_opposite_steady_states` where α is guessed from τ"""
 function all_steady_states(p; τmin=0, τmax=π, N=100, tol=DEFAULT_TOLERANCE)
-    τs = range(τmin, τmax, length=N+2)[2:end-1]
+    τs = range(τmin, τmax, length=N + 2)[2:end-1]
     ss = flatten([aligned_and_opposite_steady_states(τ, p; tol=tol) for τ in τs])
     return process_steady_states(ss)
 end
