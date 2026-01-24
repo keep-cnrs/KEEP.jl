@@ -12,7 +12,7 @@ using KEEP.LimitCycle
 using KEEP.TorqueFunction
 using KEEP.Optimization
 
-default(lw=3, formatter=:plain, label="")
+default(; lw=3, formatter=:plain, label="")
 
 tol = 1e-5
 set_torque_function!(LINEAR_TORQUE)
@@ -20,7 +20,7 @@ p0 = build_para()
 syms = [:r, :I_eq, :torque_slope]
 
 lower, upper = make_bounds(p0, syms)
-stats, model = optimize(p0, syms, lower, upper, tol=tol);
+stats, model = optimize(p0, syms, lower, upper; tol=tol);
 
 #=
 Optim r, Ieq, torque_slope
@@ -55,10 +55,10 @@ final_obj = model.f(solution) * power_dim
 # Où se trouvent la solution dans la boite des contraintes ?
 solution_dict = Dict(
     :Symbol => syms,
-    :InitialValue => initial_guess[end-length(syms)+1:end] .* para_dims,
+    :InitialValue => initial_guess[(end - length(syms) + 1):end] .* para_dims,
     :Lower => lower,
-    :Solution => solution[end-length(syms)+1:end] .* para_dims,
-    :Upper => upper
+    :Solution => solution[(end - length(syms) + 1):end] .* para_dims,
+    :Upper => upper,
 )
 df = solution_dict # Placeholder name to keep using df in the formatted string if needed, or update the formatted string to just print the dict nicely.
 # Actually, let's just create a nice string representation
@@ -111,36 +111,41 @@ function variation(var_sym, var_vals, p0, syms, lower, upper; kwargs...)
             stats, model = optimize(p0_loc, syms, lower, upper, tol=tol)
             solution = stats.solution * ifelse(stats.status == :first_order, 1, NaN)
             objs[i] = model.f(solution) * power_dim
-            prev_optimal_params .= solution[end-length(syms)+1:end] .* para_dims
+            prev_optimal_params .= solution[(end - length(syms) + 1):end] .* para_dims
             params[i, :] = prev_optimal_params
         end
     end
 
-    plot(ylabel="Objective (W)")
-    plot!(var_vals, objs, c=:red)
-    vline!([p0[var_sym]], c=:black, lw=1)
+    plot(; ylabel="Objective (W)")
+    plot!(var_vals, objs; c=:red)
+    vline!([p0[var_sym]]; c=:black, lw=1)
     # hline!([0], alpha=0)
     fig_obj = plot!()
     normalized_params = (params .- lower') ./ (upper' - lower')
-    plot(xlabel=string(var_sym), ylabel="Normalized parameters", yticks=([0, 1], ["LB", "UB"]), ylims=(0, 1))
-    plot!(var_vals, normalized_params, label=permutedims(string.(syms)))
-    fig_params = vline!([p0[var_sym]], c=:black, lw=1)
+    plot(;
+        xlabel=string(var_sym),
+        ylabel="Normalized parameters",
+        yticks=([0, 1], ["LB", "UB"]),
+        ylims=(0, 1),
+    )
+    plot!(var_vals, normalized_params; label=permutedims(string.(syms)))
+    fig_params = vline!([p0[var_sym]]; c=:black, lw=1)
 
     figs = reshape([fig_obj, fig_params], 2, 1)
-    return objs, params, plot(figs..., layout=size(figs))
+    return objs, params, plot(figs...; layout=size(figs))
 end
 
 # 10 seconds
-_, _, fig = variation(:n_wind, 3:0.2:10, p0, syms, lower, upper, tol=1e-3)
+_, _, fig = variation(:n_wind, 3:0.2:10, p0, syms, lower, upper; tol=1e-3)
 display(fig)
 
 # 10 seconds
-_, _, fig = variation(:r, 40:2:80, p0, [:I_eq], [1000], [10000], tol=1e-3)
+_, _, fig = variation(:r, 40:2:80, p0, [:I_eq], [1000], [10000]; tol=1e-3)
 display(fig)
 
 # Replace @test in optimize by if ... @warning ... end
 # 10 seconds
-_, _, fig = variation(:I_eq, 1000:1000:10000, p0, [:r], [10], [100], tol=1e-5)
+_, _, fig = variation(:I_eq, 1000:1000:10000, p0, [:r], [10], [100]; tol=1e-5)
 display(fig)
 
 function average_power(p; tol)
@@ -166,8 +171,8 @@ function landscape_slices(var_syms, N_vals, p0, syms, lower, upper; kwargs...)
     return objs
 end
 
-objs = landscape_slices(syms, 100, p0, syms, lower, upper, tol=tol)
-plot(xlabel="Normalized parameters", ylabel="Objective (W)")
-plot!(objs', label=permutedims(string.(syms)), c=palette(:tab10))
-vline!([(lower[i] + upper[i]) / 2 for i in 1:length(syms)], c=:black, lw=1)
+objs = landscape_slices(syms, 100, p0, syms, lower, upper; tol=tol)
+plot(; xlabel="Normalized parameters", ylabel="Objective (W)")
+plot!(objs'; label=permutedims(string.(syms)), c=palette(:tab10))
+vline!([(lower[i] + upper[i]) / 2 for i in 1:length(syms)]; c=:black, lw=1)
 display(plot!())

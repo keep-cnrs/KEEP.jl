@@ -9,8 +9,6 @@ What do we want ?
 Solution :
  1. Callback with a closure that remembers the previous activation state and computes the distance to the curent one. If tolerance is satisfied, stop.
 
-
-
 What should go in there :
 
 # TODO:
@@ -42,17 +40,15 @@ using KEEP: DEFAULT_TOLERANCE, TAU0
 # plot!(section, 0, xmax, label="Poincare section")
 # # Visually check that section is 0 when τ ≡ TAU0 mod 2π
 
-
 tol = 1e-9
 u0 = SA[0.0, TAU0, 0.0, 0.0, 0.0]
 vbp = build_vbpara()
 tf = 100
-cb = build_poincare_callback(eps(1.))
+cb = build_poincare_callback(eps(1.0))
 sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
 
-
 ## Plot convergence toward a fixed point in the Poincaré section
-u = sol.u[1:end-1]
+u = sol.u[1:(end - 1)]
 u_ref = sol.u[end]
 errors = [distance_on_section(u, u_ref) for u in u]
 
@@ -63,17 +59,27 @@ convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
 @info "Convergence rate = $(convergence_rate)"
 
 using Plots
-default(label="", lw=3)
-plot(title="Convergence of the Poincaré map", xlabel="iteration", ylabel="distance to last iterate", yscale=:log10, yticks=exp10.(-16:2:0))
-scatter!(errors, m=:x)
-plot!([i1, i2], [errors[i1], errors[i2]], c=:red, lw=3, label=f"Convergence rate = \%.2f(convergence_rate)")
+default(; label="", lw=3)
+plot(;
+    title="Convergence of the Poincaré map",
+    xlabel="iteration",
+    ylabel="distance to last iterate",
+    yscale=:log10,
+    yticks=exp10.(-16:2:0),
+)
+scatter!(errors; m=:x)
+plot!(
+    [i1, i2],
+    [errors[i1], errors[i2]];
+    c=:red,
+    lw=3,
+    label=f"Convergence rate = \%.2f(convergence_rate)",
+)
 display(plot!())
 
-plot!(xlim=(0, 10))
-plot!(title="Convergence of the Poincaré map — zoom")
+plot!(; xlim=(0, 10))
+plot!(; title="Convergence of the Poincaré map — zoom")
 display(plot!())
-
-
 
 #=
 If needed:
@@ -87,11 +93,9 @@ If needed:
 shooting = build_shooting(sol)
 @test maximum(abs, shooting_residuals(shooting, vbp; sense=-, tol=tol / 2)) < tol  # It is a limit cycle with negative dτ
 
-
 # Visualise the path
 lc = shoot(shooting, vbp; tol=tol, save_everystep=true)
-VIS.plot_trajectory_4D(lc, points_per_second=100)
-
+VIS.plot_trajectory_4D(lc; points_per_second=100)
 
 ## Finding all limit cycles
 using Clustering: dbscan
@@ -99,8 +103,8 @@ using StrFormat
 using Statistics: mean
 using QuasiMonteCarlo: sample, HaltonSample
 
-αmin, αmax = 0., 1π
-vmax = 5.
+αmin, αmax = 0.0, 1π
+vmax = 5.0
 dαmin, dαmax = dτmin, dτmax = -vmax, vmax
 
 samples = sample(100, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
@@ -113,9 +117,17 @@ data = reduce(hcat, shootings)
 nb_clusters = [length(dbscan(data, ε).counts) for ε in εs]
 
 with_logger(NullLogger()) do
-    plot(scale=:log10, xlabel="ε", ylabel="Number of clusters", title="Number of clusters vs dbscan parameter ε", xticks=exp10.(-10:2:0))
-    hline!([length(shootings) 2], c=[:black :red], alpha=0.5, label=["n = #samples" "n = 2"])
-    plot!(εs, nb_clusters, c=:green3, label="Number of clusters")
+    plot(;
+        scale=:log10,
+        xlabel="ε",
+        ylabel="Number of clusters",
+        title="Number of clusters vs dbscan parameter ε",
+        xticks=exp10.(-10:2:0),
+    )
+    hline!(
+        [length(shootings) 2]; c=[:black :red], alpha=0.5, label=["n = #samples" "n = 2"]
+    )
+    plot!(εs, nb_clusters; c=:green3, label="Number of clusters")
     display(plot!())
 end
 
@@ -126,17 +138,26 @@ labels = ["dτ " * ifelse(c[3] > 0, ">", "<") * " 0" for c in centroids]
 i = 1:length(centroids)
 prop = clusters.counts / sum(clusters.counts)
 Pavg = [average_power(s, vbp; tol=tol) for s in centroids]
-plot(title="Clustering phase space wrt. limit cycles", xlabel="cluster index", xticks=(1:length(centroids), labels))
-plot!(i, prop, seriestype=:bar, seriescolor=1:length(clusters.counts))
+plot(;
+    title="Clustering phase space wrt. limit cycles",
+    xlabel="cluster index",
+    xticks=(1:length(centroids), labels),
+)
+plot!(i, prop; seriestype=:bar, seriescolor=1:length(clusters.counts))
 annotate!(i, prop / 2, [f"\%.0f(100 * p)%" for p in prop], :bottom)
 annotate!(i, prop / 2 .+ 0.1, [f"P = \%.0f(Pavg) W" for Pavg in Pavg])
 display(plot!())
 
 # Recomputing the limit cycles with high precision
-refined_shootings = [build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol)) for s in centroids]
+refined_shootings = [
+    build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol)) for
+    s in centroids
+]
 
 err_before = maximum(maximum.(abs, shooting_residuals.(centroids, Ref(vbp); tol=sqrt(tol))))
-err_after = maximum(maximum.(abs, shooting_residuals.(refined_shootings, Ref(vbp); tol=tol / 10)))
+err_after = maximum(
+    maximum.(abs, shooting_residuals.(refined_shootings, Ref(vbp); tol=tol / 10))
+)
 
 @test err_after < err_before
 
@@ -145,7 +166,6 @@ Error of the centroids using sqrt(tol) = \%.1e(sqrt(tol)) to find limit cycles (
 \t\%.1e(err_before)
 Error after recomputing the limit cycles using tol = \%.1e(tol) (accurate computation of a few limit cycles after clustering)
 \t\%.1e(err_after)"
-
 
 # In one call
 limit_cycles = all_limit_cycles(vbp; αmin=αmin, αmax=αmax, vmax=vmax, N=100, tol=tol)
@@ -159,6 +179,8 @@ Sometimes produces infinities and NaNs in the ODE solver, and throws an error, n
 function _limit_cycle_rootfind(shooting, vbp; sense=default_sense(shooting), tol=tol)
     u0, _ = unpack_shooting(shooting)
     shooting1 = compute_limit_cycle(u0, vbp; tol=0.1)
-    prob = NonlinearProblem((s, p) -> shooting_residuals(s, p; sense=sense, tol=tol / 100), shooting1, vbp)
+    prob = NonlinearProblem(
+        (s, p) -> shooting_residuals(s, p; sense=sense, tol=tol / 100), shooting1, vbp
+    )
     return solve(prob)
 end

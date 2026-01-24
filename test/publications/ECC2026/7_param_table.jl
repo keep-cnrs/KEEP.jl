@@ -19,7 +19,7 @@ function main()
     p = PMP.build_para()
 
     # symbol, descr, unit, optional value
-    param_list = CA(
+    param_list = CA(;
         l=("a", "Arm length", raw"\meter", nothing),
         r=("l", "Line length", raw"\meter", nothing),
         m=("m", "Kite mass", raw"\kg", nothing),
@@ -34,10 +34,27 @@ function main()
         g=("g", "Gravity", raw"\meter\per\square\second", nothing),
         h_ref=("h_r", "Wind reference height", raw"\meter", nothing),
         v_ref=("w_r", "Wind reference speed", raw"\meter\per\second", nothing),
-        torque_slope=("b", "Arm braking coefficient", raw"\newton\metre\second\per\radian", nothing),
-        θ0=(raw"\theta_0", "Polar angle of the center of the lemniscate", raw"\radian", f"{p.θ0 * 180/π:.0f}" * raw"\pi / 180"),
-        Δθ=(raw"\Delta\theta", "Polar angle half-amplitude of the lemniscate", raw"\radian", f"{p.Δθ * 180/π:.0f}" * raw"\pi / 180"),
-        Δφ=(raw"\Delta\Phi", "Azimuthal angle half-amplitude of the lemniscate", raw"\radian", f"{p.Δφ * 180/π:.0f}" * raw"\pi / 180"),
+        torque_slope=(
+            "b", "Arm braking coefficient", raw"\newton\metre\second\per\radian", nothing
+        ),
+        θ0=(
+            raw"\theta_0",
+            "Polar angle of the center of the lemniscate",
+            raw"\radian",
+            f"{p.θ0 * 180/π:.0f}" * raw"\pi / 180",
+        ),
+        Δθ=(
+            raw"\Delta\theta",
+            "Polar angle half-amplitude of the lemniscate",
+            raw"\radian",
+            f"{p.Δθ * 180/π:.0f}" * raw"\pi / 180",
+        ),
+        Δφ=(
+            raw"\Delta\Phi",
+            "Azimuthal angle half-amplitude of the lemniscate",
+            raw"\radian",
+            f"{p.Δφ * 180/π:.0f}" * raw"\pi / 180",
+        ),
     )
 
     table_str = raw"\begin{table}[thpb]
@@ -49,10 +66,13 @@ function main()
         \midrule
         "
 
-    for key in sort(keys(param_list), by=key -> lowercase(param_list[key][1]), lt=lt)
+    for key in sort(keys(param_list); by=key -> lowercase(param_list[key][1]), lt=lt)
         sym, descr, unit, optional_value = param_list[key]
         sym_str = raw"$" * sym * raw"$"
-        val_str = raw"$" * ifelse(isnothing(optional_value), f"{p[key]:.9g}", optional_value) * raw"$"
+        val_str =
+            raw"$" *
+            ifelse(isnothing(optional_value), f"{p[key]:.9g}", optional_value) *
+            raw"$"
         unit_str = raw"\unit{" * unit * "}"
         table_str *= sym_str * " & " * descr * " & " * val_str * " & " * unit_str * raw"\\
         "

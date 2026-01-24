@@ -2,8 +2,8 @@ using Test
 using SafeTestsets
 using Underscores
 using Logging
-import Plots
-import Makie
+using Plots: Plots
+using Makie: Makie
 using ProgressMeter
 
 struct PlotSilencer <: AbstractDisplay end
@@ -24,8 +24,6 @@ function with_no_plots(f)
         popdisplay(silencer)
     end
 end
-
-
 
 const exclude = [
     "06c_phase_space_plot.jl",  # Uses Makie and is slow
@@ -56,12 +54,12 @@ end
 const pattern = r"^\d+[a-z]?_.+\.jl"
 
 function main()
-    all_files = @_ readdir(@__DIR__) |> sort
-    included_files = @_ all_files |> filter(is_included(_, pattern, exclude, only), __)
-    excluded_files = @_ all_files |> filter(!is_included(_, pattern, exclude, only), __)
+    all_files = @_ sort(readdir(@__DIR__))
+    included_files = @_ filter(is_included(_, pattern, exclude, only), __)(all_files)
+    excluded_files = @_ filter(!is_included(_, pattern, exclude, only), __)(all_files)
 
-    println("\tTested files:\n", @_ included_files |> join(__, "\n"), "\n\n")
-    println("\tDiscarded files:\n", @_ excluded_files |> join(__, "\n"), "\n\n")
+    println("\tTested files:\n", @_ join(__, "\n")(included_files), "\n\n")
+    println("\tDiscarded files:\n", @_ join(__, "\n")(excluded_files), "\n\n")
 
     silencer = PlotSilencer()
     pushdisplay(silencer)
@@ -88,4 +86,3 @@ end
 with_no_plots() do
     main()
 end
-

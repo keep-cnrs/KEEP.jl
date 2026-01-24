@@ -12,11 +12,9 @@ using KEEP.PointMass4
 using KEEP.PointMassPara
 using KEEP.LimitCycle
 
-
 function as_component_array(optim_vars)
     return ComponentArray(collect(optim_vars), OPT_VARS_AXES)
 end
-
 
 """shoot_vars -> (u0, tf, Wf0)"""
 function unpack_shoot_vars(shoot_vars)
@@ -24,14 +22,13 @@ function unpack_shoot_vars(shoot_vars)
     return SA[α0, TAU0, dα0, dτ0, 0], tf, Wf0
 end
 
-
 """(α0, dα0, dτ0, tf, Wf0) -> (αf - α0, dαf - dα0, dτf - dτ0, Wf0 - Wf)"""
 function shoot(shoot_vars, vbp)
     u0, tf, Wf0 = unpack_shoot_vars(shoot_vars)
     sol = PM4.integrate(u0, tf, vbp; reltol=tol, abstol=tol, save_everystep=true)
     α0, _, dα0, dτ0, _ = u0
     αf, τf, dαf, dτf, Wf = sol.u[end]
-    return SA[αf-α0, τf-TAU0+2π, dαf-dα0, dτf-dτ0, Wf0-Wf]
+    return SA[αf - α0, τf - TAU0 + 2π, dαf - dα0, dτf - dτ0, Wf0 - Wf]
 end
 
 function initialize_shoot_init(vbp)
@@ -42,7 +39,13 @@ end
 """Update SHOOT_INIT using TrustRegion on the shooting function"""
 function update_shoot_init_rootfind(optim_vars, vbp)
     vbp[keys(optim_vars)] .= optim_vars
-    shoot_root = solve(NonlinearProblem(shoot, SA[SHOOT_INIT...], vbp), TrustRegion(); abstol=10tol, reltol=10tol, maxiters=1000).u
+    shoot_root = solve(
+        NonlinearProblem(shoot, SA[SHOOT_INIT...], vbp),
+        TrustRegion();
+        abstol=10tol,
+        reltol=10tol,
+        maxiters=1000,
+    ).u
     SHOOT_INIT .= shoot_root
     nothing
 end
@@ -76,20 +79,34 @@ function update_shoot_init_integration(optim_vars, vbp)
     # cb_stop = DiscreteCallback((u, t, integrator) -> cond_stop(u) < 0, terminate!, save_positions=(false, false))
     # cb = CallbackSet(cb_save, cb_stop)
 
-    cb1 = ContinuousCallback((u, t, integrator) -> abs(u[2] - TAU0) - 8π, identity, save_positions=(true, false))
-    cb2 = ContinuousCallback((u, t, integrator) -> abs(u[2] - TAU0) - 10π, terminate!, save_positions=(true, false))
+    cb1 = ContinuousCallback(
+        (u, t, integrator) -> abs(u[2] - TAU0) - 8π, identity; save_positions=(true, false)
+    )
+    cb2 = ContinuousCallback(
+        (u, t, integrator) -> abs(u[2] - TAU0) - 10π,
+        terminate!;
+        save_positions=(true, false),
+    )
     cb = CallbackSet(cb1, cb2)
 
     vbp[keys(optim_vars)] .= optim_vars
     u0, tf, _ = unpack_shoot_vars(SHOOT_INIT)
     sol = PM4.integrate(u0, 100tf, vbp)
-    sol = solve(ode_prob; callback=cb, save_everystep=false, save_start=false, save_end=false, reltol=tol, abstol=tol)
+    sol = solve(
+        ode_prob;
+        callback=cb,
+        save_everystep=false,
+        save_start=false,
+        save_end=false,
+        reltol=tol,
+        abstol=tol,
+    )
     yₙ = sol.u[end]
-    yₙ₋₁ = sol.u[end-1]
+    yₙ₋₁ = sol.u[end - 1]
     SHOOT_INIT[1] = rem2pi(yₙ[1], RoundNearest)  # α0
     SHOOT_INIT[[2, 3]] = yₙ[[3, 4]]  # dα0, dτ0
     SHOOT_INIT[5] = yₙ[5] - yₙ₋₁[5]  # Wf0
-    SHOOT_INIT[4] = sol.t[end] - sol.t[end-1]  # tf
+    SHOOT_INIT[4] = sol.t[end] - sol.t[end - 1]  # tf
     nothing
 end
 function update_shoot_init_integration(optim_vars::ComponentArray{<:FD.Dual}, vbp)
@@ -106,8 +123,20 @@ function obj(optim_vars::ComponentArray, vbp)
     vbp[keys(optim_vars)] .= optim_vars
     u0, tf, _ = unpack_shoot_vars(SHOOT_INIT)
     sol = PM4.integrate(u0, 2tf, vbp)
-    one_cycle_cb = ContinuousCallback((u, t, integrator) -> abs(u[2] - TAU0) - 2π, terminate!, save_positions=(true, false))
-    sol = solve(ode_problem; callback=one_cycle_cb, abstol=tol, reltol=tol, save_everystep=false, save_start=false, save_end=false)
+    one_cycle_cb = ContinuousCallback(
+        (u, t, integrator) -> abs(u[2] - TAU0) - 2π,
+        terminate!;
+        save_positions=(true, false),
+    )
+    sol = solve(
+        ode_problem;
+        callback=one_cycle_cb,
+        abstol=tol,
+        reltol=tol,
+        save_everystep=false,
+        save_start=false,
+        save_end=false,
+    )
     if SHOOT_INIT[3] > 0
         @show "Le kite tourne dans le mauvais sens"
     end
@@ -125,20 +154,36 @@ function obj_one_integration(dτ_sign::Union{typeof(+),typeof(-)})
         u0 = SA[q0..., 0, dτ_sign(1), 0]
         @show 2
 
-        cb1 = ContinuousCallback((u, t, integrator) -> u[2] - dτ_sign(8π), identity, save_positions=(true, false))
-        cb2 = ContinuousCallback((u, t, integrator) -> u[2] - dτ_sign(10π), terminate!, save_positions=(true, false))
+        cb1 = ContinuousCallback(
+            (u, t, integrator) -> u[2] - dτ_sign(8π), identity; save_positions=(true, false)
+        )
+        cb2 = ContinuousCallback(
+            (u, t, integrator) -> u[2] - dτ_sign(10π),
+            terminate!;
+            save_positions=(true, false),
+        )
         cb = CallbackSet(cb1, cb2)
         sol = PM4.integrate(u0, 1e4, vbp)
-        sol = solve(ode_prob; callback=cb, save_everystep=false, save_start=false, save_end=false, reltol=tol, abstol=tol)
+        sol = solve(
+            ode_prob;
+            callback=cb,
+            save_everystep=false,
+            save_start=false,
+            save_end=false,
+            reltol=tol,
+            abstol=tol,
+        )
         @show 3
 
         yₙ = sol.u[end]
-        yₙ₋₁ = sol.u[end-1]
-        T = sol.t[end] - sol.t[end-1]
-        y_T = SA[yₙ[1], TAU0, yₙ[3], yₙ[4], yₙ[5]-yₙ₋₁[5]]
+        yₙ₋₁ = sol.u[end - 1]
+        T = sol.t[end] - sol.t[end - 1]
+        y_T = SA[yₙ[1], TAU0, yₙ[3], yₙ[4], yₙ[5] - yₙ₋₁[5]]
         return y_T[5] / T
     end
-    obj_one_integration(optim_vars, vbp) = obj_one_integration(as_component_array(optim_vars), vbp)
+    obj_one_integration(optim_vars, vbp) = obj_one_integration(
+        as_component_array(optim_vars), vbp
+    )
     return obj_one_integration
 end
 
@@ -151,13 +196,13 @@ optim_para_syms: vecteur des symboles des paramètres à optimiser
 =#
 const SHOOT_INIT = Array{Float64,1}(undef, 5)
 para1 = build_para()
-para2 = build_para(C_D_l=0)
-para3 = build_para(ρ_l=0)
-para4 = build_para(n_wind=0)
-para5 = build_para(C_D_l=0, ρ_l=0)
-para6 = build_para(C_D_l=0, n_wind=0)
-para7 = build_para(ρ_l=0, n_wind=0)
-para8 = build_para(C_D_l=0, ρ_l=0, n_wind=0)
+para2 = build_para(; C_D_l=0)
+para3 = build_para(; ρ_l=0)
+para4 = build_para(; n_wind=0)
+para5 = build_para(; C_D_l=0, ρ_l=0)
+para6 = build_para(; C_D_l=0, n_wind=0)
+para7 = build_para(; ρ_l=0, n_wind=0)
+para8 = build_para(; C_D_l=0, ρ_l=0, n_wind=0)
 
 begin
     para = para1
@@ -182,7 +227,7 @@ begin
     optim_para_dims = [L, M * L^2, 1]
 
     ## Setup
-    OPT_VARS_AXES = getaxes(ComponentArray(; (optim_para_syms .=> 0.)...))
+    OPT_VARS_AXES = getaxes(ComponentArray(; (optim_para_syms .=> 0.0)...))
     char_time = get_char_time(vbp0)
     SHOOT_INIT .= Float64[α0, dα0, dτ0, 1, 0]  # (α0, dα0, dτ0, tf, Wf0)
     vbp = normalize_vbpara(vbp0)  # without dimensions
@@ -208,14 +253,17 @@ begin
     @time sol = solve(opt_prob, opt_alg; maxtime=60)  # maxtime, maxiters
     # vérifier que l'on tourne dans le bon sens et que l'on a un cycle limite
 
-    println([sol.u[end-length(optim_para_syms)+1:end] .* optim_para_dims; sol.objective * L * M^2 * T^-2])
+    println(
+        [
+            sol.u[(end - length(optim_para_syms) + 1):end] .* optim_para_dims;
+            sol.objective * L * M^2 * T^-2
+        ],
+    )
     # Quelles sont les bornes saturées
     println([sol.u .* optim_para_dims; lb .* optim_para_dims; ub .* optim_para_dims])
     @test all(lb .<= sol.u .<= ub)  # Parameters inside the box
     @test SHOOT_INIT[3] < 0  # dτ0 < 0
 end
-
-
 
 sol.objective
 # Quelles bornes sont saturées, quel %gain par rapport aux paramètres initiaux
@@ -227,11 +275,10 @@ val_after = opt_func(sol.u, vbp) * M * L^2 * T^-2
 gain = (val_after - val_before) / val_before
 # injecter les paramètres dans 05_LimitCycle.jl pour avoir le scaling correct de la puissance
 
-
 using Plots
 make_plots = false
 if make_plots
-    default(label="")
+    default(; label="")
     opt_adim = as_component_array(sol.u)
     lb_adim = as_component_array(lb)
     ub_adim = as_component_array(ub)
@@ -243,20 +290,18 @@ if make_plots
     for para_sym in optim_para_syms
         partial = x -> obj((@set opt_adim[para_sym] = x), vbp)
 
-        x_adim = range(lb_adim[para_sym], ub_adim[para_sym], length=51)
+        x_adim = range(lb_adim[para_sym], ub_adim[para_sym]; length=51)
         y_adim = partial.(x_adim)
 
         x = x_adim .* dims[para_sym]
         y = y_adim .* dim_obj
 
-        plot(x, y, label="obj($para_sym)")
+        plot(x, y; label="obj($para_sym)")
         vline!(opt[[para_sym]])
-        plot!(title="$(para_sym) = $(opt[para_sym])", xlabel="$(para_sym)")
+        plot!(; title="$(para_sym) = $(opt[para_sym])", xlabel="$(para_sym)")
         display(plot!())
     end
 end
-
-
 
 function benchmark_obj(obj, optim_vars, vbp, N)
     Dobj(optim_vars, vbp) = ForwardDiff.gradient(x -> obj(x, vbp), optim_vars)

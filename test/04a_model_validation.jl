@@ -29,12 +29,12 @@ inds_10d = SA[3, 2, 8, 7, 11]
 state_dim_10d = [L, 1, 1, 1, 1, L / T, 1 / T, 1 / T, 1 / T, 1 / T, M * L^2 * T^-2]
 state_dim_4d = state_dim_10d[inds_10d]
 
-α = 0.
-τ = 1.
-dα = 0.
-dτ = 3.
+α = 0.0
+τ = 1.0
+dα = 0.0
+dτ = 3.0
 
-u0_4d = SA[α, τ, dα, dτ, 0.]
+u0_4d = SA[α, τ, dα, dτ, 0.0]
 u0_10d = PM10.init_u(τ, dτ, p)
 u0_4d_normed = u0_4d ./ state_dim_4d
 u0_10d_normed = u0_10d ./ state_dim_10d
@@ -48,10 +48,12 @@ u0_10d_normed = u0_10d ./ state_dim_10d
 # 4d & 4d_normed
 # 4dVB & 4dVB_normed
 # dy[time of comparison]_[code used][VBPara? less parameters][normalised? no dimensions]
-du0_10d = PM10.dynamics!(similar(u0_10d), u0_10d, p, 0.)[inds_10d]
-du0_10d_normed = PM10.dynamics!(similar(u0_10d_normed), u0_10d_normed, p_normed, 0.)[inds_10d] .* state_dim_4d / T  # PM10 using Para with normalisation
-du0_4dVB = PM4.dynamics(u0_4d, vbp, 0.)  # PM4norm using VBPara without normalisation
-du0_4dVB_normed = PM4.dynamics(u0_4d_normed, vbp_normed, 0.) .* state_dim_4d / T  # PM4norm using VBPara with normalisation
+du0_10d = PM10.dynamics!(similar(u0_10d), u0_10d, p, 0.0)[inds_10d]
+du0_10d_normed =
+    PM10.dynamics!(similar(u0_10d_normed), u0_10d_normed, p_normed, 0.0)[inds_10d] .*
+    state_dim_4d / T  # PM10 using Para with normalisation
+du0_4dVB = PM4.dynamics(u0_4d, vbp, 0.0)  # PM4norm using VBPara without normalisation
+du0_4dVB_normed = PM4.dynamics(u0_4d_normed, vbp_normed, 0.0) .* state_dim_4d / T  # PM4norm using VBPara with normalisation
 
 # equivalent to `@test all(eachcol(du0s) .≈ (du0s[:, 1],))`
 @test du0_10d ≈ du0_10d_normed
@@ -66,13 +68,12 @@ str = join(split(pretty_string(rel_neg_log_norm_diff(du0s)), '\n')[2:end], '\n')
 Nombre de chiffres significatifs communs entre les dynamiques (1 pas)
 [10d, 10d normalisé, 4d, 4d normalisé] \n\n""" * str
 
-
 ## Compare at t=1
 # dα(t=1) is sufficient to reach energy production
 
 # Generate the state at t=1. Use 10d because there is no code
 # for 4d -> 10d, and 10d -> 4d is a simple projection
-tf = 20.
+tf = 20.0
 cb = PM10.build_manifold_projection(u0_10d)
 sol_cb = PM10.integrate(u0_10d, tf, p; callback=cb)
 y1_10d_cb = sol_cb(tf)
@@ -81,10 +82,11 @@ y1_4d = SA[y1_10d_cb[inds_10d]...]
 y1_10d_normed = y1_10d_cb ./ state_dim_10d
 y1_4d_normed = y1_4d ./ state_dim_4d
 
-
 # Compare 10d and 4d at t=20
 dy1_10d = PM10.dynamics!(similar(y1_10d_cb), y1_10d_cb, p, tf)[inds_10d]
-dy1_10d_normed = PM10.dynamics!(similar(y1_10d_normed), y1_10d_normed, p_normed, tf)[inds_10d] .* state_dim_4d / T
+dy1_10d_normed =
+    PM10.dynamics!(similar(y1_10d_normed), y1_10d_normed, p_normed, tf)[inds_10d] .*
+    state_dim_4d / T
 dy1_4dVB = PM4.dynamics(y1_4d, vbp, tf)
 dy1_4dVB_normed = PM4.dynamics(y1_4d_normed, vbp_normed, tf) .* state_dim_4d / T
 
@@ -94,12 +96,15 @@ dy1_4dVB_normed = PM4.dynamics(y1_4d_normed, vbp_normed, tf) .* state_dim_4d / T
 
 dy1s = [dy1_10d dy1_10d_normed dy1_4dVB dy1_4dVB_normed]
 str = join(split(pretty_string(rel_neg_log_norm_diff(dy1s)), '\n')[2:end], '\n')
-relres_cb = norm(PM10.manifold_residuals!(similar(u0_10d, 6), y1_10d_cb, p)) / norm(y1_10d_cb)
+relres_cb =
+    norm(PM10.manifold_residuals!(similar(u0_10d, 6), y1_10d_cb, p)) / norm(y1_10d_cb)
 @info """[Dynamique à un état "dense" le long d'une trajectoire obtenue par intégration]
 Nombre de chiffres significatifs communs entre les dynamiques à t=20 (1 pas depuis la solution du modèle 10d)
-[10d, 10d normalisé, 4d, 4d normalisé] \n\n""" * str * "\n\n[Validation du point de calcul, obtenu par intégration avec callback]
-Norme relative des résidus pour le point utilisé : " * string(relres_cb)
-
+[10d, 10d normalisé, 4d, 4d normalisé] \n\n""" *
+    str *
+    "\n\n[Validation du point de calcul, obtenu par intégration avec callback]
+Norme relative des résidus pour le point utilisé : " *
+    string(relres_cb)
 
 ## Test de l'intégration de la dynamique
 # 10d & 10d_normed
@@ -130,14 +135,17 @@ str = join(split(pretty_string(rel_neg_log_norm_diff(y1s)), '\n')[2:end], '\n')
 Nombre de chiffres significatifs communs entre les états après une intégration de 20 secondes :
 [10d, 10d normalisé, 4d, 4d normalisé] \n\n""" * str
 
-relres_no_cb = norm(PM10.manifold_residuals!(similar(u0_10d, 6), sol10d(tf), p)) / norm(sol10d(tf))
+relres_no_cb =
+    norm(PM10.manifold_residuals!(similar(u0_10d, 6), sol10d(tf), p)) / norm(sol10d(tf))
 @info "[Résidus callback vs no callback]
-Résidus à t=20 avec callback : " * string(relres_cb) * " (point utilisé plus haut)
-Résidus à t=20 sans callback : " * string(relres_no_cb)
+Résidus à t=20 avec callback : " *
+    string(relres_cb) *
+    " (point utilisé plus haut)
+Résidus à t=20 sans callback : " *
+    string(relres_no_cb)
 @test relres_cb < relres_no_cb
 
 ## Visualisation : quels méthodes donnent des résultats similaires entre eux ?
-
 
 """
         generate_logsim_and_order(samples)
@@ -161,7 +169,7 @@ function generate_logsim_and_order(samples)
     dist = [norm(samp1 - samp2) for samp1 in eachcol(samples), samp2 in eachcol(samples)]
 
     # Transform distances to log-similarity values
-    logsim = -log10.(dist .+ minimum(dist[dist.>0.]))
+    logsim = -log10.(dist .+ minimum(dist[dist .> 0.0]))
     min_logsim, max_logsim = extrema(logsim)
     logsim = (logsim .- min_logsim) ./ (max_logsim - min_logsim)
 
@@ -192,7 +200,8 @@ function logsim_heatmap(logsim, order, names, title="")
     ordered_logsim = logsim[order, order]
     ordered_names = names[order]
 
-    heatmap(ordered_logsim,
+    heatmap(
+        ordered_logsim;
         xticks=(1:length(ordered_names), ordered_names),
         yticks=(1:length(ordered_names), ordered_names),
         xmirror=true,
@@ -201,7 +210,7 @@ function logsim_heatmap(logsim, order, names, title="")
         color=:Purples,
         title=title,
         aspect_ratio=1,
-        size=(600, 600)
+        size=(600, 600),
     )
 end
 
@@ -223,9 +232,9 @@ display(logsim_heatmap(logsim_y1, order_dy1, names, "État à t=20 — log-simil
 ## PCA sur l'état final de l'intégration
 
 # rescale les données avec StatsBase
-rescaler = fit(ZScoreTransform, y1s, dims=2)
+rescaler = fit(ZScoreTransform, y1s; dims=2)
 y1s_rescaled = StatsBase.transform(rescaler, y1s)
-pca = fit(PCA, y1s_rescaled, mean=0, pratio=1)
+pca = fit(PCA, y1s_rescaled; mean=0, pratio=1)
 pc1, pc2 = eachrow(predict(pca, y1s_rescaled))
 
 min_pc1, max_pc1 = extrema(pc1)
@@ -234,7 +243,9 @@ min_pc2, max_pc2 = extrema(pc2)
 # 10d_normed is omitted because it is an outlier
 x_starts = 0.8 .* range(min_pc1, max_pc1, length(names))
 y_starts = zeros(length(names))
-pca_plot = plot([x_starts pc1]', [y_starts pc2]', labels=names, c=(1:length(names))', legend=:outerright)
-scatter!(pca_plot, collect(pc1)', collect(pc2)', c=(1:length(names))', msw=0, labels="")
-plot!(pca_plot, title="PCA de l'état à t=20", xlabel="PC1", ylabel="PC2")
+pca_plot = plot(
+    [x_starts pc1]', [y_starts pc2]'; labels=names, c=(1:length(names))', legend=:outerright
+)
+scatter!(pca_plot, collect(pc1)', collect(pc2)'; c=(1:length(names))', msw=0, labels="")
+plot!(pca_plot; title="PCA de l'état à t=20", xlabel="PC1", ylabel="PC2")
 display(pca_plot)

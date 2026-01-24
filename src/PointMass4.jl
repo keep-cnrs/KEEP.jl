@@ -4,7 +4,7 @@ import LinearAlgebra: norm, normalize, ⋅, ×
 using StaticArrays
 import NaNMath as nm
 import OrdinaryDiffEqTsit5: Tsit5
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
@@ -35,7 +35,9 @@ function scnd_deriv_sample(f, x, v1, v2)
     ## Integration using ForwardDiff is 25% faster compared to AbstractDifferentiation with ForwardDiff backend
     ## jacobian-vector product should be done this way
     # return AD.jacobian(ab, τ2 -> AD.jacobian(ab, τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0)[1], 0.0)[1]
-    return ForwardDiff.derivative(τ2 -> ForwardDiff.derivative(τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0), 0.0)
+    return ForwardDiff.derivative(
+        τ2 -> ForwardDiff.derivative(τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0), 0.0
+    )
 end
 
 """
@@ -60,13 +62,8 @@ function compute_τhat(τ, p)
     θ, φ = τ_to_θφ(τ, p)
     sin_θ, cos_θ = sincos(θ)
     sin_φ, cos_φ = sincos(φ)
-    return SA[
-        sin_θ*cos_φ,
-        sin_θ*sin_φ,
-        cos_θ
-    ]
+    return SA[sin_θ * cos_φ, sin_θ * sin_φ, cos_θ]
 end
-
 
 @doc raw"""
 (α, τ) -> (R, τ)
@@ -77,9 +74,7 @@ function compute_Rτ(q, p)
     dot_prod = compute_αhat(α) ⋅ compute_τhat(τ, p)
     # ε = 1e-5
     # my_sqrt(x) = sqrt(sqrt(x^2 + ε^2))
-    return SA[
-        L*(dot_prod+nm.sqrt(p.r^2 - (1 - dot_prod^2))), q[2]
-    ]
+    return SA[L * (dot_prod + nm.sqrt(p.r ^ 2 - (1 - dot_prod ^ 2))), q[2]]
 end
 
 @doc raw"""
@@ -89,7 +84,6 @@ function compute_OK(Rτ, p)
     R, τ = Rτ
     return R * compute_τhat(τ, p)
 end
-
 
 @doc raw"""
 Compute du, the evolution of the state.
@@ -119,10 +113,10 @@ function dynamics(u, p, t)
     rhat = normalize(OK - OA)
 
     # Compute gravity force
-    Fgrav = SA[0, 0, -p.g-p.m_l*p.r] * M * L * T^-2
+    Fgrav = SA[0, 0, -p.g - p.m_l * p.r] * M * L * T^-2
 
     # Compute aerodynamical force
-    wind = SA[abs(OK[3] / (p.h_ref * L))^(1/p.n_wind), 0, 0] * L * T^-1
+    wind = SA[abs(OK[3] / (p.h_ref * L)) ^ (1 / p.n_wind), 0, 0] * L * T^-1
     kite_speed = D_OK * dRτ
     app_wind = wind - kite_speed  # apparent wind, We
 
@@ -149,16 +143,11 @@ function dynamics(u, p, t)
 
     D_OK_D_Rτ = D_OK * D_Rτ
     A = D_OK_D_Rτ .* M .- A_tension
-    b = (
-        ddOK * M +
-        D_OK * ddRτ * M +
-        -b_tension - Fgrav - Faero
-    )
+    b = (ddOK * M + D_OK * ddRτ * M + -b_tension - Fgrav - Faero)
     instantaneous_power = torque * dα
     ddq = (D_OK' * A) \ (-D_OK' * b)
     return SA[dq[1], dq[2], ddq[1], ddq[2], instantaneous_power]
 end
-
 
 """
 [For post-processing]
@@ -189,10 +178,12 @@ function init_u(α, dα, dτ; τ=TAU0, W=0.0)
     return create_u(α, τ, dα, dτ, W)
 end
 
-function integrate(u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
-    return _integrate(dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
+function integrate(
+    u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...
+)
+    return _integrate(
+        dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...
+    )
 end
-
-
 
 end  # module

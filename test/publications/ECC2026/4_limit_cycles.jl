@@ -22,16 +22,28 @@ function main()
     sol = PM4.integrate(-u0, tf, p; callback=cb, save_end=false, tol=1e-13)
 
     x_infty = sol.u[end]
-    errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:end-1]]
+    errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end - 1)]]
     n = length(errors)
 
     i1, i2 = 2, 6
     convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
 
-    plot(yscale=:log10, xlim=(0, n + 1), xticks=0:2:100, ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), xlabel="lemniscate revolutions", ylabel="distance to limit")
-    plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black)
-    annotate!((3.9, 1e-8, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
-    scatter!(errors .+ 1e-16, label=L"|| x_i - x_\infty  ||")
+    plot(;
+        yscale=:log10,
+        xlim=(0, n + 1),
+        xticks=0:2:100,
+        ylim=(1e-16, 1e2),
+        yticks=10.0 .^ (0:-3:-16),
+        xlabel="lemniscate revolutions",
+        ylabel="distance to limit",
+    )
+    plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)); label="", c=:black)
+    annotate!((
+        3.9,
+        1e-8,
+        (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black"),
+    ))
+    scatter!(errors .+ 1e-16; label=L"|| x_i - x_\infty  ||")
     display(plot!())
     savefig("test/publications/ECC2026/figs/limit_cycle_convergence.pdf")
 
@@ -65,20 +77,18 @@ function main()
     lc_p = LC.compute_limit_cycle(p; sense=+, save_everystep=true)
     lc_m = LC.compute_limit_cycle(p; sense=-, save_everystep=true)
 
-
-    P_fig = plot(ylabel="P (kW)", xformatter=x -> "", yticks=0:10:20, ylim=(-3, 23))
+    P_fig = plot(; ylabel="P (kW)", xformatter=x -> "", yticks=0:10:20, ylim=(-3, 23))
     @_ plot!(τ(_, lc_m) + 2π, P(_, lc_m) / 1000, lc_m.t, label="", c=2)
     @_ plot!(τ(_, lc_p), P(_, lc_p) / 1000, lc_p.t, label="", c=1)
     @_ plot!(-τ(_, lc_m), P(_, lc_m) / 1000, lc_m.t, label="", c=2, ls=:dot)
 
-    α_fig = plot(ylabel="α (rad)", xlabel="τ (rad)", yticks=-1:1:1, ylim=(-1.1, 1.1))
+    α_fig = plot(; ylabel="α (rad)", xlabel="τ (rad)", yticks=-1:1:1, ylim=(-1.1, 1.1))
     @_ plot!(τ(_, lc_m) + 2π, α(_, lc_m), lc_m.t, label="", c=2)
     @_ plot!(τ(_, lc_p), α(_, lc_p), lc_p.t, label="", c=1)
     @_ plot!(-τ(_, lc_m), -α(_, lc_m), lc_m.t, label="", c=2, ls=:dot)
 
-    plot(P_fig, α_fig, layout=(2, 1), size=(400, 300))
+    plot(P_fig, α_fig; layout=(2, 1), size=(400, 300))
     display(plot!())
-
 
     ## Eight-trajectory in YZ plane
     function yz_split(sol, n_splits)
@@ -95,15 +105,22 @@ function main()
 
     n_splits = 4
     arrows = [permutedims(repeat([true], n_splits - 1)) false]
-    plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-20:5:20, ytick=5:2.5:10, size=plot_size(1.8))
-    plot!(invert(yz_split(lc_p, n_splits))..., arrows=true, label="\$\\dot{\\tau} > 0\$")
-    plot!(invert(yz_split(lc_m, n_splits))..., arrows=true, label="\$\\dot{\\tau} < 0\$")
+    plot(;
+        aspect_ratio=:equal,
+        xlabel="\$y\$ (m)",
+        ylabel="\$z\$ (m)",
+        xtick=-20:5:20,
+        ytick=5:2.5:10,
+        size=plot_size(1.8),
+    )
+    plot!(invert(yz_split(lc_p, n_splits))...; arrows=true, label="\$\\dot{\\tau} > 0\$")
+    plot!(invert(yz_split(lc_m, n_splits))...; arrows=true, label="\$\\dot{\\tau} < 0\$")
     plot!([0], [13])
-    lens!([-11, -10], [8, 9], inset=(1, bbox(0.3, 0, 0.3, 0.4)))
+    lens!([-11, -10], [8, 9]; inset=(1, bbox(0.3, 0, 0.3, 0.4)))
     l = plot!().inset_subplots[1]
     xticks!(l, -11:0.5:-10)
     yticks!(l, 8:0.5:9)
-    plot!(l, tickfontsize=TICKFONTSIZE - 1)
+    plot!(l; tickfontsize=TICKFONTSIZE - 1)
 
     display(plot!())
 
@@ -114,7 +131,6 @@ function main()
     Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
     =#
 
-
     ## Map limit cycles direction in τ
 
     # more accurate version: do not compute the limit cycle, just integrate for enough time
@@ -123,11 +139,11 @@ function main()
     lc_sign(q, p) = last(PM4.integrate(SA[q..., 0, 0, 0], 3, p; tol=1e-2))[4] > 0 ? 1 : -1
 
     n = 10
-    qs = [SA[α, τ] for α in range(-π, π, length=100) for τ in range(0, 2π, length=100)]
+    qs = [SA[α, τ] for α in range(-π, π; length=100) for τ in range(0, 2π; length=100)]
 
     @time lc_signs = lc_sign.(qs, Ref(p))
 
-    scatter(invert(qs)..., c=lc_signs, label="", aspect_ratio=:equal, ms=1)
+    scatter(invert(qs)...; c=lc_signs, label="", aspect_ratio=:equal, ms=1)
     display(plot!())
 end
 
