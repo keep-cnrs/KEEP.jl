@@ -36,8 +36,9 @@ StrFormat = "b5087856-efa9-5a6d-8e6f-97303a7af894"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Underscores = "d9a01c3f-67ce-4d8c-9b55-35f6e4050bb1"
 
-[sources]
-KEEP = {path = ".."}
+[sources.KEEP]
+path = ".."
 
 [compat]
 Aqua = "0.8"
+Plots = "1"
