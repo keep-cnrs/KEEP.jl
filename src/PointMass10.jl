@@ -4,7 +4,7 @@ import LinearAlgebra: norm, normalize, ⋅, ×
 using StaticArrays
 import NaNMath as nm
 import OrdinaryDiffEqTsit5: Tsit5
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 using DiffResults
 using Logging: @warn
 using DiffEqCallbacks: ManifoldProjection
@@ -81,7 +81,7 @@ Compute the force of gravity on the solid kite + lines
 function Fgrav_func(q, p)
     linear_density_l = p.ρ_l * π * (p.d_l^2) / 4
     m_l = NB_LINES * linear_density_l * p.r / 2
-    return SA[0, 0, -p.g*(p.m+m_l)]
+    return SA[0, 0, -p.g * (p.m + m_l)]
 end
 
 """
@@ -90,7 +90,7 @@ Compute the aerodynamical force on the solid kite + lines
 function Faero_func(q, dq, p)
     # test OK with compute_pos2 & compute_speed2 to compute z (height of kite) and app_wind (apparent wind)
     z = compute_pos1(q, p)[3]
-    wind = SA[p.v_ref*abs(z / p.h_ref)^(1/p.n_wind), 0, 0]
+    wind = SA[p.v_ref * abs(z / p.h_ref) ^ (1 / p.n_wind), 0, 0]
     kite_speed = compute_speed1(q, dq, p)
     app_wind = wind - kite_speed  # We
     r_hat = rot2(q)[:, 1]  # er
@@ -105,7 +105,8 @@ function Faero_func(q, dq, p)
 
     lift_k = 1 // 2 * p.S * p.ρ_air * norm(app_wind)^2 * p.C_L
     drag_k = lift_k * p.C_D / p.C_L
-    drag_l = 1 // 6 * NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
+    drag_l =
+        1 // 6 * NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
     Faero_on_kite = -drag_k * xw - lift_k * zw
     Faero_on_lines = drag_l .* ew
     return Faero_on_kite + Faero_on_lines
@@ -115,7 +116,6 @@ end
 Compute the Jacobian-vector product between the Jacobian of the function `f` at position `x` and the vector `δx`.
 """
 Jv(f, x, δx) = ForwardDiff.derivative(τ -> f(x .+ τ .* δx), 0.0)
-
 
 # 1: use (R, τ)
 # 2: use (α, θ2, φ2)
@@ -132,14 +132,12 @@ compute_pos_diff(q, p) = compute_pos1(q, p) - compute_pos2(q, p)
 compute_speed_diff(q, dq, p) = Jv(q_ -> compute_pos_diff(q_, p), q, dq)
 compute_accel_diff(q, ddq, p) = Jv(dq_ -> compute_speed_diff(q, dq_, p), q, ddq)
 
-
 function compute_posA(q, p)
     α = q[3]
-    return SA[p.l*cos(α), p.l*sin(α), 0]
+    return SA[p.l * cos(α), p.l * sin(α), 0]
 end
 compute_speedA(q, dq, p) = Jv(q_ -> compute_posA(q_, p), q, dq)
 compute_accelA(q, ddq, p) = Jv(dq_ -> compute_speedA(q, dq_, p), q, ddq)
-
 
 @doc raw"""
 Compute the residuals of the dynamics of the system given the state (`q` and `dq`) the forces (and torque) and the dynamics `ddq`.
@@ -168,11 +166,10 @@ function residuals(q, dq, ddq, p; Fgrav, Faero, torque)
     _, _, ddα, _, _ = ddq
 
     ## Use automatic differentiation
-    Fapp = p.m * (
-        Jv(q_ -> compute_speed2(q_, dq, p), q, dq) +
-        Jv(q_ -> compute_pos2(q_, p), q, ddq)
-    )
-    Ftension_kite = SA[(p.I_eq*ddα+torque)/(p.l*sin(θ2)*sin(φ2)), 0, 0]
+    Fapp =
+        p.m *
+        (Jv(q_ -> compute_speed2(q_, dq, p), q, dq) + Jv(q_ -> compute_pos2(q_, p), q, ddq))
+    Ftension_kite = SA[(p.I_eq * ddα + torque) / (p.l * sin(θ2) * sin(φ2)), 0, 0]
     Fres = Fapp - Fgrav - Faero + rot2(q) * Ftension_kite
 
     ∂OK∂R = ForwardDiff.derivative(R_ -> compute_pos1(SA[R_, τ, α, θ2, φ2], p), R)
@@ -186,7 +183,6 @@ function residuals(q, dq, ddq, p; Fgrav, Faero, torque)
     )
     return SA[resid1, resid2, resid3, resid4, resid5]
 end
-
 
 @doc raw"""
 Compute du, the evolution of the state.
@@ -218,7 +214,11 @@ function dynamics!(du, u, p, t)
 
     ddq_eval = zero(q)
     diffresult = DiffResults.DiffResult(zeros(eltype(q), 5), zeros(eltype(q), 5, 5))
-    diffresult = ForwardDiff.jacobian!(diffresult, ddq_ -> residuals(q, dq, ddq_, p; Fgrav=Fgrav, Faero=Faero, torque=torque), ddq_eval)
+    diffresult = ForwardDiff.jacobian!(
+        diffresult,
+        ddq_ -> residuals(q, dq, ddq_, p; Fgrav=Fgrav, Faero=Faero, torque=torque),
+        ddq_eval,
+    )
     b = DiffResults.value(diffresult)
     M = DiffResults.jacobian(diffresult)
 
@@ -268,7 +268,7 @@ function init_q(τ, p)
     R = p.l * sin(θ) * cos(φ) + sqrt((p.l * sin(θ) * cos(φ))^2 + (p.r^2 - p.l^2))
     θ2 = acos(R * cos(θ) / p.r)
     φ2 = asin(R * sin(θ) * sin(φ) / (p.r * sin(θ2)))
-    α = 0.
+    α = 0.0
     return SA[R, τ, α, θ2, φ2]
 end
 
@@ -285,9 +285,9 @@ determine `dR`, `dθ2`, and `dφ2`.
 function init_dq(q, dτ, p)
     R, τ, α, θ2, φ2 = q
 
-    _, dphi2, dtheta2, dR, dtau = vitesse_init(α, φ2, θ2, R, τ, 0., dτ, p)
+    _, dphi2, dtheta2, dR, dtau = vitesse_init(α, φ2, θ2, R, τ, 0.0, dτ, p)
 
-    dR, dτ, dα, dθ2, dφ2 = dR, dtau, 0., dtheta2, dphi2
+    dR, dτ, dα, dθ2, dφ2 = dR, dtau, 0.0, dtheta2, dphi2
     return SA[dR, dτ, dα, dθ2, dφ2]
 end
 
@@ -308,8 +308,12 @@ function manifold_residuals!(res, u, p)
     res
 end
 
-function integrate(u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
-    return _integrate(dynamics!, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
+function integrate(
+    u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...
+)
+    return _integrate(
+        dynamics!, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...
+    )
 end
 
 """
@@ -317,11 +321,18 @@ Make a callback that projects the manifold onto the tangent space of the manifol
 
 `y_prototype` is used to determine the type of `resid_prototype`.
 """
-function build_manifold_projection(y_prototype; nlsolve=NewtonRaphson(), tol=DEFAULT_TOLERANCE, kwargs...)
-    return ManifoldProjection(manifold_residuals!; autodiff=AutoForwardDiff(), resid_prototype=similar(y_prototype, 6), nlsolve=nlsolve, abstol=tol, reltol=tol, kwargs...)
+function build_manifold_projection(
+    y_prototype; nlsolve=NewtonRaphson(), tol=DEFAULT_TOLERANCE, kwargs...
+)
+    return ManifoldProjection(
+        manifold_residuals!;
+        autodiff=AutoForwardDiff(),
+        resid_prototype=similar(y_prototype, 6),
+        nlsolve=nlsolve,
+        abstol=tol,
+        reltol=tol,
+        kwargs...,
+    )
 end
-
-
-
 
 end  # module

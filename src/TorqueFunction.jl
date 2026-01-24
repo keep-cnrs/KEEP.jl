@@ -3,7 +3,8 @@ module TorqueFunction
 using Logging
 
 export torque_function, set_torque_function!, reset_torque_function!
-export DEFAULT_TORQUE, RATIONAL_TORQUE, LINEAR_TORQUE, CINFTY_TORQUE, CONTINUOUS_TORQUE, DISCONTINUOUS_TORQUE
+export DEFAULT_TORQUE,
+    RATIONAL_TORQUE, LINEAR_TORQUE, CINFTY_TORQUE, CONTINUOUS_TORQUE, DISCONTINUOUS_TORQUE
 
 """
 eq. 68 of `Fechner_et_al_2014_cf_KiteModels`, "Dynamic Model of a Pumping Kite Power System"
@@ -28,7 +29,8 @@ end
 
 """piece-wise with discontinuous decay"""
 function torque_function_discontinuous(dα, p)
-    @warn "Using legacy non-smooth torque function `torque_function_legacy` instead of `torque_function`" maxlog = 1
+    @warn "Using legacy non-smooth torque function `torque_function_legacy` instead of `torque_function`" maxlog =
+        1
     abs_out = begin
         if p.Ωmin < abs(dα) < p.Ωmax
             p.Cmax * (abs(dα) - p.Ωmin) / (p.Ωmax - p.Ωmin)
@@ -41,7 +43,8 @@ end
 
 """piece-wise with continuous decay"""
 function torque_function_continuous(dα, p)
-    @warn "Using legacy non-smooth torque function `torque_function_continuous` instead of `torque_function`" maxlog = 1
+    @warn "Using legacy non-smooth torque function `torque_function_continuous` instead of `torque_function`" maxlog =
+        1
     (; Ωmin, Ωmax, Ωlim, Cmax) = p
     abs_out = begin
         if Ωmin < abs(dα) < Ωmax
@@ -61,7 +64,6 @@ function torque_function_Cinfty(dα, p)
     x = dα / p.Ωmax
     return p.Cmax * (k * sinh(k) * x) / (cosh(k * x) - (cosh(k) - k * sinh(k)))
 end
-
 
 """
 A simplified version of `torque_function_rational` where `dα` stays in the linear zone.

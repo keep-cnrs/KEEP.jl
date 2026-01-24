@@ -20,7 +20,7 @@ Dimensionful parameters.
  - 10d: used for simulation
  - other: used for translation only.
 """
-DEFAULT_PARA = ComponentArray(
+DEFAULT_PARA = ComponentArray(;
     l=2.0, # m
     m=6.0, # kg
     v_ref=9.0, # m s^-1
@@ -55,35 +55,36 @@ function build_para(; kwargs...)::Para
     return p
 end
 
-
 function build_vbpara(p::Para=DEFAULT_PARA)::VBPara
     L, M, T = lmt(p)
-    return ComponentArray(
+    return ComponentArray(;
         l=p.l,
         m=p.m,
-        v_ref=p.v_ref;
+        v_ref=p.v_ref,
         g=p.g * T^2 / L,
-        h_ref=p.h_ref / L,
-        r=p.r / L,
+        h_ref=(p.h_ref / L),
+        r=(p.r / L),
         c_L=p.S * p.ρ_air * p.C_L / 2 * L / M,
-        f=p.C_L / p.C_D,
+        f=(p.C_L / p.C_D),
         c_D_l=p.d_l * NB_LINES * p.ρ_air * p.C_D_l / 6 * L^2 / M,
         m_l=π * p.d_l^2 * NB_LINES * p.ρ_l * p.g / 8 * T^2 / M,
-        I_eq=p.I_eq / (L^2 * M),
+        I_eq=(p.I_eq / (L^2 * M)),
         Cmax=p.Cmax * T^2 / (M * L^2),
-        Ωmin=p.Ωmin * T,
-        Ωmax=p.Ωmax * T,
-        Ωlim=p.Ωlim * T,
+        Ωmin=(p.Ωmin * T),
+        Ωmax=(p.Ωmax * T),
+        Ωlim=(p.Ωlim * T),
         torque_slope=p.torque_slope * T / (M * L^2),
         n_wind=p.n_wind,
         θ0=p.θ0,
         φ0=p.φ0,
         Δθ=p.Δθ,
-        Δφ=p.Δφ
+        Δφ=p.Δφ,
     )
 end
 
-function build_para(p::VBPara; S=DEFAULT_PARA.S, ρ_air=DEFAULT_PARA.ρ_air, d_l=DEFAULT_PARA.d_l)::Para
+function build_para(
+    p::VBPara; S=DEFAULT_PARA.S, ρ_air=DEFAULT_PARA.ρ_air, d_l=DEFAULT_PARA.d_l
+)::Para
     L, M, T = lmt(p)
 
     S_normalized = S / L^2
@@ -99,29 +100,28 @@ function build_para(p::VBPara; S=DEFAULT_PARA.S, ρ_air=DEFAULT_PARA.ρ_air, d_l
         m=p.m,
         v_ref=p.v_ref,
         g=p.g * L / T^2,
-        h_ref=p.h_ref * L,
+        h_ref=(p.h_ref * L),
         n_wind=p.n_wind,
         ρ_air=ρ_air_normalized * M / L^3,
-        r=p.r * L,
+        r=(p.r * L),
         S=S_normalized * L^2,
         C_L=C_L,
         C_D=C_D,
         d_l=d_l_normalized * L,
         C_D_l=C_D_l,
         ρ_l=ρ_l,
-        I_eq=p.I_eq * M * L^2,
+        I_eq=(p.I_eq * M * L^2),
         Cmax=p.Cmax * M * L^2 / T^2,
-        Ωmin=p.Ωmin / T,
-        Ωmax=p.Ωmax / T,
-        Ωlim=p.Ωlim / T,
+        Ωmin=(p.Ωmin / T),
+        Ωmax=(p.Ωmax / T),
+        Ωlim=(p.Ωlim / T),
         torque_slope=p.torque_slope * M * L^2 / T,
         θ0=p.θ0,
         φ0=p.φ0,
         Δθ=p.Δθ,
-        Δφ=p.Δφ
+        Δφ=p.Δφ,
     )
 end
-
 
 """
 Compute the characteristic length, mass and time for the set of parameters `p`.
@@ -164,12 +164,13 @@ function normalize_vbpara(p::VBPara)::VBPara
     return p
 end
 
-
 """
 vbp : VBPara -> Para -> set new values -> VBPara
 
 kwargs: kwargs to build_para (parameters that are lost when building VBPara, eg. S, ρ_air, d_l)"""
-function vbpara_set_params(vbp::VBPara, new_params::ComponentArray=ComponentArray(); kwargs...)::VBPara
+function vbpara_set_params(
+    vbp::VBPara, new_params::ComponentArray=ComponentArray(); kwargs...
+)::VBPara
     # p = build_para(vbp; kwargs...)
     # p[keys(new_params)] = new_params
 
@@ -181,6 +182,8 @@ function vbpara_set_params(vbp::VBPara, new_params::ComponentArray=ComponentArra
     return vbp
 end
 
-vbpara_set_params(vbp, new_params::NamedTuple; kwargs...) = vbpara_set_params(vbp, ComponentArray(new_params); kwargs...)
+function vbpara_set_params(vbp, new_params::NamedTuple; kwargs...)
+    vbpara_set_params(vbp, ComponentArray(new_params); kwargs...)
+end
 
 end  # module
