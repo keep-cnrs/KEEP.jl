@@ -27,7 +27,7 @@ lower, upper = make_bounds(p0, syms)
 lower[3] = 1
 upper[3] = 1e6
 tol = 1e-6
-stats, model = optimize(p0, syms, lower, upper; tol=tol);
+stats, model = optimize(p0, syms, lower, upper; tol=tol, max_wall_time=500.);  # High wall_time for github CI
 
 ## Avant/Après : texte
 
