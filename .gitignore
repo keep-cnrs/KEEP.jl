@@ -26,10 +26,10 @@ docs/site/
 # Keep Project.toml; ignore Manifest.toml in packages
 !Project.toml
 # Ignore all Manifest.toml files...
-Manifest.toml
-**/Manifest.toml
+Manifest*.toml
+**/Manifest*.toml
 # ...except the one inside docs/src/assets
-!docs/src/assets/Manifest.toml
+!docs/src/assets/Manifest*.toml
 
 *.log
 *.csv
