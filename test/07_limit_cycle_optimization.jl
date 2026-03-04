@@ -50,7 +50,7 @@ val = solution[5] * power_dim
 
 @info f"""Status: \%(string(stats.status))
 Constraints neglog error (should be 0 < e < 16): \%.1f(constraints_neg_log_error) (~correct digits)
-dτ0 (should be <0): \%.3f(dτ0)
+dτ0 (should be >0): \%.3f(dτ0)
 
 Optimisation on:
 \t[\%(join(map(string, syms), ", "))]
