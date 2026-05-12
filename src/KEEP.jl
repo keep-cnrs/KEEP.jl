@@ -12,7 +12,7 @@ include("PointMass10.jl")
 include("PointMass4.jl")
 include("LimitCycle.jl")
 include("SteadyState.jl")
-include("Visualisation.jl")
+include("Visualization.jl")
 include("Optimization.jl")
 
 #=

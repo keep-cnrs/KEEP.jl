@@ -15,6 +15,8 @@ include("state_funcs.jl")
 include("plots_default.jl")
 
 function main()
+    outpath = mkpath("out/2026_07_ECC")
+
     u0 = SA[0, TAU0, 0, 1, 0]
     p = PM4.build_vbpara()
     tf = 25
@@ -28,12 +30,12 @@ function main()
     i1, i2 = 2, 6
     convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
 
-    plot(yscale=:log10, xlim=(0, n + 1), xticks=0:2:100, ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), xlabel="lemniscate revolutions", ylabel="distance to limit")
-    plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black)
+    plot(yscale=:log10, xlim=(0, n + 1), xticks=0:2:100, ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), xlabel="Lemniscate revolutions", ylabel="Distance to limit")
+    plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black, ls=:dash)
     annotate!((3.9, 1e-8, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
     scatter!(errors .+ 1e-16, label=L"|| x_i - x_\infty  ||")
     display(plot!())
-    savefig("test/publications/ECC2026/figs/limit_cycle_convergence.pdf")
+    savefig(plot!(), joinpath(outpath, "limit_cycle_convergence.pdf"))
 
     tabular_str = raw"\begin{table}[thpb]
     \centering
@@ -107,7 +109,7 @@ function main()
 
     display(plot!())
 
-    savefig(plot!(), "test/publications/ECC2026/figs/yz_limit_cycles.pdf")
+    savefig(plot!(), joinpath(outpath, "yz_limit_cycles.pdf"))
 
     #=
     Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.

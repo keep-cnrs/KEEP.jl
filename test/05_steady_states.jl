@@ -5,7 +5,7 @@ using Plots
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
 using KEEP.SteadyState
-using KEEP.Visualisation
+using KEEP.Visualization
 
 
 default(formatter=:plain, label="")

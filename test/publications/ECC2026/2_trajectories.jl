@@ -1,4 +1,3 @@
-
 using StaticArrays
 using Plots
 using SplitApplyCombine
@@ -16,6 +15,8 @@ include("state_funcs.jl")
 include("plots_default.jl")
 
 function main()
+    outpath = mkpath("out/2026_07_ECC")
+
     p = PMP.build_vbpara()
 
     α0, τ0, dα0, dτ0 = 0, 1, 0, 0
@@ -23,7 +24,7 @@ function main()
     sol_plus = PM4.integrate(SA[α0, 1, dα0, dτ0, 0], tf, p, save_everystep=true)
     sol_minus = PM4.integrate(SA[α0, -1, dα0, dτ0, 0], tf, p, save_everystep=true)
     # TOP FRONT LEFT view
-    # using code in @Visualisation.jl , write a function here that will plot the trajectory in XY, XZ and YZ planes, aswell as from the current angle
+    # using code in @Visualization.jl , write a function here that will plot the trajectory in XY, XZ and YZ planes, aswell as from the current angle
 
     t = range(tf - 5, tf, step=0.01)
     plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-20:5:20, ytick=5:2.5:10, size=plot_size(1.8))
@@ -36,17 +37,13 @@ function main()
     plot!([0], [13])
     display(plot!())
 
-    # DEPRECATED, use the one found in limit_cycles.jl
-    # savefig("test/publications/ECC2026/figs/two_trajectories.pdf")
-
-    ##
     plot(title="Two different limit cycles", aspect_ratio=:equal, axis=false, xlabel=L"\alpha", ylabel=L"\tau")
     plot!(α.(t, Ref(sol_plus)), τ.(t, Ref(sol_plus)) .% 2π, label="+")
     plot!(α.(t, Ref(sol_minus)), τ.(t, Ref(sol_minus)) .% 2π, label="-")
     display(plot!())
 
 
-    ## This is very cool
+    ## This is very cool: torus plot
     xyz_torus = (t, sol, sym=false) -> begin
         α_ = α(t, sol)
         τ_ = τ(t, sol)

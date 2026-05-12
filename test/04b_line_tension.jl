@@ -8,7 +8,7 @@ import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
 using KEEP.LimitCycle
 using KEEP.TorqueFunction
-using KEEP.Visualisation: plot_trajectory_4D
+using KEEP.Visualization: plot_trajectory_4D
 
 # v_ref = 11.6896, que se passe-t-il ?
 # le bras va plus loin

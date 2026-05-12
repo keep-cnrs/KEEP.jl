@@ -55,6 +55,10 @@ function build_para(; kwargs...)::Para
     return p
 end
 
+function awebox_para()::Para
+    p = build_para(l=2.0, r=50.0, m=36.8, S=3.0, I_eq=2000, torque_slope=1500, C_D_l=1.2, ρ_l=1464, d_l=2e-3, h_ref=10.0, v_ref=9.0, n=1 / 0.15)
+end
+
 
 function build_vbpara(p::Para=DEFAULT_PARA)::VBPara
     L, M, T = lmt(p)

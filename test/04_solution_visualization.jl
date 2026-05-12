@@ -11,7 +11,7 @@ import KEEP.PointMass10 as PM10
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
 using KEEP.TorqueFunction
-import KEEP.Visualisation as VIS
+import KEEP.Visualization as VIS
 
 include("utils.jl")
 default(lw=3, formatter=:plain, label="")

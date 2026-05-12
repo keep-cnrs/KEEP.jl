@@ -60,8 +60,8 @@ function main()
     included_files = @_ all_files |> filter(is_included(_, pattern, exclude, only), __)
     excluded_files = @_ all_files |> filter(!is_included(_, pattern, exclude, only), __)
 
-    println("\tTested files:\n", @_ included_files |> join(__, "\n"), "\n\n")
-    println("\tDiscarded files:\n", @_ excluded_files |> join(__, "\n"), "\n\n")
+    println("\tTested files:\n", join(included_files, "\n"), "\n\n")
+    println("\tDiscarded files:\n", join(excluded_files, "\n"), "\n\n")
 
     silencer = PlotSilencer()
     pushdisplay(silencer)

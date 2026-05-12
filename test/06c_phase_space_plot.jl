@@ -24,7 +24,7 @@ using LinearAlgebra: norm
 
 using KEEP.SteadyState: ddq_partial
 using KEEP.PointMassPara
-using KEEP.Visualisation: TICKS_PI, TICKS_HALF_PI
+using KEEP.Visualization: TICKS_PI, TICKS_HALF_PI
 
 vbp = build_vbpara()
 f = q -> ddq_partial(q .+ 1e-100, vbp)

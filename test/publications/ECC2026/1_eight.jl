@@ -7,13 +7,13 @@ using SplitApplyCombine
 include("plots_default.jl")
 
 function main()
-    τ = range(0, 360, length=100)
+    τ = range(0, 360, length=501)
     θ = τ -> sind(2 * τ)
     φ = τ -> sind(τ)
 
     plot(xmirror=true, size=plot_size(2))
     # plot!(xlabel="\$ϕ(τ)\$", ylabel="\$θ(τ)\$")
-    plot!(xticks=([-1, 0, 1], ("\$Δφ\$", "\$φ = 0\$", "\$Δφ\$")),
+    plot!(xticks=([-1, 0, 1], ("\$-Δφ\$", "\$φ = 0\$", "\$Δφ\$")),
         yticks=([-1, 0, 1], ("\$θ_0 + Δθ\$", "\$θ = θ_0\$", "\$θ_0 - Δθ\$"))
     )
 
@@ -45,8 +45,8 @@ function main()
     annotate!(-dx + 0.05, dy + 0.25, ("\$\\dot{\\tau} < 0\$", ANNOTATIONFONTSIZE, :center, palette(:auto)[down_col]))
 
     display(plot!())
-
-    savefig(plot!(), "test/publications/ECC2026/figs/eight_plot.pdf")
+    outpath = mkpath("out/2026_07_ECC")
+    savefig(plot!(), joinpath(outpath, "eight_plot.pdf"))
 end
 
 main()

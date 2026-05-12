@@ -12,11 +12,13 @@ using StaticArrays
 import KEEP.PointMass4 as PM4
 import KEEP.PointMassPara as PMP
 using KEEP.SteadyState: ddq_partial, all_steady_states
-using KEEP.Visualisation: TICKS_PI, TICKS_HALF_PI
+using KEEP.Visualization: TICKS_PI, TICKS_HALF_PI
 
 include("plots_default.jl")
 
 function main()
+    outpath = mkpath("out/2026_07_ECC")
+
     PT = 4 / 3  # Makie point size ???
 
     p = PMP.build_vbpara()
@@ -48,8 +50,8 @@ function main()
         yticklabelrotation=π / 2,
         aspect=Makie.DataAspect(),
     )
-    cm.hidedecorations!(ax, label=false, ticklabels=false, grid=false)
-    cm.hidespines!(ax)
+    # cm.hidedecorations!(ax, label=false, ticklabels=false, grid=false)
+    cm.hidespines!(ax, :t, :r)
     cm.poly!([Makie.Rect(-π + i * π / 2, -π, π / 2, 2π) for i in 0:3], color=[:red, :green, :green, :red], alpha=0.1)
     col_α = PALETTE[4] # :steelblue2
     col_τ = PALETTE[3] # :chartreuse2

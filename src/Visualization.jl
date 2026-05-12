@@ -9,7 +9,7 @@
  - plot states 2D (phase space)
 =#
 
-module Visualisation
+module Visualization
 
 using Plots
 using SplitApplyCombine

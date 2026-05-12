@@ -16,98 +16,93 @@ import KEEP.TorqueFunction as TF
 include("state_funcs.jl")
 include("plots_default.jl")
 
+struct OptVar
+    sym::String
+    unit::String
+    low::Float64
+    up::Float64
+    guess::Float64
+    sol::Float64
+end
+
 function main()
+    outpath = mkpath("out/2026_07_ECC")
+
     syms = [:r, :I_eq, :torque_slope]
     p0 = PMP.build_para()
     lower, upper = OPT.make_bounds(p0, syms)
     tol = 1e-6
-    stats, model = OPT.optimize(p0, syms, lower, upper; sense=+, tol=tol)
+    solution, stats, model = OPT.optimize(p0, syms, lower, upper; sense=+, tol=tol)
 
     para_dims, state_dims, iterate_dims, power_dim = OPT.compute_dims(p0, syms)
     initial_guess_ = model.meta.x0
     initial_guess = initial_guess_ .* iterate_dims
     solution_ = stats.solution
-    solution = solution_ .* iterate_dims
-
-
-    table_params_str = raw"\begin{table}[thpb]
-    \centering
-    \begin{tabular}{l l S S}
-        \toprule
-        {Name} & {Symbol [Unit]} & {Lower} & {Upper}  \\
-        \midrule
-        Line length & $\ell$ [\si{\meter}] & " * f"{lower[1]:.1f}" * " & " * f"{upper[1]:.1f}" * raw" \\
-        Arm braking & $b$ [\si{\newton\metre\per\radian\per\second}] & " * f"{lower[2]:.1f}" * " & " * f"{upper[2]:.1f}" * raw" \\
-        Arm inertia & $I$ [\si{\kilogram\metre\squared}] & " * f"{lower[3]:.1f}" * " & " * f"{upper[3]:.1f}" * raw" \\
-        \bottomrule
-    \end{tabular}
-    \caption{Description of the optimized parameters}
-    \end{table}"
 
     g_fmt = (x) -> begin
         e = floor(Int, log10(x))
         m = x / exp10(e)
-        return f"{m:.1f}" * raw"\times10^{" * f"{e}" * "}"
+        return f"${m:.1f}" * raw"\times10^{" * f"{e}" * raw"}$"
     end
 
-    table_opt_str = raw"\begin{table}[thpb]
-    \centering
-    \begin{tabular}{l S S}
-        \toprule
-        {Symbol} & {Initial guess} & {Solution} \\
-        \midrule"
+    # 1. Populate the data into a Vector of OptVar
+    # This acts as your single source of truth
+    data = [
+        OptVar(raw"$\ell$", raw"\si{\meter}", lower[1], upper[1], initial_guess[end-2], solution[end-2]),
+        OptVar(raw"$I$", raw"\si{\kilogram\meter\squared}", lower[2], upper[2], initial_guess[end-1], solution[end-1]),
+        OptVar(raw"$b$", raw"\si{\newton\meter\second\per\radian}", lower[3], upper[3], initial_guess[end], solution[end])
+    ]
 
-    table_opt_str *= "\n    " * join([
-                             raw"$\ell$",
-                             f"{initial_guess[end-2]:.1f}",
-                             f"{solution[end-2]:.1f}"
-                         ], " & ") * raw" \\ "
+    # 2. Build Table 1 Rows (Bounds)
+    bounds_rows = [f"    {v.sym} ({v.unit}) & {v.low:.1f} & {v.up:.1f} \\\\ " for v in data]
 
-    table_opt_str *= "\n    " * join([
-                             raw"$b$",
-                             f"{initial_guess[end-1]:.1f}",
-                             f"{solution[end-1]:.1f}"
-                         ], " & ") * raw" \\ "
+    # 3. Build Table 2 Rows (Results)
+    results_rows = [f"    {v.sym} ({v.unit}) & {v.guess:.1f} & {v.sol:.1f} \\\\ " for v in data]
 
-    table_opt_str *= "\n    " * join([
-                             raw"$I$",
-                             f"{initial_guess[end]:.1f}",
-                             f"{solution[end]:.1f}"
-                         ], " & ") * raw" \\ "
+    # Add special rows to Results
+    push!(results_rows, raw"    \midrule")
+    push!(results_rows, f"    Average power (\\si{{\\kilo\\watt}}) & {initial_guess[5]/1000:.2f} & {solution[5]/1000:.2f} \\\\ ")
 
-    table_opt_str *= raw"\midrule"
+    res_guess = g_fmt(norm(model.c!(model.meta.ucon, initial_guess_)))
+    res_sol = g_fmt(norm(model.c!(model.meta.ucon, stats.solution)))
+    push!(results_rows, raw"    Norm of residual & {" * res_guess * raw"} & {" * res_sol * raw"} \\ ")
 
-    table_opt_str *= "\n    " * join([
-                             raw"Average power (W)",
-                             f"{initial_guess[5]:.1f}",
-                             f"{solution[5]:.1f}"
-                         ], " & ") * raw" \\ "
+    # 4. Generate LaTeX Strings
+    table_params_str = raw"""
+\begin{table}[thpb]
+\centering
+\caption{Description of the Optimized Parameters}
+\begin{tabular}{l S S}
+    \toprule
+    {Symbol (Unit)} & {Lower} & {Upper} \\
+    \midrule
+""" * join(bounds_rows, "\n") * raw""" 
+    \bottomrule
+\end{tabular}
+\label{tab:opt_descr}
+\end{table}"""
 
-    table_opt_str *= "\n    " * join([
-                             raw"Norm of residual",
-                             "{" * g_fmt(norm(model.c!(model.meta.ucon, initial_guess_))) * "}",
-                             "{" * g_fmt(norm(model.c!(model.meta.ucon, solution_))) * "}"
-                         ], " & ") * raw" \\ "
+    table_opt_str = raw"""
+\begin{table}[thpb]
+\centering
+\caption{Optimization Results}
+\begin{tabular}{l S S}
+    \toprule
+    {Symbol (Unit)} & {Initial Guess} & {Solution} \\
+    \midrule
+""" * join(results_rows, "\n") * raw""" 
+    \bottomrule
+\end{tabular}
+\label{tab:opt_results}
+\end{table}"""
 
-    table_opt_str *= raw"
-        \bottomrule
-    \end{tabular}
-    \caption{Optimization results}
-    \parbox{0.8\linewidth}{\footnotesize
-      We optimize for a kite that ascends on the
-      sides of the figure-eight ($\dot{tau} > 0$). Ipopt converges within $11$ iterations after $\SI{0.5}{\second} on an M2 MacBook Air for a tolerance requirement of $10^{-6}$.}
-    \end{table}"
-
-    println(join(["% ## BEGIN TABLE",
-            table_params_str,
-            table_opt_str,
-            "% ## END TABLE"],
-        "\n\n"))
+    println(join(["%% BEGIN TABLE 2", table_params_str, table_opt_str, "%% END TABLE 2"], "\n\n"))
 
     ## Plot power vs time before and after optimizing
 
     vbp0 = PMP.build_vbpara(p0)
-    vbp_opt = CA(vbp0; (syms .=> solution_[end-length(syms)+1:end])...)
+    p_opt = CA(p0; solution.params...)
+    vbp_opt = PMP.build_vbpara(p_opt)
     lc_0 = LC.compute_limit_cycle(vbp0; sense=+)
     tf_0 = last(lc_0.t)
     tf_opt = solution[4]
@@ -122,37 +117,41 @@ function main()
     step = 0.01
     t_0 = 0:step:tf_0
     t_opt = 0:step:tf_opt
-    t = 0:3step:tf
 
     c_0 = :black
     c_opt = :red
 
-    tf_0_str = "\$t_f = $(round(tf_0, sigdigits=2))\$ s"
-    tf_opt_str = "\$t_f = $(round(tf_opt, sigdigits=2))\$ s"
+    label = ff"{lbl:s}, $t_f$: {tf:.2f} s, avg: {avg:.2f} kW"
+    label_0 = label((lbl="Initial guess", tf=tf_0, avg=avg_0))
+    label_opt = label((lbl="Optimized", tf=tf_opt, avg=avg_opt))
+    println(label_0)
+    println(label_opt)
 
-    plot(size=plot_size(4 / 3), xticks=(0:0.25:1, ["0", "", "", "", "1"]), xlabel="Normalized time", yticks=0:5:20, ylim=(0, 20), ylabel="Power (kW)", legend=:outerbottom, bottom_margin=-8Plots.mm)
+    plot(size=plot_size(4 / 3), xticks=(0:0.25:1, ["0", "0.25", "0.5", "0.75", "1"]), xlabel="Normalized time", yticks=0:5:20, ylim=(0, 20), ylabel="Power (kW)", legend=:outerbottom)
+    plot!(bottom_margin=-7.5Plots.mm)
 
-    plot!([], [], label="Optimized, " * tf_opt_str, c=c_opt)
-    @_ plot!(_ / tf_0, P(_, sol_0) / 1000, t_0, label="Initial guess, " * tf_0_str, c=c_0)
+    # Shenanigans to plot Optimized on top of Initial guess, while it being first in the legend
+    plot!([], [], label=label_opt, c=c_opt)
+    @_ plot!(_ / tf_0, P(_, sol_0) / 1000, t_0, label=label_0, c=c_0)
     @_ plot!(_ / tf_opt, P(_, sol_opt) / 1000, t_opt, c=c_opt)
 
-    # annotate!(1, 12.5, (tf_0_str, ANNOTATIONFONTSIZE, c_0, :right))
-    # annotate!(1, 10.2, (tf_opt_str, ANNOTATIONFONTSIZE, c_opt, :right))
-
-    annotate!(0.72, avg_0 - 2, Plots.text("\$$(round(avg_0, sigdigits=2))\$ kW", ANNOTATIONFONTSIZE, c_0, :right, rotation=0, family=FONT))
-    annotate!(0.28, avg_opt + 2, Plots.text("\$$(round(avg_opt, sigdigits=2))\$ kW", ANNOTATIONFONTSIZE, c_opt, :left, rotation=0, family=FONT))
+    # annotate!(0.72, avg_0 - 2, Plots.text(f"+{100*(avg_opt/avg_0 - 1)}%", ANNOTATIONFONTSIZE, c_0, :right, rotation=0, family=FONT))
+    # annotate!(0.72, avg_0 - 2, Plots.text("Avg: \$$(round(avg_0, sigdigits=2))\$ kW", ANNOTATIONFONTSIZE, c_0, :right, rotation=0, family=FONT))
+    # annotate!(0.28, avg_opt + 2, Plots.text("Avg: \$$(round(avg_opt, sigdigits=2))\$ kW", ANNOTATIONFONTSIZE, c_opt, :left, rotation=0, family=FONT))
+    annotate!(0.9, avg_opt + 1, Plots.text(f"+{100*(avg_opt/avg_0 - 1):.0f}%", ANNOTATIONFONTSIZE, c_opt, :center, rotation=0, family=FONT))
 
     n = 100
     # scatter!(range(0, 1, n), fill(avg_0, n), ms=.5, c=c_0)
     # scatter!(range(0, 1, n), fill(avg_opt, n), ms=.5, c=c_opt)
-    plot!([0, 1], fill(avg_0, 2), c=c_0, ls=:dash)
-    plot!([0, 1], fill(avg_opt, 2), c=c_opt, ls=:dash)
+    plot!([0, 1], fill(avg_0, 2), c=c_0, ls=:dot, lw=1)
+    plot!([0, 1], fill(avg_opt, 2), c=c_opt, ls=:dot, lw=1)
     display(plot!())
 
-    println("tf_0 = \$$(round(tf_0, sigdigits=3))\$ s")
+    @show avg_0, avg_opt
+    println(f"Power gain: {avg_opt:.2f}/{avg_0:.2f} = {100*avg_opt/avg_0:.2f} %")
     println("tf_opt = \$$(round(tf_opt, sigdigits=3))\$ s")
 
-    savefig("test/publications/ECC2026/figs/optimized_power.pdf")
+    savefig(plot!(), joinpath(outpath, "optimized_power.pdf"))
 end
 
 main()

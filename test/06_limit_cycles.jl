@@ -27,7 +27,7 @@ using Logging
 using StrFormat
 
 import KEEP.PointMass4 as PM4
-import KEEP.Visualisation as VIS
+import KEEP.Visualization as VIS
 using KEEP.PointMassPara: build_para, build_vbpara, VBPara
 using KEEP.LimitCycle
 using KEEP: DEFAULT_TOLERANCE, TAU0

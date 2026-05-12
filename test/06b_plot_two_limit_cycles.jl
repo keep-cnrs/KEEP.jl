@@ -8,7 +8,7 @@ using KEEP.PointMassPara
 using KEEP.LimitCycle
 import KEEP: TAU0
 using KEEP.TorqueFunction
-using KEEP.Visualisation: plot_trajectory_4D
+using KEEP.Visualization: plot_trajectory_4D
 
 p = build_vbpara()
 

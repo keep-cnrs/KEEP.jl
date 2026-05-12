@@ -19,7 +19,7 @@ import KEEP.PointMassPara as PMP
 import KEEP.Optimization as OPT
 import KEEP.LimitCycle as LC
 
-includet("plots_default.jl")
+include("plots_default.jl")
 
 function extrema_tension(sol)
     tmin, tmax = sol.prob.tspan
@@ -84,7 +84,7 @@ function compute_results(param, value; syms, p0, sense, tol)
 
     # optimize
     lower, upper = OPT.make_bounds(p0, syms)
-    stats, model = with_logger(NullLogger()) do
+    _, stats, model = with_logger(NullLogger()) do
         OPT.optimize(p0, syms, lower, upper; sense=sense, tol=tol)
     end
     para_dims, state_dims, iterate_dims, power_dim = OPT.compute_dims(p0, syms)
@@ -105,8 +105,8 @@ function compute_results(param, value; syms, p0, sense, tol)
     return stats_no_opt, stats_opt, theta
 end
 
-function range_optim(param, values; syms, p0, sense, tol)
-    stats_no_opt_vec, stats_opt_vec, theta_vec = invert(@showprogress y = [
+function range_optim(param, values; syms, p_ref, sense, tol)
+    stats_no_opt_vec, stats_opt_vec, theta_vec = invert(@showprogress [
         compute_results(param, v; syms=syms, p0=p_ref, sense=sense, tol=tol)
         for v in values
     ])
@@ -117,6 +117,8 @@ minmaxnormalize(x) = (x .- minimum(x)) ./ (maximum(x) - minimum(x))
 maxnormalize(x) = x ./ maximum(x)
 
 function main()
+    outpath = mkpath("out/2026_07_ECC")
+
     sense = +
     syms = [:r, :I_eq, :torque_slope]  # \ell, I, b
     wind_range = range(5, 15, length=11)
@@ -127,7 +129,7 @@ function main()
     _, _, theta0 = compute_results(:v_ref, wind_ref; syms=syms, p0=p0, sense=sense, tol=tol)
     p_ref = CA(p0; (syms .=> theta0)...)
 
-    stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:v_ref, wind_range; syms=syms, p0=p_ref, sense=sense, tol=tol)
+    stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:v_ref, wind_range; syms=syms, p_ref=p_ref, sense=sense, tol=tol)
 
     ## Plot
     my_defaults()
@@ -137,15 +139,15 @@ function main()
 
     default(xformatter=x -> "", xticks=4:2:16, xlim=(4, 16))
     f1 = plot(yticks=0:20:40, ylim=(-5, 55), ylabel="Power (kW)")
-    f2 = plot(yticks=0:20:40, ylim=(-5, 40), ylabel="Tension range (kN)")
+    f2 = plot(yticks=0:20:40, ylim=(-5, 40), ylabel="Line tension (kN)")
     f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(-0.1, 1.1), ylabel="Parameters", xlabel="Wind speed (m/s)", formatter=:plain)
 
     theta_vec_normalized = [maxnormalize(theta) for theta in invert(theta_vec)]
 
-    c = :black
-    plot!(f1, wind_range, power_no_opt_vec ./ 1000, c=c)
-    plot!(f2, wind_range, [max_tension_no_opt_vec ./ 1000, min_tension_no_opt_vec ./ 1000], c=:black)
-    # plot!(f3, wind_range, [[p for _ in wind_range] for p in invert(theta_vec_normalized)[i_ref]], c = c)
+    ref_style = (; ls=:dot, c=:black)
+    plot!(f1, wind_range, power_no_opt_vec ./ 1000; ref_style...)
+    plot!(f2, wind_range, [max_tension_no_opt_vec ./ 1000, min_tension_no_opt_vec ./ 1000]; ref_style...)
+    plot!(f3, wind_range, [[p for _ in wind_range] for p in invert(theta_vec_normalized)[i_ref]]; lw=0.5, ref_style...)
 
     # Plot optimization results
     plot!(f1, wind_range, power_vec ./ 1000, m=:circle, c=[1], label="Power (kW)")
@@ -169,9 +171,9 @@ function main()
     if legend == :annotate
         annotate!(f1, wind_range[end] - 2, power_vec[end] ./ 1000, ("Power (kW)", TICKFONTSIZE, :right))
         annotate!(f2, wind_range[end] - 2, max_tension_vec[end] ./ 1000, ("Tension range (kN)", TICKFONTSIZE, :right))
-        annotate!(f3, wind_range[end] - 2, 1.05, ("Line length", TICKFONTSIZE, :right, palette(:auto)[1]))
-        annotate!(f3, wind_range[end] - 0.2, 0.7, ("Arm inertia", TICKFONTSIZE, :right, palette(:auto)[2]))
-        annotate!(f3, wind_range[2], 0.3, ("Arm braking coefficient", TICKFONTSIZE, :left, palette(:auto)[3]))
+        annotate!(f3, wind_range[end] - 2, 1.0, ("Line length", TICKFONTSIZE, :right, palette(:auto)[1]))
+        annotate!(f3, wind_range[end] - 0.2, 0.74, ("Arm inertia", TICKFONTSIZE, :right, palette(:auto)[2]))
+        annotate!(f3, wind_range[2], 0.35, ("Arm braking coefficient", TICKFONTSIZE, :left, palette(:auto)[3]))
     end
 
     fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(3 / 4))
@@ -182,10 +184,10 @@ function main()
 
     display(fig)
 
-    savefig(fig, "test/publications/ECC2026/figs/parametrized_optimization.pdf")
-    savefig(f1, "test/publications/ECC2026/figs/parametrized_optimization_power.pdf")
-    savefig(f2, "test/publications/ECC2026/figs/parametrized_optimization_tension.pdf")
-    savefig(f3, "test/publications/ECC2026/figs/parametrized_optimization_params.pdf")
+    savefig(fig, joinpath(outpath, "parametrized_optimization.pdf"))
+    savefig(f1, joinpath(outpath, "parametrized_optimization_power.pdf"))
+    savefig(f2, joinpath(outpath, "parametrized_optimization_tension.pdf"))
+    savefig(f3, joinpath(outpath, "parametrized_optimization_params.pdf"))
 
     ##
     plot(xlabel="Wind speed (m/s)")
@@ -225,10 +227,11 @@ function main()
     plot!(wind_range, [(125 / (theta[2] - 3270) + 0.2) / 1.2 for theta in theta_vec], label="arm inertia")
     plot!([0], [0])
 
+    #=
     ## Optimize I for range of r
 
     r_range = 10:5:100
-    _, _, theta_vec_ = range_optim(:r, r_range; syms=[:I_eq], p0=p_ref, sense=sense, tol=tol)
+    _, _, theta_vec_ = range_optim(:r, r_range; syms=[:I_eq], p_ref=p_ref, sense=sense, tol=tol)
 
     Is = [theta[1] for theta in theta_vec_]
     inds = 30 .< r_range .< 80
@@ -236,6 +239,7 @@ function main()
     ##
     plot(r_range[inds], @. (Is[inds] / 8000 + 0.3))
     plot!([0], [0])
+    =#
 end
 
 main()
