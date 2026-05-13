@@ -11,7 +11,7 @@ function compute_OK(q, p)
     return nothing
 end
 
-function dynamics(x, u, p, t)
+function dynamics(x, u, p, t=0)
     # L, M, T = lmt(p)
     # α, _, _ = q = y[SA[1, 2, 3]]
     # dα, _, _ = dq = y[SA[4, 5, 6]]

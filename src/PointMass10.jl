@@ -202,7 +202,7 @@ We have a function `residuals` linear in `ddq`, and we want to find its root.
 We compute its Jacobian `M` wrt. `ddq` and its value `b` at `ddq = zeros(5)`.
 Finally, we solve `ddq = - M \\ b` to get the dynamics.
 """
-function dynamics!(du, u, p, t)
+function dynamics!(du, u, p, t=0)
     q = u[1:5]
     dq = u[6:10]
     dα = dq[3]

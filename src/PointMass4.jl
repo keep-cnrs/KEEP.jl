@@ -97,7 +97,7 @@ Compute du, the evolution of the state.
 u = (α, τ, dα, dτ)
 du = (dα, dτ, ddα, ddτ)
 """
-function dynamics(u, p, t)
+function dynamics(u, p, t=0)
     L, M, T = lmt(p)
     α, _ = q = u[SA[1, 2]]
     dα, _ = dq = u[SA[3, 4]]
