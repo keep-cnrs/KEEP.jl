@@ -1,13 +1,12 @@
 using Test
-using ComponentArrays
+using ComponentArrays: ComponentArray as CA
 using Logging
 
 using KEEP.PointMassPara
 
-CA = ComponentArray
 
 # Test creation
-p = build_para(I_eq = π)
+p = build_para(I_eq=π)
 @test p.I_eq ≈ π
 
 
@@ -30,7 +29,7 @@ para_to_vbpara_to_para = build_para(para_to_vbpara; S=para.S, ρ_air=para.ρ_air
 
 # test lmt
 L, M, T = rand(3)
-p_lmt = build_para(l=L, m=M, v_ref=L/T)
+p_lmt = build_para(l=L, m=M, v_ref=L / T)
 @test all(lmt(p_lmt) .≈ (L, M, T))
 @test all(lmt(build_vbpara(p_lmt)) .≈ (L, M, T))
 

@@ -93,7 +93,7 @@ table_str = join([
 Constraints neglog error (should be 0 < e < 16): \%.1f(constraints_neg_log_error) (~correct digits)
 dτ0 (should be > 0): \%.3f(dτ0)
 
-Power Objective:
+Average power:
 \tInit: \%.1f(x0.P) W
 \tSol : \%.1f(solution.P) W
 

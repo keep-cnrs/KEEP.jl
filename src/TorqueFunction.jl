@@ -102,6 +102,10 @@ function reset_torque_function!()
     set_torque_function!(DEFAULT_TORQUE)
 end
 
+"""
+torque_function has input and output dimension of 1.
+`L, M, T = lmt(p); torque_function(dα * T, p) * M * L^2 * T^-2`
+"""
 function torque_function(dα, p, choice::TorqueFunctionChoice=CURR_TORQUE_REF[])
     if choice == RATIONAL_TORQUE
         return torque_function_rational(dα, p)

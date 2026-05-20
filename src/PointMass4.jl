@@ -141,7 +141,7 @@ function dynamics(u, p, t=0)
     Faero_on_lines = drag_l * ew
     Faero = Faero_on_kite + Faero_on_lines
 
-    # torque with same sign as dα, the torque applied by the arm on the generator
+    # torque_function takes a dimensionless dα
     torque = torque_function(dα * T, p) * M * L^2 * T^-2
     l_tension = rhat ⋅ (SA[0, 0, 1] × OA)
     A_tension = -(p.I_eq * M * L^2) / l_tension * rhat * SA[1, 0]'
