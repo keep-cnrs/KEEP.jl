@@ -7,7 +7,7 @@ using LinearAlgebra
 using OrdinaryDiffEq
 using Plots
 
-using OptimalControl
+using OptimalControl, NLPModelsIpopt
 
 
 #=
@@ -456,5 +456,5 @@ begin
 end
 
 init = nothing
-solve(ocp; initial_guess=init, backend=:manual)
-solve(ocp, initial_guess=init)
+solve(ocp; init=init, backend=:manual)
+solve(ocp, init=init)
