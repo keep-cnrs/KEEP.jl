@@ -91,14 +91,14 @@ end
 
 
 """
-shooting -> u0, T"""
+shooting = [α0, dα0, dτ0, T] -> u0, T"""
 function unpack_shooting(shooting)
     α0, dα0, dτ0, T = shooting
     return SA[rem2pi(α0, RoundNearest), TAU0, dα0, dτ0, 0], T
 end
 
 """
-u0, t0, t1 -> shooting"""
+u0, t0, t1 -> shooting = [α0, dα0, dτ0, T]"""
 function build_shooting(u0, t0, t1)
     α0, dα0, dτ0 = project_to_section(u0)
     T = t1 - t0
@@ -108,7 +108,7 @@ end
 """
 sol contains only states that are on the Poincaré section, eg. with `build_poincare_callback()`.
 
-sol -> u0, t0, t1 -> shooting"""
+sol -> u0, t0, t1 -> shooting = [α0, dα0, dτ0, T]"""
 function build_shooting(sol)
     u0 = sol.u[end]
     t0, t1 = sol.t[[end - 1, end]]

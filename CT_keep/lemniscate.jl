@@ -120,7 +120,7 @@ begin  # Functions
             vars ∈ R⁴, variable
             tf = vars[1]
             p = vars[2:4]
-            t ∈ [0, 1], time                      # Fixed time interval [0, 1]
+            s ∈ [0, 1], time                      # Fixed time interval [0, 1]
             X = (α, τ, dα, dτ) ∈ R⁴, state
 
             calc_vars(lc) ./ factor <= vars <= calc_vars(lc) .* factor
@@ -131,16 +131,19 @@ begin  # Functions
             dα(1) - dα(0) == 0
             dτ(1) - dτ(0) == 0
 
-            Ẋ(t) == tf * f(X(t), p)               # Explicitly scaled dynamics
+            Ẋ(s) == tf * f(X(s), p)               # Explicitly scaled dynamics
 
-            ∫(generated_power(dα(t), p)) → max     # Directly yields P_avg
+            ∫(generated_power(dα(s), p)) → max     # Directly yields P_avg
         end
 
         # Interpolate the initial guess from [0, tf] to [0, 1]
         init = @init ocp begin
             vars := calc_vars(lc)
-            X(t) := lc(t * calc_vars(lc)[1])[1:4]
+            X(s) := lc(s * calc_vars(lc)[1])[1:4]
         end
+        #=
+
+        =#
         return ocp, init
     end
 
@@ -237,12 +240,13 @@ P_ct = optim_sol.objective
 
 
 ##########
-# Indirect single shooting
+## Indirect single shooting
 ##########
 using OrdinaryDiffEq
 
 flow = Flow(optim_ocp);
 
+# https://control-toolbox.org/MagneticResonanceImaging.jl/stable/saturation.html
 function shoot!(res, x0, p0, tf, λ)
     # λ is previous p
     xf, pf, pλf = flow(0, x0, p0, tf, [tf, λ...]; augment=true)
@@ -272,12 +276,192 @@ tf_guess, λ_guess = tf_direct, λ_direct
 y_guess = [x0_guess; p0_guess; tf_guess; λ_guess]
 shoot(y_guess)
 # NLE problem with initial guess (2 unknowns: p0, λ)
-prob_indirect = NonlinearProblem(shoot!,)
+if false  # To implement
+    prob_indirect = NonlinearProblem(shoot!,)
 
-# Solve shooting equations
-shooting_sol = solve(prob_indirect; show_trace=Val(true))
-p0_sol, λ_sol = shooting_sol.u
+    # Solve shooting equations
+    shooting_sol = solve(prob_indirect; show_trace=Val(true))
+    p0_sol, λ_sol = shooting_sol.u
 
-println("Indirect solution:")
-println("Initial costate: p0 = ", p0_sol)
-println("Parameter: λ = ", λ_sol)
+    println("Indirect solution:")
+    println("Initial costate: p0 = ", p0_sol)
+    println("Parameter: λ = ", λ_sol)
+end
+
+using ForwardDiff
+using KEEP.PointMass4: integrate
+
+begin  # solve_trajectory_with_jacobian
+    """
+        solve_trajectory_with_jacobian(u0, tf, vbp)
+
+    Integrates the system with ForwardDiff.Dual numbers seeded at `u0`.
+    Returns two functions:
+    - `f(t)`: returns the N-element state vector at time t.
+    - `J(t)`: returns the N×N Jacobian matrix (∂u(t)/∂u0) at time t.
+    """
+    function solve_trajectory_with_jacobian(u0, tf, vbp)
+        N = length(u0)
+        T = eltype(u0)
+        tag = ForwardDiff.Tag(integrate, T)
+
+        # 1. Seed the initial state with Dual numbers (identity matrix partials)
+        u0_dual = SVector{N}(
+            ForwardDiff.Dual{typeof(tag)}(
+                u0[i],
+                ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N))
+            ) for i in 1:N
+        )
+
+        # 2. Integrate using the dual-valued initial state
+        ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
+
+        # 3. Define the continuous-time lookup functions using the ODE interpolation
+        f(t) = ForwardDiff.value.(ode_sol_dual(t))
+
+        J(t) =
+            let ut = ode_sol_dual(t)
+                SMatrix{N,N}(ForwardDiff.partials(ut[i], j) for i in 1:N, j in 1:N)
+            end
+
+        return f, J
+    end
+
+
+    """
+        solve_trajectory_with_jacobian_4d(u0, tf, vbp)
+
+    Integrates the 5D system, but only tracks the sensitivity of the first 4 states 
+    with respect to the first 4 initial conditions.
+
+    Returns:
+      - `f(t)`: returns the 4-element state vector at time t.
+      - `J(t)`: returns the 4×4 Jacobian matrix (∂u_{1:4}(t)/∂u0_{1:4}) at time t.
+    """
+    function solve_trajectory_with_jacobian_4d(u0, tf, vbp)
+        T = eltype(u0)
+        tag = ForwardDiff.Tag(integrate, T)
+
+        # We differentiate with respect to the first 4 states
+        N_diff = 4
+
+        # Build a 5-element SVector of Duals, but with only 4 derivative partials
+        u0_dual = SVector{5}(
+            i <= N_diff ?
+            ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N_diff))) :
+            ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> zero(T), N_diff)))
+            for i in 1:5
+        )
+
+        # Integrate the 5D system
+        ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
+
+        # f(t) returns the first 4 nominal states
+        f(t) = SVector{4}(ForwardDiff.value(ode_sol_dual(t)[i]) for i in 1:4)
+
+        # J(t) extracts the 4×4 Jacobian for the first 4 states
+        J(t) =
+            let ut = ode_sol_dual(t)
+                SMatrix{4,4}(ForwardDiff.partials(ut[i], j) for i in 1:4, j in 1:4)
+            end
+
+        return f, J
+    end
+end
+
+tf, p... = variable(optim_sol)  # Float64, Vector{Float64}
+u0 = SA[vcat(x_direct(0), 0)...]  # StaticArray{Float64}
+optim_vbp = CA(vbp0; (syms .=> p)...)  # ComponentArray{Float64}
+
+optim_lc = compute_limit_cycle(u0, optim_vbp)
+u0_bis = first(optim_lc.u)
+tf_bis = last(optim_lc.t)
+
+_, J = solve_trajectory_with_jacobian_4d(u0, tf, optim_vbp);
+# _, J = solve_trajectory_with_jacobian(u0_bis, tf_bis, optim_vbp);
+
+# 2. Define a time grid for evaluation
+ts = J.ode_sol_dual.t
+
+# 3. Compute the singular values at each time point
+# svdvals(J(t)) returns a sorted vector of 5 singular values [σ₁, σ₂, ..., σ₅]
+svals = [svdvals(J(t)) for t in ts]
+
+# 4. Reshape the data for plotting (matrix of size: length(ts) × 5)
+svals_matrix = reduce(hcat, svals)'
+
+# 5. Plot the singular values on a logarithmic scale
+plot(
+    ts,
+    svals_matrix,
+    yscale=:log10,
+    xlabel="Time (t)",
+    ylabel="Singular Values (log scale)",
+    label=["σ₁ (Max)" "σ₂" "σ₃" "σ₄" "σ₅ (Min)"],
+    title="Singular Values of J(t) over Time",
+    lw=2,
+    legend=:outerright
+)
+nothing
+
+
+
+
+
+###########
+## BK
+###########
+
+using Accessors: @set, @optic
+using BifurcationKit
+using LinearAlgebra
+
+nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
+
+function F(u, params)
+    α, τ, dα, dτ, tf = u
+    u = SA[α, τ, dα, dτ, 0]
+    # vbp = @set nt_vbp0[keys(p)] = values(p)
+    _, _, ddα, ddτ, _ = dynamics(u, params)
+    dtf = 0
+    return tf .* SA[dα, dτ, ddα, ddτ, dtf]
+end
+
+function g(u0, uT, p)
+    return SA[
+        uT[1] - u0[1]       # α loop
+        uT[3] - u0[3]       # dα loop
+        uT[4] - u0[4]       # dτ loop
+        u0[2] - TAU0        # τ init
+        uT[2] - TAU0 - 2π   # τ end
+    ]
+    return SA[]
+end
+
+
+u0_bif = SA[x_direct(0)..., tf_direct]
+const STATE_SIZE = length(u0_bif)
+model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE, phase=(u, p, T) -> T - 1.0)
+# Rename to grid_size and degree
+grid_size, degree = 40, 5
+disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree)
+bvp = BifurcationKit.BVP.discretize(model, disc)
+
+params = nt_vbp0
+t_vals = range(0, 1, 101)
+generate_solution()
+x0 = rand(STATE_SIZE * (1 + disc.m * disc.Ntst))
+# Initial guess -> quelle structure ???
+
+prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+    record_from_solution=(x, p; k...) -> begin
+        # x is not already a flattened vector ??
+        u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
+        return (max_u=norm(x, 2), s=sum(x))
+    end,
+    plot_solution=(x, p; kwargs...) -> begin
+        u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
+        plot!(u[1, :]; ylabel="u(t)", title="KEEP Solution (p₁=)", kwargs...)
+    end
+)
+
