@@ -290,6 +290,7 @@ end
 
 using ForwardDiff
 using KEEP.PointMass4: integrate
+using LinearAlgebra
 
 begin  # solve_trajectory_with_jacobian
     """
@@ -412,17 +413,25 @@ nothing
 ## BK
 ###########
 
-using Accessors: @set, @optic
 using BifurcationKit
 using LinearAlgebra
 
-nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
+function record_from_solution(x, p; k...)
+    # u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
+    return (max_u=norm(x, 2), s=sum(x))
+end
+
+function plot_solution(x, p; kwargs...)
+    u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
+    plot!(u[:, :]'; ylabel="u(t)", title="KEEP Solution (p₁=$p)", kwargs...)
+end
+
 
 function F(u, params)
     α, τ, dα, dτ, tf = u
-    u = SA[α, τ, dα, dτ, 0]
+    u_dyn = SA[α, τ, dα, dτ, 0]
     # vbp = @set nt_vbp0[keys(p)] = values(p)
-    _, _, ddα, ddτ, _ = dynamics(u, params)
+    _, _, ddα, ddτ, _ = dynamics(u_dyn, params)
     dtf = 0
     return tf .* SA[dα, dτ, ddα, ddτ, dtf]
 end
@@ -435,33 +444,89 @@ function g(u0, uT, p)
         u0[2] - TAU0        # τ init
         uT[2] - TAU0 - 2π   # τ end
     ]
-    return SA[]
 end
 
 
+nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
 u0_bif = SA[x_direct(0)..., tf_direct]
 const STATE_SIZE = length(u0_bif)
-model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE, phase=(u, p, T) -> T - 1.0)
+model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE)
 # Rename to grid_size and degree
 grid_size, degree = 40, 5
-disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree)
+const disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree)
 bvp = BifurcationKit.BVP.discretize(model, disc)
 
 params = nt_vbp0
 t_vals = range(0, 1, 101)
-generate_solution()
-x0 = rand(STATE_SIZE * (1 + disc.m * disc.Ntst))
-# Initial guess -> quelle structure ???
+# we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
+x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_direct(tf_direct * s), tf_direct))
 
 prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
-    record_from_solution=(x, p; k...) -> begin
-        # x is not already a flattened vector ??
-        u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
-        return (max_u=norm(x, 2), s=sum(x))
-    end,
-    plot_solution=(x, p; kwargs...) -> begin
-        u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
-        plot!(u[1, :]; ylabel="u(t)", title="KEEP Solution (p₁=)", kwargs...)
-    end
+    jacobian=BifurcationKit.DenseAnalytical(),
+    record_from_solution,
+    plot_solution
 )
 
+@assert false
+optn = NewtonPar(tol=1e-10, verbose=true)
+
+J = BifurcationKit.jacobian(prob, prob.u0, prob.params)
+
+sol = BifurcationKit.solve(prob, Newton(), optn)
+
+plot();
+plot_solution(sol.u, prob.params);
+
+optc = ContinuationPar(
+    p_min=0.1,
+    p_max=10.05,
+    dsmax=0.1,
+    ds=0.01,
+    detect_bifurcation=0,
+    # detect_fold = false,
+    newton_options=optn,
+    max_steps=200,
+    nev=20,
+    n_inversion=6
+)
+
+br = continuation(prob, PALC(), optc;
+    plot=true,
+    verbosity=1,
+    normC=norminf,
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function transform_data(op::Symbol, x::Number)
+    if op === :to_int
+        return Int64(x)
+    elseif op === :to_float
+        return Float64(x)
+    else
+        return string(x)
+    end
+end
+@code_warntype transform_data(:to_int, 3.5)
+
+transform_data_val(::Val{:to_int}, x::Number) = Int64(x)
+transform_data_val(::Val{:to_float}, x::Number) = Float64(x)
+transform_data_val(::Val{S}, x::Number) where S = string(x)
+@code_warntype transform_data_val(Val(:to_int), 3.5)
+
+_syms = :to_int, :to_float
+function rand_type()
+    transform_data_val(Val(rand(_syms)), 3.5)
+end
+@code_warntype rand_type()
