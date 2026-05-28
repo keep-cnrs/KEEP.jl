@@ -201,20 +201,18 @@ lc = compute_limit_cycle(vbp0; sense=+, save_everystep=true);
 factor = 5
 lc_ocp, lc_init = build_lc_ocp();
 optim_ocp, optim_init = build_optim_ocp(lc; factor=factor);
-scaled_optim_ocp, scaled_optim_init = build_scaled_optim_ocp(lc; factor=factor);
+# scaled_optim_ocp, scaled_optim_init = build_scaled_optim_ocp(lc; factor=factor);
 
 lc_init_sol, lc_sol = solve_ocp(lc_ocp, lc_init; oc_kwargs...);
 optim_init_sol, optim_sol = solve_ocp(optim_ocp, optim_init; oc_kwargs...);
-scaled_optim_init_sol, scaled_optim_sol = solve_ocp(scaled_optim_ocp, scaled_optim_init; oc_kwargs...);
-# optim_init_sol, optim_sol = solve_ocp(optim_ocp, optim_init; oc_kwargs..., method=:shooting, shooting_method=:single);
+# scaled_optim_init_sol, scaled_optim_sol = solve_ocp(scaled_optim_ocp, scaled_optim_init; oc_kwargs...);
 
 
 display.(make_plots(optim_init_sol, optim_sol))
-display.(make_plots(scaled_optim_init_sol, scaled_optim_sol))
+# display.(make_plots(scaled_optim_init_sol, scaled_optim_sol))
 
 using KEEP.PointMassPara: build_para
 using KEEP.Optimization: optimize
-# function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=+, tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", initial_guess=(;))
 L, M, T = lmt(vbp0)
 p0 = build_para(vbp0)
 units = p0[syms] ./ vbp0[syms]
@@ -244,11 +242,10 @@ P_ct = optim_sol.objective
 ##########
 using OrdinaryDiffEq
 
-flow = Flow(optim_ocp);
+const flow = Flow(optim_ocp);
 
 # https://control-toolbox.org/MagneticResonanceImaging.jl/stable/saturation.html
 function shoot!(res, x0, p0, tf, λ)
-    # λ is previous p
     xf, pf, pλf = flow(0, x0, p0, tf, [tf, λ...]; augment=true)
     Hf = pf' * f(xf, λ) - generated_power(xf[3], λ) / tf
 
@@ -260,7 +257,23 @@ function shoot!(res, x0, p0, tf, λ)
     return res
 end
 
-shoot!(res, y, _) = shoot!(res, y[1:4], y[5:8], y[9], y[10:12])
+@views function shoot!(res, x0, p0, xf, pf, tf, λ, pλf)
+    res[1] = x0[2] - TAU0
+    res[2:5] = xf - x0 - [0, 2π, 0, 0]
+    res[6] = pf' * f(xf, λ) - generated_power(xf[3], λ) / tf # Hf
+    res[7:9] = (pf-p0)[[1, 3, 4]]
+    res[10:12] = pλf
+    return res
+end
+
+@views function shoot!(res, x0, p0, tf, λ)
+    # λ is previous p
+    xf, pf, pvf = flow(0.0, x0, p0, tf, [tf; λ]; augment=true)
+    pλf = pvf[2:4]
+    return shoot!(res, x0, p0, xf, pf, tf, λ, pλf)
+end
+
+@views shoot!(res, y, _) = shoot!(res, y[1:4], y[5:8], y[9], y[10:12])
 shoot(y) = shoot!(similar(y), y, nothing)
 
 # Extract solution from direct method for initialization
@@ -291,242 +304,525 @@ end
 using ForwardDiff
 using KEEP.PointMass4: integrate
 using LinearAlgebra
+if false
+    begin  # solve_trajectory_with_jacobian
+        """
+            solve_trajectory_with_jacobian(u0, tf, vbp)
 
-begin  # solve_trajectory_with_jacobian
-    """
-        solve_trajectory_with_jacobian(u0, tf, vbp)
+        Integrates the system with ForwardDiff.Dual numbers seeded at `u0`.
+        Returns two functions:
+        - `f(t)`: returns the N-element state vector at time t.
+        - `J(t)`: returns the N×N Jacobian matrix (∂u(t)/∂u0) at time t.
+        """
+        function solve_trajectory_with_jacobian(u0, tf, vbp)
+            N = length(u0)
+            T = eltype(u0)
+            tag = ForwardDiff.Tag(integrate, T)
 
-    Integrates the system with ForwardDiff.Dual numbers seeded at `u0`.
-    Returns two functions:
-    - `f(t)`: returns the N-element state vector at time t.
-    - `J(t)`: returns the N×N Jacobian matrix (∂u(t)/∂u0) at time t.
-    """
-    function solve_trajectory_with_jacobian(u0, tf, vbp)
-        N = length(u0)
-        T = eltype(u0)
-        tag = ForwardDiff.Tag(integrate, T)
+            # 1. Seed the initial state with Dual numbers (identity matrix partials)
+            u0_dual = SVector{N}(
+                ForwardDiff.Dual{typeof(tag)}(
+                    u0[i],
+                    ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N))
+                ) for i in 1:N
+            )
 
-        # 1. Seed the initial state with Dual numbers (identity matrix partials)
-        u0_dual = SVector{N}(
-            ForwardDiff.Dual{typeof(tag)}(
-                u0[i],
-                ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N))
-            ) for i in 1:N
-        )
+            # 2. Integrate using the dual-valued initial state
+            ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
 
-        # 2. Integrate using the dual-valued initial state
-        ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
+            # 3. Define the continuous-time lookup functions using the ODE interpolation
+            f(t) = ForwardDiff.value.(ode_sol_dual(t))
 
-        # 3. Define the continuous-time lookup functions using the ODE interpolation
-        f(t) = ForwardDiff.value.(ode_sol_dual(t))
+            J(t) =
+                let ut = ode_sol_dual(t)
+                    SMatrix{N,N}(ForwardDiff.partials(ut[i], j) for i in 1:N, j in 1:N)
+                end
 
-        J(t) =
-            let ut = ode_sol_dual(t)
-                SMatrix{N,N}(ForwardDiff.partials(ut[i], j) for i in 1:N, j in 1:N)
+            return f, J
+        end
+
+
+        """
+            solve_trajectory_with_jacobian_4d(u0, tf, vbp)
+
+        Integrates the 5D system, but only tracks the sensitivity of the first 4 states 
+        with respect to the first 4 initial conditions.
+
+        Returns:
+          - `f(t)`: returns the 4-element state vector at time t.
+          - `J(t)`: returns the 4×4 Jacobian matrix (∂u_{1:4}(t)/∂u0_{1:4}) at time t.
+        """
+        function solve_trajectory_with_jacobian_4d(u0, tf, vbp)
+            T = eltype(u0)
+            tag = ForwardDiff.Tag(integrate, T)
+
+            # We differentiate with respect to the first 4 states
+            N_diff = 4
+
+            # Build a 5-element SVector of Duals, but with only 4 derivative partials
+            u0_dual = SVector{5}(
+                i <= N_diff ?
+                ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N_diff))) :
+                ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> zero(T), N_diff)))
+                for i in 1:5
+            )
+
+            # Integrate the 5D system
+            ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
+
+            # f(t) returns the first 4 nominal states
+            f(t) = SVector{4}(ForwardDiff.value(ode_sol_dual(t)[i]) for i in 1:4)
+
+            # J(t) extracts the 4×4 Jacobian for the first 4 states
+            J(t) =
+                let ut = ode_sol_dual(t)
+                    SMatrix{4,4}(ForwardDiff.partials(ut[i], j) for i in 1:4, j in 1:4)
+                end
+
+            return f, J
+        end
+    end
+
+    tf, p... = variable(optim_sol)  # Float64, Vector{Float64}
+    u0 = SA[vcat(x_direct(0), 0)...]  # StaticArray{Float64}
+    optim_vbp = CA(vbp0; (syms .=> p)...)  # ComponentArray{Float64}
+
+    optim_lc = compute_limit_cycle(u0, optim_vbp)
+    u0_bis = first(optim_lc.u)
+    tf_bis = last(optim_lc.t)
+
+    _, J = solve_trajectory_with_jacobian_4d(u0, tf, optim_vbp)
+    # _, J = solve_trajectory_with_jacobian(u0_bis, tf_bis, optim_vbp);
+
+    # 2. Define a time grid for evaluation
+    ts = J.ode_sol_dual.t
+
+    # 3. Compute the singular values at each time point
+    # svdvals(J(t)) returns a sorted vector of 5 singular values [σ₁, σ₂, ..., σ₅]
+    svals = [svdvals(J(t)) for t in ts]
+
+    # 4. Reshape the data for plotting (matrix of size: length(ts) × 5)
+    svals_matrix = reduce(hcat, svals)'
+
+    # 5. Plot the singular values on a logarithmic scale
+    plot(
+        ts,
+        svals_matrix,
+        yscale=:log10,
+        xlabel="Time (t)",
+        ylabel="Singular Values (log scale)",
+        label=["σ₁ (Max)" "σ₂" "σ₃" "σ₄" "σ₅ (Min)"],
+        title="Singular Values of J(t) over Time",
+        lw=2,
+        legend=:outerright
+    )
+    nothing
+
+    ##########
+    ## Indirect multiple shooting (General N)
+    ##########
+
+    function shoot_multiple_N!(res, y, N)
+        # Extract variables
+        tf = y[end-3]
+        λ = y[end-2:end]
+
+        # Grid of matching times
+        ts = range(0, tf, length=N + 1)
+
+        pv_total = zeros(eltype(y), 4)
+        x_curr = y[1:4]
+        p_curr = y[5:8]
+
+        idx_res = 13 # Match conditions start after the first 12 boundary/transversality conditions
+
+        for i in 1:N
+            t_start = ts[i]
+            t_end = ts[i+1]
+
+            # Integrate segment
+            x_next_flow, p_next_flow, pv_segment = flow(t_start, x_curr, p_curr, t_end, [tf, λ...]; augment=true)
+            pv_total .+= pv_segment
+
+            if i < N
+                # Extract intermediate state/costate variables
+                idx_var = 8 * i + 1
+                x_next_var = y[idx_var:idx_var+3]
+                p_next_var = y[idx_var+4:idx_var+7]
+
+                # Formulate matching conditions
+                res[idx_res:idx_res+3] = x_next_flow - x_next_var
+                res[idx_res+4:idx_res+7] = p_next_flow - p_next_var
+                idx_res += 8
+
+                # Step forward
+                x_curr = x_next_var
+                p_curr = p_next_var
+            else
+                # Enforce boundary conditions on the final segment
+                x_final = x_next_flow
+                p_final = p_next_flow
+
+                # Boundary & Periodic conditions
+                res[1] = y[2] - TAU0                  # τ(0) == TAU0 (using x0[2])
+                res[2:5] = x_final - y[1:4] - [0, 2π, 0, 0] # Cyclic conditions on state
+
+                # Hamiltonian condition
+                Hf = p_final' * f(x_final, λ) - generated_power(x_final[3], λ) / tf
+                res[6] = Hf
+
+                # Periodic conditions on costates
+                res[7:9] = (p_final-y[5:8])[[1, 3, 4]]
+
+                # Transversality conditions on parameters
+                res[10:12] = pv_total[2:4]
             end
-
-        return f, J
+        end
+        return res
     end
 
+    # Generate initial guess by evaluating the direct solution at N points
+    function generate_initial_guess_N(x_direct, p_direct, tf_direct, λ_direct, N)
+        ts = range(0, tf_direct, length=N + 1)
+        y_guess = Float64[]
+        for i in 1:N
+            t = ts[i]
+            append!(y_guess, x_direct(t))
+            append!(y_guess, p_direct(t))
+        end
+        push!(y_guess, tf_direct)
+        append!(y_guess, λ_direct)
+        return y_guess
+    end
+
+    # Set segment count
+    N_segments = 10
+
+    # Wrappers
+    shoot_multN!(res, y, _) = shoot_multiple_N!(res, y, N_segments)
+    shoot_multN(y) = shoot_multiple_N!(similar(y), y, N_segments)
+
+    y_guess_multN = generate_initial_guess_N(x_direct, p_direct, tf_direct, λ_direct, N_segments)
+
+    # Verify initial residual
+    println("N=$N_segments residual norm: ", sum(abs2, shoot_multN(y_guess_multN)))
+
+    using NonlinearSolve
+
+    # 1. Define the shooting function matching the NonlinearSolve signature: f!(res, y, p)
+    # Here, the third argument `N` is passed as the parameter of the NonlinearProblem.
+    function shoot_mult_N!(res, y, N)
+        return shoot_multiple_N!(res, y, N)
+    end
+
+    # 2. Select the number of segments and generate the initial guess
+    N_segments = 10
+
+    y_guess_multN = generate_initial_guess_N(
+        x_direct,
+        p_direct,
+        tf_direct,
+        λ_direct,
+        N_segments
+    )
+
+    # 3. Define and solve the Nonlinear Problem
+    # We pass N_segments as the third argument to parameterize the problem.
+    prob_indirect_N = NonlinearProblem(shoot_mult_N!, y_guess_multN, N_segments)
+
+    # Solve using a Trust Region method (or NewtonRaphson())
+    sol_indirect_N = solve(prob_indirect_N, TrustRegion(); show_trace=Val(true))
+
+    # 4. Extract results
+    y_sol = sol_indirect_N.u
+    tf_sol = y_sol[end-3]
+    λ_sol = y_sol[end-2:end]
+
+    println("\n--- Optimization Results ($N_segments segments) ---")
+    println("Sol Status: ", sol_indirect_N.retcode)
+    println("Final Time (tf): ", tf_sol)
+    println("Parameters (λ): ", λ_sol)
+
+    # 5. Reconstruct the continuous trajectory
+    # Since multiple shooting only solves for states and costates at the grid nodes,
+    # we integrate the flow forward from each node to recover the full continuous path.
+    ts_nodes = range(0, tf_sol, length=N_segments + 1)
+    points_per_segment = 50
+
+    t_plot = Float64[]
+    x_plot = Vector{Float64}[]
+    p_plot = Vector{Float64}[]
+
+    for i in 1:N_segments
+        t_start = ts_nodes[i]
+        t_end = ts_nodes[i+1]
+
+        # Retrieve state and costate values at node i-1
+        idx_var = 8 * (i - 1) + 1
+        x_node = y_sol[idx_var:idx_var+3]
+        p_node = y_sol[idx_var+4:idx_var+7]
+
+        # Generate fine time grid for the current segment
+        ts_seg = range(t_start, t_end, length=points_per_segment)
+
+        for t in ts_seg
+            # Propagate from t_start to current t
+            xt, pt, _ = flow(t_start, x_node, p_node, t, [tf_sol, λ_sol...]; augment=true)
+            push!(t_plot, t)
+            push!(x_plot, xt)
+            push!(p_plot, pt)
+        end
+    end
+
+    # Convert trajectory lists to matrices for easy plotting
+    x_matrix = hcat(x_plot...)'  # Dimensions: (Time steps) x 4
+    p_matrix = hcat(p_plot...)'  # Dimensions: (Time steps) x 4
+
+    # Example verification plot
+    using Plots
+    plot(t_plot, x_matrix, label=["α" "τ" "dα" "dτ"], lw=1.5,
+        xlabel="Time [s]", ylabel="States", title="Reconstructed State Trajectories")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ## 
+
+    using NonlinearSolve
+    using Plots
 
     """
-        solve_trajectory_with_jacobian_4d(u0, tf, vbp)
+        shoot_multiple_N!(res, y, N)
 
-    Integrates the 5D system, but only tracks the sensitivity of the first 4 states 
-    with respect to the first 4 initial conditions.
-
-    Returns:
-      - `f(t)`: returns the 4-element state vector at time t.
-      - `J(t)`: returns the 4×4 Jacobian matrix (∂u_{1:4}(t)/∂u0_{1:4}) at time t.
+    Formulate the multiple shooting equations for N segments.
+    y: [ x_node_1, p_node_1, ..., x_node_N, p_node_N, tf, λ... ]
     """
-    function solve_trajectory_with_jacobian_4d(u0, tf, vbp)
-        T = eltype(u0)
-        tag = ForwardDiff.Tag(integrate, T)
+    function shoot_multiple_N!(res, y, N)
+        # 1. Unpack decision variables using structured views
+        nodes = reshape(view(y, 1:8N), 8, N)
+        tf = y[end-3]
+        λ = y[end-2:end]
 
-        # We differentiate with respect to the first 4 states
-        N_diff = 4
+        # Grid of matching times
+        ts = range(0, tf, length=N + 1)
 
-        # Build a 5-element SVector of Duals, but with only 4 derivative partials
-        u0_dual = SVector{5}(
-            i <= N_diff ?
-            ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> j == i ? one(T) : zero(T), N_diff))) :
-            ForwardDiff.Dual{typeof(tag)}(u0[i], ForwardDiff.Partials(ntuple(j -> zero(T), N_diff)))
-            for i in 1:5
-        )
+        # Views for the matching conditions (8 equations for each of the N-1 internal nodes)
+        matching_res = reshape(view(res, 13:8N+4), 8, N - 1)
+        pv_total = zeros(eltype(y), 4)
 
-        # Integrate the 5D system
-        ode_sol_dual = integrate(u0_dual, tf, vbp; save_everystep=true)
+        # Start integration at the first node
+        x_curr, p_curr = nodes[1:4, 1], nodes[5:8, 1]
 
-        # f(t) returns the first 4 nominal states
-        f(t) = SVector{4}(ForwardDiff.value(ode_sol_dual(t)[i]) for i in 1:4)
+        for i in 1:N
+            # Integrate the current segment
+            x_flow, p_flow, pv_segment = flow(ts[i], x_curr, p_curr, ts[i+1], [tf, λ...]; augment=true)
+            pv_total .+= pv_segment
 
-        # J(t) extracts the 4×4 Jacobian for the first 4 states
-        J(t) =
-            let ut = ode_sol_dual(t)
-                SMatrix{4,4}(ForwardDiff.partials(ut[i], j) for i in 1:4, j in 1:4)
+            if i < N
+                # Extract variables for the next node
+                x_next, p_next = nodes[1:4, i+1], nodes[5:8, i+1]
+
+                # Enforce matching conditions at the node interface
+                matching_res[1:4, i] .= x_flow .- x_next
+                matching_res[5:8, i] .= p_flow .- p_next
+
+                # Step forward to the next segment
+                x_curr, p_curr = x_next, p_next
+            else
+                # Final segment: boundary & transversality conditions
+                x0, p0 = nodes[1:4, 1], nodes[5:8, 1]
+
+                res[1] = x0[2] - TAU0                       # Initial state constraint τ(0) == TAU0
+                res[2:5] .= x_flow .- x0 .- [0, 2π, 0, 0]   # Cyclic state conditions
+
+                # Hamiltonian condition (tf is free)
+                Hf = p_flow' * f(x_flow, λ) - generated_power(x_flow[3], λ) / tf
+                res[6] = Hf
+
+                # Cyclic costate conditions
+                res[7:9] .= (p_flow.-p0)[[1, 3, 4]]
+
+                # Transversality conditions on parameters λ
+                res[10:12] .= pv_total[2:4]
             end
-
-        return f, J
+        end
+        return res
     end
-end
 
-tf, p... = variable(optim_sol)  # Float64, Vector{Float64}
-u0 = SA[vcat(x_direct(0), 0)...]  # StaticArray{Float64}
-optim_vbp = CA(vbp0; (syms .=> p)...)  # ComponentArray{Float64}
-
-optim_lc = compute_limit_cycle(u0, optim_vbp)
-u0_bis = first(optim_lc.u)
-tf_bis = last(optim_lc.t)
-
-_, J = solve_trajectory_with_jacobian_4d(u0, tf, optim_vbp);
-# _, J = solve_trajectory_with_jacobian(u0_bis, tf_bis, optim_vbp);
-
-# 2. Define a time grid for evaluation
-ts = J.ode_sol_dual.t
-
-# 3. Compute the singular values at each time point
-# svdvals(J(t)) returns a sorted vector of 5 singular values [σ₁, σ₂, ..., σ₅]
-svals = [svdvals(J(t)) for t in ts]
-
-# 4. Reshape the data for plotting (matrix of size: length(ts) × 5)
-svals_matrix = reduce(hcat, svals)'
-
-# 5. Plot the singular values on a logarithmic scale
-plot(
-    ts,
-    svals_matrix,
-    yscale=:log10,
-    xlabel="Time (t)",
-    ylabel="Singular Values (log scale)",
-    label=["σ₁ (Max)" "σ₂" "σ₃" "σ₄" "σ₅ (Min)"],
-    title="Singular Values of J(t) over Time",
-    lw=2,
-    legend=:outerright
-)
-nothing
-
-
-
-
-
-###########
-## BK
-###########
-
-using BifurcationKit
-using LinearAlgebra
-
-function record_from_solution(x, p; k...)
-    # u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
-    return (max_u=norm(x, 2), s=sum(x))
-end
-
-function plot_solution(x, p; kwargs...)
-    u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
-    plot!(u[:, :]'; ylabel="u(t)", title="KEEP Solution (p₁=$p)", kwargs...)
-end
-
-
-function F(u, params)
-    α, τ, dα, dτ, tf = u
-    u_dyn = SA[α, τ, dα, dτ, 0]
-    # vbp = @set nt_vbp0[keys(p)] = values(p)
-    _, _, ddα, ddτ, _ = dynamics(u_dyn, params)
-    dtf = 0
-    return tf .* SA[dα, dτ, ddα, ddτ, dtf]
-end
-
-function g(u0, uT, p)
-    return SA[
-        uT[1] - u0[1]       # α loop
-        uT[3] - u0[3]       # dα loop
-        uT[4] - u0[4]       # dτ loop
-        u0[2] - TAU0        # τ init
-        uT[2] - TAU0 - 2π   # τ end
-    ]
-end
-
-
-nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
-u0_bif = SA[x_direct(0)..., tf_direct]
-const STATE_SIZE = length(u0_bif)
-model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE)
-# Rename to grid_size and degree
-grid_size, degree = 40, 5
-const disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree)
-bvp = BifurcationKit.BVP.discretize(model, disc)
-
-params = nt_vbp0
-t_vals = range(0, 1, 101)
-# we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
-x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_direct(tf_direct * s), tf_direct))
-
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
-    jacobian=BifurcationKit.DenseAnalytical(),
-    record_from_solution,
-    plot_solution
-)
-
-@assert false
-optn = NewtonPar(tol=1e-10, verbose=true)
-
-J = BifurcationKit.jacobian(prob, prob.u0, prob.params)
-
-sol = BifurcationKit.solve(prob, Newton(), optn)
-
-plot();
-plot_solution(sol.u, prob.params);
-
-optc = ContinuationPar(
-    p_min=0.1,
-    p_max=10.05,
-    dsmax=0.1,
-    ds=0.01,
-    detect_bifurcation=0,
-    # detect_fold = false,
-    newton_options=optn,
-    max_steps=200,
-    nev=20,
-    n_inversion=6
-)
-
-br = continuation(prob, PALC(), optc;
-    plot=true,
-    verbosity=1,
-    normC=norminf,
-)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function transform_data(op::Symbol, x::Number)
-    if op === :to_int
-        return Int64(x)
-    elseif op === :to_float
-        return Float64(x)
-    else
-        return string(x)
+    # Generate initial guess using concise list comprehensions
+    function generate_initial_guess_N(x_direct, p_direct, tf_direct, λ_direct, N)
+        ts = range(0, tf_direct, length=N + 1)[1:N]
+        nodes_guess = [vcat(x_direct(t), p_direct(t)) for t in ts]
+        return vcat(nodes_guess..., tf_direct, λ_direct)
     end
-end
-@code_warntype transform_data(:to_int, 3.5)
 
-transform_data_val(::Val{:to_int}, x::Number) = Int64(x)
-transform_data_val(::Val{:to_float}, x::Number) = Float64(x)
-transform_data_val(::Val{S}, x::Number) where S = string(x)
-@code_warntype transform_data_val(Val(:to_int), 3.5)
+    # 1. Define the shooting function with NonlinearSolve's signature: f!(res, y, p)
+    shoot_mult_N!(res, y, N) = shoot_multiple_N!(res, y, N)
 
-_syms = :to_int, :to_float
-function rand_type()
-    transform_data_val(Val(rand(_syms)), 3.5)
+    # 2. Select segment count and generate the initial guess
+    N_segments = 10
+    y_guess_multN = generate_initial_guess_N(x_direct, p_direct, tf_direct, λ_direct, N_segments)
+
+    # 3. Define and solve the Nonlinear Problem
+    prob_indirect_N = NonlinearProblem(shoot_mult_N!, y_guess_multN, N_segments)
+    sol_indirect_N = solve(prob_indirect_N; show_trace=Val(true), maxiters=2)
+
+    # 4. Extract results
+    y_sol = sol_indirect_N.u
+    tf_sol = y_sol[end-3]
+    λ_sol = y_sol[end-2:end]
+
+    println("\n--- Optimization Results ($N_segments segments) ---")
+    println("Sol Status: ", sol_indirect_N.retcode)
+    println("Final Time (tf): ", tf_sol)
+    println("Parameters (λ): ", λ_sol)
+
+    # 5. Reconstruct the continuous trajectory
+    ts_nodes = range(0, tf_sol, length=N_segments + 1)
+    points_per_segment = 50
+    nodes_sol = reshape(view(y_sol, 1:8*N_segments), 8, N_segments)
+
+    t_plot = Float64[]
+    x_list = Vector{Float64}[]
+    p_list = Vector{Float64}[]
+
+    for i in 1:N_segments
+        ts_seg = range(ts_nodes[i], ts_nodes[i+1], length=points_per_segment)
+        x_node, p_node = nodes_sol[1:4, i], nodes_sol[5:8, i]
+
+        for t in ts_seg
+            xt, pt, _ = flow(ts_nodes[i], x_node, p_node, t, [tf_sol, λ_sol...]; augment=true)
+            push!(t_plot, t)
+            push!(x_list, xt)
+            push!(p_list, pt)
+        end
+    end
+
+    x_matrix = hcat(x_list...)'
+    p_matrix = hcat(p_list...)'
+
+    # Plot the reconstructed states
+    plot(t_plot, x_matrix, label=["α" "τ" "dα" "dτ"], lw=1.5,
+        xlabel="Time [s]", ylabel="States", title="Reconstructed State Trajectories")
 end
-@code_warntype rand_type()
+##
+struct MultipleShooting{F,B,K}
+    flow::F
+    boundary_conds!::B
+    dim_x::Int
+    dim_p::Int
+    dim_param::Int
+    kwargs::K
+end
+
+# Outer constructor: Infers dimensions from prototype inputs
+function MultipleShooting(flow, boundary_conds!, x_proto, p_proto, λ_proto; kwargs...)
+    return MultipleShooting(
+        flow,
+        boundary_conds!,
+        length(x_proto),
+        length(p_proto),
+        length(λ_proto),
+        kwargs
+    )
+end
+
+# The callable behavior matching the NonlinearSolve signature: f!(res, y, N)
+function (ms::MultipleShooting)(res, y, N)
+    dim_node = ms.dim_x + ms.dim_p
+    dim_bc = dim_node + 1 + ms.dim_param
+
+    # Unpack node matrix and parameters
+    nodes = reshape(view(y, 1:dim_node*N), dim_node, N)
+    tf = y[end-ms.dim_param]
+    λ = view(y, (length(y)-ms.dim_param+1):length(y))
+
+    # Define segment matching times and output views
+    ts = range(0, tf, length=N + 1)
+    bc_res = view(res, 1:dim_bc)
+    matching_res = reshape(view(res, (dim_bc+1):length(res)), dim_node, N - 1)
+
+    pv_total = zeros(eltype(y), ms.dim_p)
+    x_curr = nodes[1:ms.dim_x, 1]
+    p_curr = nodes[ms.dim_x+1:dim_node, 1]
+
+    for i in 1:N
+        # Integrate current segment using the inferred parameters
+        flow_params = [tf; λ]
+        x_flow, p_flow, pv_segment = ms.flow(ts[i], x_curr, p_curr, ts[i+1], flow_params; ms.kwargs...)
+        pv_total .+= pv_segment
+
+        if i < N
+            x_next = nodes[1:ms.dim_x, i+1]
+            p_next = nodes[ms.dim_x+1:dim_node, i+1]
+
+            # Matching conditions at the node interface
+            matching_res[1:ms.dim_x, i] .= x_flow .- x_next
+            matching_res[ms.dim_x+1:dim_node, i] .= p_flow .- p_next
+
+            # Step forward to the next segment
+            x_curr, p_curr = x_next, p_next
+        else
+            # Final segment: delegate boundary/transversality conditions to the user callback
+            x0 = nodes[1:ms.dim_x, 1]
+            p0 = nodes[ms.dim_x+1:dim_node, 1]
+            ms.boundary_conds!(bc_res, x0, p0, x_flow, p_flow, tf, λ, pv_total)
+        end
+    end
+    return res
+end
+
+# Helper to generate the initial guess vector
+function generate_initial_guess(ms::MultipleShooting, x_direct, p_direct, tf_direct, λ_direct, N)
+    ts = range(0, tf_direct, length=N + 1)[1:N]
+    nodes_guess = [vcat(x_direct(t), p_direct(t)) for t in ts]
+    return vcat(nodes_guess..., tf_direct, λ_direct)
+end
+
+# Helper to reconstruct the fine continuous trajectory from a solution vector
+function reconstruct_trajectory(ms::MultipleShooting, y_sol, N; points_per_segment=50)
+    dim_node = ms.dim_x + ms.dim_p
+    nodes_sol = reshape(view(y_sol, 1:dim_node*N), dim_node, N)
+    tf_sol = y_sol[end-ms.dim_param]
+    λ_sol = view(y_sol, (length(y_sol)-ms.dim_param+1):length(y_sol))
+
+    ts_nodes = range(0, tf_sol, length=N + 1)
+    t_plot, x_list, p_list = Float64[], Vector{Float64}[], Vector{Float64}[]
+
+    for i in 1:N
+        ts_seg = range(ts_nodes[i], ts_nodes[i+1], length=points_per_segment)
+        x_node, p_node = nodes_sol[1:ms.dim_x, i], nodes_sol[ms.dim_x+1:dim_node, i]
+
+        for t in ts_seg
+            xt, pt, _ = ms.flow(ts_nodes[i], x_node, p_node, t, [tf_sol; λ_sol]; ms.kwargs...)
+            push!(t_plot, t)
+            push!(x_list, xt)
+            push!(p_list, pt)
+        end
+    end
+    return t_plot, hcat(x_list...)', hcat(p_list...)'
+end
+
+# shoot!(res, x0, p0, tf, λ)
+ms = MultipleShooting(flow, shoot!, x_direct(0), p_direct(0), λ_direct; augment=true);
+
+N_segments = 10
+y_guess = generate_initial_guess(ms, x_direct, p_direct, tf_direct, λ_direct, N_segments)
+
+prob = NonlinearProblem(ms, y_guess, N_segments)
+sol = solve(prob, TrustRegion(); show_trace=Val(true), maxiters=2)

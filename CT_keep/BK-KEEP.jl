@@ -1,6 +1,7 @@
 using Pkg
 Pkg.activate("CT_keep")
 
+import OrdinaryDiffEq as ODE
 using BifurcationKit
 using LinearAlgebra
 using ComponentArrays: ComponentArray as CA
@@ -48,7 +49,7 @@ function plot_solution(x, p; kwargs...)
 end
 
 
-function F(u, params)
+function F(u, params, t=0)
     α, τ, dα, dτ, tf = u
     u_dyn = SA[α, τ, dα, dτ, 0]
     # vbp = @set nt_vbp0[keys(p)] = values(p)
@@ -67,9 +68,10 @@ function g(u0, uT, p)
     ]
 end
 
+nt_vbp0 = (; zip(keys(vbp0), vbp0)...)  # Named Tuple with same parameters
+u0_bif = SA[x_direct(0)..., tf_direct]  # α, τ, dα, dτ, tf
 
-nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
-u0_bif = SA[x_direct(0)..., tf_direct]
+## Collocation
 const STATE_SIZE = length(u0_bif)
 model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE)
 # Rename to grid_size and degree
@@ -78,7 +80,6 @@ const disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree, meshadapt=
 bvp = BifurcationKit.BVP.discretize(model, disc)
 
 params = nt_vbp0
-t_vals = range(0, 1, 101)
 # we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
 x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_direct(tf_direct * s), tf_direct))
 
@@ -100,7 +101,7 @@ plot_solution(sol.u, prob.params);
 
 optc = ContinuationPar(
     p_min=0.1,
-    p_max=10.05,
+    p_max=50.05,
     dsmax=0.1,
     ds=0.01,
     detect_bifurcation=0,
@@ -117,8 +118,22 @@ br = continuation(prob, PALC(), optc;
     normC=norminf,
     bothside=true,
 )
+plot(br)
 
 # plot(br)
+
+
+
+## Multiple shooting
+
+odeprob = ODE.ODEProblem(F, u0_bif, (0, 1), nt_vbp0)
+model = BifurcationKit.BVP.BVPModel(odeprob, g; n=2)
+# 4. Discretize using Collocation method
+# Using 201 points for better accuracy
+const disc = BifurcationKit.BVP.Shooting(10, ODE.Vern9(), true)
+bvp = BifurcationKit.BVP.discretize(model, disc; abstol=1e-12, reltol=1e-10)
+
+nothing
 
 #######
 ## Sparse test
