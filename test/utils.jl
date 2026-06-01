@@ -17,10 +17,10 @@ end
 
 """arr has samples in columns and variables in rows. Returns the relative negative log norm difference between each pair of samples"""
 function rel_neg_log_norm_diff(arr)
-    norms = map(norm, eachslice(arr, dims=2))
+    norms = map(norm, eachslice(arr; dims=2))
     arr1 = reshape(arr, size(arr)..., 1)
     arr2 = permutedims(arr1, (1, 3, 2))
-    diff_norms = map(norm, eachslice(arr1 .- arr2, dims=(2, 3)))
+    diff_norms = map(norm, eachslice(arr1 .- arr2; dims=(2, 3)))
     @. -log10(diff_norms / max(norms, norms'))
 end
 
@@ -67,7 +67,6 @@ end
 #     return plot!()
 # end
 
-
 # # TODO: Have one function that initializes the plot, and one function that adds a position to it, then loop over all positions
 # # Reuse these for the animation
 # function plot_position4(sol, p; t=sol.t, figure=plot())
@@ -86,7 +85,6 @@ end
 #     return plot!()
 # end
 
-
 # function plot_avg_power10(sol, p; t=sol.t, figure=plot())
 #     dα_ind, P_ind = 8, 11
 #     t0, tf = extrema(t)
@@ -98,7 +96,6 @@ end
 #     plot!([0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = \%.0f(avg_power) W")
 #     plot!(legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 # end
-
 
 # function plot_avg_power4(sol, p; t=sol.t, figure=plot(), kwargs...)
 #     dα_ind, P_ind = 3, 5
@@ -113,7 +110,6 @@ end
 #     default_kwargs = (legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 #     return plot!(; merge(default_kwargs, kwargs)...)
 # end
-
 
 # function animate_position4(sol, p; tspan=extrema(sol.t), fps=30, trail_length=1, trail_step=1 / 5fps, start_camera=(30, 30), end_camera=(40, 30), figsize=(800, 800))
 #     # Compute box
@@ -145,16 +141,14 @@ end
 #     return anim
 # end
 
-
 function pairwise_dist(X)
     G = X * X'
-    sq_norms = sum(abs2, X, dims=2)
+    sq_norms = sum(abs2, X; dims=2)
     D_sq = @. sq_norms + sq_norms' - 2 * G
     @. D_sq = sqrt(max(D_sq, 0.0))
 
     return D_sq
 end
-
 
 ## Graphs
 
@@ -207,7 +201,10 @@ function reduce_expand_reduce(steady_states, ε)
     clusters, nb_clusters = connected_components(compute_adjacency(steady_states, ε))
 
     # Compute the center of each cluster
-    cluster_centers = [mean(steady_states[:, clusters.==i_cluster], dims=2) for i_cluster in 1:nb_clusters]
+    cluster_centers = [
+        mean(steady_states[:, clusters .== i_cluster]; dims=2) for
+        i_cluster in 1:nb_clusters
+    ]
     cluster_centers = combinedims(vec.(cluster_centers))
 
     # Add the complement of each center
@@ -217,10 +214,15 @@ function reduce_expand_reduce(steady_states, ε)
 
     # Clusterize the complemented centers
     reduced_steady_states .= rem2pi.(reduced_steady_states, RoundNearest)
-    reduced_clusters, nb_reduced_clusters = connected_components(compute_adjacency(reduced_steady_states, ε))
+    reduced_clusters, nb_reduced_clusters = connected_components(
+        compute_adjacency(reduced_steady_states, ε)
+    )
 
     # Compute the new centers
-    reduced_cluster_centers = [mean(reduced_steady_states[:, reduced_clusters.==i_cluster], dims=2) for i_cluster in 1:nb_reduced_clusters]
+    reduced_cluster_centers = [
+        mean(reduced_steady_states[:, reduced_clusters .== i_cluster]; dims=2) for
+        i_cluster in 1:nb_reduced_clusters
+    ]
     reduced_cluster_centers = combinedims(vec.(reduced_cluster_centers))
 
     return reduced_cluster_centers

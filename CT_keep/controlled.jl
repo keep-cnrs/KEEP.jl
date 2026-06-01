@@ -9,7 +9,6 @@ using Plots
 
 using OptimalControl, NLPModelsIpopt
 
-
 #=
 The Coriolis term computed the mass matrix temporal derivative dM using positions q instead of velocities dq. This has been corrected to use dq.
 
@@ -37,17 +36,21 @@ function aerodynamics(X, u, pars)
     cq = cos.(q)
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     W = SVector(
         dq[4] + cq[2] * dq[3],
         sq[4] * sq[2] * dq[3] + cq[4] * dq[2],
-        cq[4] * sq[2] * dq[3] - sq[4] * dq[2]
+        cq[4] * sq[2] * dq[3] - sq[4] * dq[2],
     )
 
     # Position and velocity of the panels
@@ -55,7 +58,7 @@ function aerodynamics(X, u, pars)
     vCG = SVector(
         -b * sq[1] * dq[1] + l * cq[2] * cq[3] * dq[2] - l * sq[2] * sq[3] * dq[3],
         b * cq[1] * dq[1] + l * cq[2] * sq[3] * dq[2] + l * sq[2] * cq[3] * dq[3],
-        -l * sq[2] * dq[2]
+        -l * sq[2] * dq[2],
     )
     vCGrel = vCG - SVector(wind(zCG), 0.0, 0.0)
 
@@ -126,7 +129,7 @@ function Caero(alpha)
     return SVector(
         1.0 * (alpha + 5.0 * pi / 180.0) * (abs(alpha) <= 30.0 * pi / 180.0),
         0.2 + 0.1 * (alpha + 5.0 * pi / 180.0)^2,
-        0.0
+        0.0,
     )
 end
 
@@ -143,34 +146,37 @@ function lagrangian(X, pars)
     cq = cos.(q)
     sq = sin.(q)
 
-    rCG = SVector(
-        b * cq[1] + l * sq[2] * cq[3],
-        b * sq[1] + l * sq[2] * sq[3],
-        l * cq[2]
-    )
+    rCG = SVector(b * cq[1] + l * sq[2] * cq[3], b * sq[1] + l * sq[2] * sq[3], l * cq[2])
     vCG = SVector(
         -b * sq[1] * dq[1] + l * cq[2] * cq[3] * dq[2] - l * sq[2] * sq[3] * dq[3],
         b * cq[1] * dq[1] + l * cq[2] * sq[3] * dq[2] + l * sq[2] * cq[3] * dq[3],
-        -l * sq[2] * dq[2]
+        -l * sq[2] * dq[2],
     )
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     w = SVector(
         dq[4] + cq[2] * dq[3],
         sq[4] * sq[2] * dq[3] + cq[4] * dq[2],
-        cq[4] * sq[2] * dq[3] - sq[4] * dq[2]
+        cq[4] * sq[2] * dq[3] - sq[4] * dq[2],
     )
 
     # NOTE: The original MATLAB code missed squaring the angular velocity (dq[1]) 
     # of the arm in the rotational kinetic energy. We've corrected this to dq[1]^2.
-    T_kin = 0.5 * m * sum(abs2, vCG) + 0.5 * dot(SVector(A, B, C), w .^ 2) + 0.5 * Iarm * dq[1]^2
+    T_kin =
+        0.5 * m * sum(abs2, vCG) +
+        0.5 * dot(SVector(A, B, C), w .^ 2) +
+        0.5 * Iarm * dq[1]^2
     V_pot = m * g * rCG[3]
 
     L = T_kin - V_pot
@@ -240,20 +246,25 @@ function eom(X, u, pars, t=0)
     dM = dq[1] * dM1 + dq[2] * dM2 + dq[3] * dM3 + dq[4] * dM4
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     Rref2body = vcat(Ihat', Jhat', Khat')
 
-    deltaRcg = Rref2body * @SMatrix [
-        -b*sq[1] l*cq[2]*cq[3] -l*sq[2]*sq[3] 0.0;
-        b*cq[1] l*cq[2]*sq[3] l*sq[2]*cq[3] 0.0;
-        0.0 -l*sq[2] 0.0 0.0
-    ]
+    deltaRcg =
+        Rref2body * @SMatrix [
+            -b*sq[1] l*cq[2]*cq[3] -l*sq[2]*sq[3] 0.0;
+            b*cq[1] l*cq[2]*sq[3] l*sq[2]*cq[3] 0.0;
+            0.0 -l*sq[2] 0.0 0.0
+        ]
 
     deltaW = @SMatrix [
         0.0 0.0 cq[2] 1.0;
@@ -273,12 +284,10 @@ function eom(X, u, pars, t=0)
     Q = Qaero + Qgenerator + Qlines
 
     dV = SVector(0.0, -m * g * l * sq[2], 0.0, 0.0)
-    dLdq = SVector(
-        dot(dq, dM1 * dq),
-        dot(dq, dM2 * dq),
-        dot(dq, dM3 * dq),
-        dot(dq, dM4 * dq)
-    ) / 2.0 - dV
+    dLdq =
+        SVector(
+            dot(dq, dM1 * dq), dot(dq, dM2 * dq), dot(dq, dM3 * dq), dot(dq, dM4 * dq)
+        ) / 2.0 - dV
 
     # Calculate states derivative avoiding explicit inversion operations over allocations
     @warn "Regularizing mass matrix M in eom" maxlog = 1
@@ -295,7 +304,7 @@ end
 LU = 1.0
 TU = 1.0
 
-const pars = CA(
+const pars = CA(;
     larm=2.0 / LU,
     lcg=20.0 / LU,
     mass=5.0,
@@ -308,13 +317,14 @@ const pars = CA(
     aero=(
         S=5.0 / LU^2,
         rho=1.225 / LU^3,
-        panels=[0.1/LU 0.1/LU;
+        panels=[
+            0.1/LU 0.1/LU;
             1.25/LU -1.25/LU;
-            0.0 0.0],
-        delta=30.0 * pi / 180.0
-    )
+            0.0 0.0
+        ],
+        delta=30.0 * pi / 180.0,
+    ),
 )
-
 
 x0 = @SVector [0.0, pi / 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 const u_const = @SVector [-20.0 * pi / 180.0, -20.0 * pi / 180.0]
@@ -330,17 +340,20 @@ prob = ODEProblem(f_ode, x0, tspan, pars)
 
 ## Solve
 # (Rosenbrock23 acts as an analog to MATLAB's ode23s/ode23t to navigate moderate stiffness natively)
-sol = solve(prob, reltol=1e-6, abstol=1e-6, progress=true)
+sol = solve(prob; reltol=1e-6, abstol=1e-6, progress=true)
 
 # =========================================================
 # Figures & Visualization
 # =========================================================
-t_plot = range(0.0, 20.0 / TU, length=101)
+t_plot = range(0.0, 20.0 / TU; length=101)
 x_plot = sol.(t_plot)
 
 # 1. Trajectory Animation (Replaces the drawnow interactive MATLAB loop)
 calc_OA(x, pars) = pars.larm * SVector(cos(x[1]), sin(x[1]), 0.0)
-calc_OG(x, pars) = calc_OA(x, pars) + pars.lcg * SVector(sin(x[2]) * cos(x[3]), sin(x[2]) * sin(x[3]), cos(x[2]))
+function calc_OG(x, pars)
+    calc_OA(x, pars) +
+    pars.lcg * SVector(sin(x[2]) * cos(x[3]), sin(x[2]) * sin(x[3]), cos(x[2]))
+end
 
 OA = calc_OA.(x_plot, Ref(pars))
 OG = calc_OG.(x_plot, Ref(pars))
@@ -348,38 +361,83 @@ OG = calc_OG.(x_plot, Ref(pars))
 if false
     anim = @animate for j in 1:length(t_plot)
         plot(
-            [0.0, pars.larm], [0.0, 0.0], [0.0, 0.0],
-            color=:black, linewidth=2, label=false, aspect_ratio=:equal,
-            showaxis=false, grid=false
+            [0.0, pars.larm],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            color=:black,
+            linewidth=2,
+            label=false,
+            aspect_ratio=:equal,
+            showaxis=false,
+            grid=false,
         )
-        plot!([0.0, 0.0], [0.0, pars.larm], [0.0, 0.0], color=:black, linewidth=2, label=false)
-        plot!([0.0, 0.0], [0.0, 0.0], [0.0, pars.larm], color=:black, linewidth=2, label=false)
+        plot!(
+            [0.0, 0.0], [0.0, pars.larm], [0.0, 0.0], color=:black, linewidth=2, label=false
+        )
+        plot!(
+            [0.0, 0.0], [0.0, 0.0], [0.0, pars.larm], color=:black, linewidth=2, label=false
+        )
 
         # Arm and Lines
-        plot!([0.0, OA[j][1]], [0.0, OA[j][2]], [0.0, OA[j][3]], color=:red, linewidth=2, label=false)
-        plot!([OG[j][1], OA[j][1]], [OG[j][2], OA[j][2]], [OG[j][3], OA[j][3]], color=:blue, linewidth=2, label=false)
+        plot!(
+            [0.0, OA[j][1]],
+            [0.0, OA[j][2]],
+            [0.0, OA[j][3]],
+            color=:red,
+            linewidth=2,
+            label=false,
+        )
+        plot!(
+            [OG[j][1], OA[j][1]],
+            [OG[j][2], OA[j][2]],
+            [OG[j][3], OA[j][3]],
+            color=:blue,
+            linewidth=2,
+            label=false,
+        )
 
         xlims!(-pars.lcg, pars.lcg)
         ylims!(-pars.lcg, pars.lcg)
         zlims!(0, pars.lcg)
     end
-    g = gif(anim, fps=30) # Use this if you wish to dump a fluid video!
+    g = gif(anim; fps=30) # Use this if you wish to dump a fluid video!
     display(g)
 
     # 2. Beta angle plot
 
     get_beta(x) = x[2] * (180.0 / pi)
-    p_beta = plot(t_plot .* TU, get_beta.(x_plot), color=:black, linewidth=2,
-        xlabel="Time [s]", ylabel="β [deg]", framestyle=:box, legend=false)
+    p_beta = plot(
+        t_plot .* TU,
+        get_beta.(x_plot);
+        color=:black,
+        linewidth=2,
+        xlabel="Time [s]",
+        ylabel="β [deg]",
+        framestyle=:box,
+        legend=false,
+    )
     display(p_beta)
 
     # 3. Aerodynamic incidence plot
     get_i1(x, u, p) = aerodynamics(x, u, p).i1 * (180.0 / pi)
     get_i2(x, u, p) = aerodynamics(x, u, p).i2 * (180.0 / pi)
 
-    p_inc = plot(t_plot .* TU, get_i1.(x_plot, Ref(u_const), Ref(pars)), label="Panel 1", linewidth=2,
-        xlabel="Time [s]", ylabel="Incidence [deg]", framestyle=:box)
-    plot!(p_inc, t_plot .* TU, get_i2.(x_plot, Ref(u_const), Ref(pars)), label="Panel 2", linewidth=2)
+    p_inc = plot(
+        t_plot .* TU,
+        get_i1.(x_plot, Ref(u_const), Ref(pars));
+        label="Panel 1",
+        linewidth=2,
+        xlabel="Time [s]",
+        ylabel="Incidence [deg]",
+        framestyle=:box,
+    )
+    plot!(
+        p_inc,
+        t_plot .* TU,
+        get_i2.(x_plot, Ref(u_const), Ref(pars));
+        label="Panel 2",
+        linewidth=2,
+    )
     display(p_inc)
 end
 
@@ -408,7 +466,6 @@ ocp = @def begin
     ∫(1e-3 * sum(abs2, u(t))) → min
 end
 
-
 # Initial guess
 begin
     using KEEP.PointMassPara: build_vbpara
@@ -416,29 +473,32 @@ begin
     using KEEP.LimitCycle: compute_limit_cycle
 
     vbp = build_vbpara()
-    lc = compute_limit_cycle(vbp, sense=+, save_everystep=true)
+    lc = compute_limit_cycle(vbp; sense=(+), save_everystep=true)
 
     fα(t) = lc(t)[1]
     fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
     fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
 
-    fpos(t) = begin
+    function fpos(t)
         LU = vbp.l
         a, θl, φl = fα(t), fθ(t), fφ(t)
-        LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
+        LU .* [
+            cos(a) + vbp.r * sin(θl) * cos(φl),
             sin(a) + vbp.r * sin(θl) * sin(φl),
-            vbp.r * cos(θl)]
+            vbp.r * cos(θl),
+        ]
     end
 
-    fβ(t) = begin
+    function fβ(t)
         v = ForwardDiff.derivative(fpos, t)
         θl, φl = fθ(t), fφ(t)
         J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
         K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
-        atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
-            (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
+        atan(
+            -(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
+            (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]),
+        )
     end
-
 
     init = @init ocp begin
         # One symbol only on lhs, `θ, φ = τ_to_θφ(x[2], vbp)` is not allowed for example
@@ -457,4 +517,4 @@ end
 
 init = nothing
 solve(ocp; init=init, backend=:manual)
-solve(ocp, init=init)
+solve(ocp; init=init)

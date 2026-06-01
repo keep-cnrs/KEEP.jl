@@ -31,9 +31,9 @@ using KEEP.LimitCycle: shoot as lc_shoot
 
 vbp = build_vbpara(CA(p0; solution.params...))
 shooting = solution[1:4]
-solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
+solution_sim = lc_shoot(shooting, vbp; save_everystep=true)
 
-x_direct = t -> solution_sim(t, idxs=1:4)
+x_direct = t -> solution_sim(t; idxs=1:4)
 tf_direct = solution_sim.t[end]
 
 ##################
@@ -45,9 +45,16 @@ end
 
 function plot_solution(x, p; kwargs...)
     u = BifurcationKit.get_time_slices(x[1:end], STATE_SIZE, disc.m, disc.Ntst)
-    plot!(u[4, :]; ylabel="u(t)", title="KEEP Solution (p₁=)", legend=false, marker=:d, markersize=1, kwargs...)
+    plot!(
+        u[4, :];
+        ylabel="u(t)",
+        title="KEEP Solution (p₁=)",
+        legend=false,
+        marker=:d,
+        markersize=1,
+        kwargs...,
+    )
 end
-
 
 function F(u, params, t=0)
     α, τ, dα, dτ, tf = u
@@ -76,21 +83,27 @@ const STATE_SIZE = length(u0_bif)
 model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE)
 # Rename to grid_size and degree
 grid_size, degree = 30, 5
-const disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree, meshadapt=true)
+const disc = BifurcationKit.BVP.Collocation(; Ntst=grid_size, m=degree, meshadapt=true)
 bvp = BifurcationKit.BVP.discretize(model, disc)
 
 params = nt_vbp0
 # we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
-x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_direct(tf_direct * s), tf_direct))
+x0 = BifurcationKit.BVP.generate_solution(
+    bvp, s -> vcat(x_direct(tf_direct * s), tf_direct)
+)
 
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BifurcationKit.BVP.BVPBifProblem(
+    bvp,
+    x0,
+    params,
+    (@optic _.v_ref);
     jacobian=BifurcationKit.DenseAnalytical(),
     record_from_solution,
-    plot_solution
+    plot_solution,
 )
 
 # @assert false
-optn = NewtonPar(tol=1e-10, verbose=true)
+optn = NewtonPar(; tol=1e-10, verbose=true)
 
 # J = BifurcationKit.jacobian(prob, prob.u0, prob.params)
 
@@ -99,7 +112,7 @@ sol = @time BifurcationKit.solve(prob, Newton(), optn);
 plot();
 plot_solution(sol.u, prob.params);
 
-optc = ContinuationPar(
+optc = ContinuationPar(;
     p_min=0.1,
     p_max=50.05,
     dsmax=0.1,
@@ -109,20 +122,13 @@ optc = ContinuationPar(
     newton_options=optn,
     max_steps=100,
     nev=20,
-    n_inversion=6
+    n_inversion=6,
 )
 
-br = continuation(prob, PALC(), optc;
-    plot=true,
-    verbosity=1,
-    normC=norminf,
-    bothside=true,
-)
+br = continuation(prob, PALC(), optc; plot=true, verbosity=1, normC=norminf, bothside=true)
 plot(br)
 
 # plot(br)
-
-
 
 ## Multiple shooting
 
@@ -141,7 +147,7 @@ nothing
 
 using DifferentiationInterface
 using ADTypes
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 using SparseArrays
 
 # 1. Define the residual
@@ -156,7 +162,7 @@ droptol!(sparsity_pattern, 1e-12)
 # 3. Setup backend with qualified KnownJacobianSparsityDetector
 backend = AutoSparse(
     AutoForwardDiff();
-    sparsity_detector=ADTypes.KnownJacobianSparsityDetector(sparsity_pattern)
+    sparsity_detector=ADTypes.KnownJacobianSparsityDetector(sparsity_pattern),
 )
 
 # 4. Prepare the cache
@@ -169,26 +175,28 @@ function J_sparse_bvp(u, p)
 end
 
 # 6. Rebuild the BVPBifProblem using the sparse Jacobian function
-prob_sparse = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob_sparse = BifurcationKit.BVP.BVPBifProblem(
+    bvp,
+    x0,
+    params,
+    (@optic _.v_ref);
     jacobian=J_sparse_bvp,
     record_from_solution,
-    plot_solution
+    plot_solution,
 )
 
 # function BifurcationKit.jacobian(prob::BifurcationKit.BVP.BVPBifProblem, u, p)
 #     return prob.jacobian(u, p)
 # end
-function BifurcationKit.jacobian(prob::BifurcationKit.BVP.BVPBifProblem{Tbvp,<:Function}, u, p) where Tbvp
+function BifurcationKit.jacobian(
+    prob::BifurcationKit.BVP.BVPBifProblem{Tbvp,<:Function}, u, p
+) where {Tbvp}
     return prob.jacobian(u, p)
     @info "Jacobian metadata:" typeof(J) size(J) nnz(J) density = (nnz(J) / length(J))
 end
 
 # 7. Define Newton parameters
-optn_sparse = NewtonPar(
-    tol=1e-10,
-    verbose=false,
-    linsolver=DefaultLS()
-)
+optn_sparse = NewtonPar(; tol=1e-10, verbose=false, linsolver=DefaultLS())
 
 # Test sparse Newton solve
 @info "Solving BVP with sparse Jacobian..."
