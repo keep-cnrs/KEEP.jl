@@ -13,12 +13,12 @@ import KEEP.TorqueFunction: torque_function
 ## Une simulation
 
 τ0 = -asin(0.01 / (50π / 180))
-dα0 = 0.
-dτ0 = 2.
+dα0 = 0.0
+dτ0 = 2.0
 
 τ0 = 1e-10
-dα0 = 0.
-dτ0 = 0.
+dα0 = 0.0
+dτ0 = 0.0
 
 p_para = PMP.build_para()
 p_vb = PMP.build_vbpara(p_para)
@@ -55,10 +55,10 @@ function coeff_aero(u, p)
         # Compute gravity force
         linear_density_l = π * p.ρ_l * (p.d_l^2) / 4
         m_l = PMP.NB_LINES * linear_density_l * p.r / 2
-        Fgrav = SA[0, 0, -p.g*(p.m+m_l)]
+        Fgrav = SA[0, 0, -p.g * (p.m + m_l)]
 
         # Compute aerodynamical force
-        wind = SA[p.v_ref*abs(OK[3] / p.h_ref)^p.n_wind, 0, 0]
+        wind = SA[p.v_ref * abs(OK[3] / p.h_ref) ^ p.n_wind, 0, 0]
         kite_speed = D_OK * D_Rτ * dq
         app_wind = wind - kite_speed  # apparent wind, We
 
@@ -72,7 +72,14 @@ function coeff_aero(u, p)
 
         lift_k = 1 // 2 * p.S * p.ρ_air * norm(app_wind)^2 * p.C_L
         drag_k = lift_k * p.C_D / p.C_L
-        drag_l = 1 // 6 * PMP.NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
+        drag_l =
+            1 // 6 *
+            PMP.NB_LINES *
+            p.ρ_air *
+            p.d_l *
+            p.C_D_l *
+            p.r *
+            norm(app_wind_perp_to_lines)^2
         Faero_on_kite = -drag_k * xw - lift_k * zw
         Faero_on_lines = drag_l .* ew
         Faero = Faero_on_kite + Faero_on_lines
@@ -89,11 +96,7 @@ function coeff_aero(u, p)
         dL_Rτ = D_Rτ * dq
         acc_OK = scnd_deriv_sample(Rτ_ -> compute_OK(Rτ_, p), Rτ, dL_Rτ, dL_Rτ)
 
-        b = (
-            p.m * acc_OK +
-            p.m * D_OK * acc_Rτ +
-            -b_tension - Fgrav - Faero
-        )
+        b = (p.m * acc_OK + p.m * D_OK * acc_Rτ + -b_tension - Fgrav - Faero)
         ddq = (D_OK' * A) \ (-D_OK' * b)
         Fcone = A * ddq + b
     end
@@ -110,7 +113,7 @@ function coeff_aero(u, p)
 end
 
 period = 3.095  # trouvé à la main
-t = range(tf - period, tf, step=0.001)
+t = range(tf - period, tf; step=0.001)
 res = coeff_aero.(sol.(t), (p_para,))
 Fx, Fy, Fz, Cx, Cy, Cz = eachrow(reduce(hcat, res))
 α, τ, dα, dτ, P = eachrow(reduce(hcat, sol.(t)))
@@ -121,24 +124,39 @@ res_θφ = τ_to_θφ.(τ, Ref(p_para))
 
 ## Visualisation du sens de parcours.
 # En vert : le position, en orange : les positions futures.
-plot(φ, θ, xlim=(p_para.φ0 - 1.1p_para.Δφ, p_para.φ0 + 1.1p_para.Δφ), ylim=(p_para.θ0 - 1.1p_para.Δθ, p_para.θ0 + 1.1p_para.Δθ), label="")
-scatter!(φ[1:50], θ[1:50], markerstrokewidth=0, label="sens de parcours")
-scatter!(φ[1:1], θ[1:1], label="start")
+plot(
+    φ,
+    θ;
+    xlim=(p_para.φ0 - 1.1p_para.Δφ, p_para.φ0 + 1.1p_para.Δφ),
+    ylim=(p_para.θ0 - 1.1p_para.Δθ, p_para.θ0 + 1.1p_para.Δθ),
+    label="",
+)
+scatter!(φ[1:50], θ[1:50]; markerstrokewidth=0, label="sens de parcours")
+scatter!(φ[1:1], θ[1:1]; label="start")
 
 ## Plot Cx, Cy et Cz en fonction du temps
-plot(title="Coeffs aero équivalents")
-plot!(t, Cx, label="Cx")
-plot!(t, Cy, label="Cy")
-plot!(t, Cz, label="Cz")
+plot(; title="Coeffs aero équivalents")
+plot!(t, Cx; label="Cx")
+plot!(t, Cy; label="Cy")
+plot!(t, Cz; label="Cz")
 
 ## Plot finesse en fonction du temps
-plot(t, Cz ./ Cx, title="Finesse équivalente", label="")
+plot(t, Cz ./ Cx; title="Finesse équivalente", label="")
 
 ## Plot Cz(t) vs Cx(t)
-plot(Cz, Cx, line_z=t, lw=20 * Cx ./ Cz, label="",
-    xlabel="Cz", ylabel="Cx",
-    linecolor=:viridis, colorbar=true, colorbar_title="t (s)",
-    title="Cz(t) vs Cx(t)\nCourbe épaisse —> Finesse faible")
+plot(
+    Cz,
+    Cx;
+    line_z=t,
+    lw=20 * Cx ./ Cz,
+    label="",
+    xlabel="Cz",
+    ylabel="Cx",
+    linecolor=:viridis,
+    colorbar=true,
+    colorbar_title="t (s)",
+    title="Cz(t) vs Cx(t)\nCourbe épaisse —> Finesse faible",
+)
 
 ## Malheureusement on ne peut pas ajouter les lignes de niveau de la finesse car l'échelle de couleur est partagée avec le temps (line_z)
 # resolution = 100

@@ -12,13 +12,12 @@ struct Parameter
     value_override::Union{String,Nothing}
 end
 
-
 const LATEX_TO_UNICODE = Dict(
     raw"\ell" => "l",
     raw"\rho" => "ρ",
     raw"\theta" => "θ",
     raw"\Delta" => "Δ",
-    raw"\phi" => "φ"
+    raw"\phi" => "φ",
 )
 
 function eor_transform(sym)
@@ -49,20 +48,46 @@ function main()
         Parameter(:g, "g", "Gravity", raw"\meter\per\square\second", nothing),
         Parameter(:h_ref, "z_0", "Wind reference altitude", raw"\meter", nothing),
         Parameter(:v_ref, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
-        Parameter(:torque_slope, "b", "Arm braking coefficient", raw"\newton\meter\second\per\radian", nothing),
-        Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle", raw"\radian", f"{p.θ0 * 180/π:.0f}" * raw"\pi / 180"),
-        Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height", raw"\radian", f"{p.Δθ * 180/π:.0f}" * raw"\pi / 180"),
-        Parameter(:Δφ, raw"\Delta\phi", "Lemniscate azimuthal half-width", raw"\radian", f"{p.Δφ * 180/π:.0f}" * raw"\pi / 180"),
+        Parameter(
+            :torque_slope,
+            "b",
+            "Arm braking coefficient",
+            raw"\newton\meter\second\per\radian",
+            nothing,
+        ),
+        Parameter(
+            :θ0,
+            raw"\theta_0",
+            "Lemniscate mean polar angle",
+            raw"\radian",
+            f"{p.θ0 * 180/π:.0f}" * raw"\pi / 180",
+        ),
+        Parameter(
+            :Δθ,
+            raw"\Delta\theta",
+            "Lemniscate polar half-height",
+            raw"\radian",
+            f"{p.Δθ * 180/π:.0f}" * raw"\pi / 180",
+        ),
+        Parameter(
+            :Δφ,
+            raw"\Delta\phi",
+            "Lemniscate azimuthal half-width",
+            raw"\radian",
+            f"{p.Δφ * 180/π:.0f}" * raw"\pi / 180",
+        ),
     ]
 
-
-    sort!(params, by=x -> eor_transform(x.sym))
+    sort!(params; by=x -> eor_transform(x.sym))
     table_rows = map(params) do p_item
-        val = isnothing(p_item.value_override) ? f"{p[p_item.key]:.9g}" : p_item.value_override
+        val = if isnothing(p_item.value_override)
+            f"{p[p_item.key]:.9g}"
+        else
+            p_item.value_override
+        end
         unit_col = isempty(p_item.unit) ? "" : raw"\si{" * p_item.unit * "}"
         f"    ${p_item.sym}$ & {p_item.descr} & ${val}$ & {unit_col} \\\\ "
     end
-
 
     table_str = raw"""
 \begin{table}[thpb]

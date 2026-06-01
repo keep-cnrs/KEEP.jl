@@ -25,7 +25,7 @@ begin  # Helper Functions
         return dynamics(x_dyn, vbp)[SOneTo(4)]
     end
 
-    generated_power(dα, p) = begin
+    function generated_power(dα, p)
         T = promote_type(eltype(vbp0), eltype(p))
         vbp = CA(T.(vbp0); (syms .=> p)...)
         L, M, T = lmt(vbp)
@@ -100,8 +100,8 @@ function (interp::StateInterpolator)(t)
     end
 
     t_start = i * dt
-    x_node = interp.nodes_x[i+1]
-    p_node = interp.nodes_p[i+1]
+    x_node = interp.nodes_x[i + 1]
+    p_node = interp.nodes_p[i + 1]
 
     if t_clamped == t_start
         return x_node
@@ -115,7 +115,7 @@ end
     res[1] = x0[2] - TAU0
     res[2:5] = xf - x0 - [0, 2π, 0, 0]
     res[6] = pf' * f(xf, λ) - generated_power(xf[3], λ) / tf # Hf
-    res[7:9] = (pf-p0)[[1, 3, 4]]
+    res[7:9] = (pf - p0)[[1, 3, 4]]
     res[10:12] = pλf
     return res
 end
@@ -133,20 +133,20 @@ function (ms::MultipleShooting)(res, Y)
     nv = ms.nv
     nw = 2 * nx + nv
 
-    v = Y[N*nw+1:end]
+    v = Y[(N * nw + 1):end]
     tf = v[1]
     dt = tf / N
 
     w0 = Y[1:nw]
     x_curr = w0[1:nx]
-    p_curr = w0[nx+1:2*nx]
-    pv_curr = w0[2*nx+1:2*nx+nv]
+    p_curr = w0[(nx + 1):(2 * nx)]
+    pv_curr = w0[(2 * nx + 1):(2 * nx + nv)]
 
     x0 = x_curr
     p0 = p_curr
     pv0 = pv_curr
 
-    for i in 0:N-2
+    for i in 0:(N - 2)
         t_curr = i * dt
         t_next = (i + 1) * dt
 
@@ -154,14 +154,14 @@ function (ms::MultipleShooting)(res, Y)
         pv_next_pred = pv_curr + dpv
 
         idx_next = (i + 1) * nw
-        w_next = Y[idx_next+1:idx_next+nw]
+        w_next = Y[(idx_next + 1):(idx_next + nw)]
         x_next = w_next[1:nx]
-        p_next = w_next[nx+1:2*nx]
-        pv_next = w_next[2*nx+1:2*nx+nv]
+        p_next = w_next[(nx + 1):(2 * nx)]
+        pv_next = w_next[(2 * nx + 1):(2 * nx + nv)]
 
-        res[idx_next-nw+1:idx_next-nw+nx] .= x_next .- xf
-        res[idx_next-nw+nx+1:idx_next-nw+2*nx] .= p_next .- pf
-        res[idx_next-nw+2*nx+1:idx_next] .= pv_next .- pv_next_pred
+        res[(idx_next - nw + 1):(idx_next - nw + nx)] .= x_next .- xf
+        res[(idx_next - nw + nx + 1):(idx_next - nw + 2 * nx)] .= p_next .- pf
+        res[(idx_next - nw + 2 * nx + 1):idx_next] .= pv_next .- pv_next_pred
 
         x_curr = x_next
         p_curr = p_next
@@ -177,10 +177,10 @@ function (ms::MultipleShooting)(res, Y)
     offset = (N - 1) * nw
 
     # 1. 12 Boundary conditions (cyclic constraints and Hamiltonian transversality)
-    shoot!(view(res, offset+1:offset+12), x0, p0, xf, pf, tf, v[2:end], pvf[2:end])
+    shoot!(view(res, (offset + 1):(offset + 12)), x0, p0, xf, pf, tf, v[2:end], pvf[2:end])
 
     # 2. 4 Parameter adjoint initial conditions (pv0 == 0)
-    res[offset+13:offset+12+nv] .= pv0
+    res[(offset + 13):(offset + 12 + nv)] .= pv0
 
     return res
 end
@@ -203,11 +203,11 @@ function init_multiple_shooting(flow, optim_sol, N)
 
     Y_init = zeros(N * nw + nv)
 
-    for i in 0:N-1
+    for i in 0:(N - 1)
         idx = i * nw
-        Y_init[idx+1:idx+nx] .= x_curr
-        Y_init[idx+nx+1:idx+2*nx] .= p_curr
-        Y_init[idx+2*nx+1:idx+nw] .= pv_curr
+        Y_init[(idx + 1):(idx + nx)] .= x_curr
+        Y_init[(idx + nx + 1):(idx + 2 * nx)] .= p_curr
+        Y_init[(idx + 2 * nx + 1):(idx + nw)] .= pv_curr
 
         if i < N - 1
             t_curr = i * dt
@@ -217,7 +217,7 @@ function init_multiple_shooting(flow, optim_sol, N)
         end
     end
 
-    Y_init[N*nw+1:end] .= v
+    Y_init[(N * nw + 1):end] .= v
     return Y_init
 end
 
@@ -228,26 +228,25 @@ function reconstruct_trajectory(ms::MultipleShooting, Y; num_points=200)
     nv = ms.nv
     nw = 2 * nx + nv
 
-    v = Y[N*nw+1:end]
+    v = Y[(N * nw + 1):end]
     tf = v[1]
     dt = tf / N
 
-    nodes_x = [Y[i*nw+1:i*nw+nx] for i in 0:N-1]
-    nodes_p = [Y[i*nw+nx+1:i*nw+2*nx] for i in 0:N-1]
+    nodes_x = [Y[(i * nw + 1):(i * nw + nx)] for i in 0:(N - 1)]
+    nodes_p = [Y[(i * nw + nx + 1):(i * nw + 2 * nx)] for i in 0:(N - 1)]
 
     interpolator = StateInterpolator(ms.flow, N, tf, v, nodes_x, nodes_p)
 
-    ts = range(0.0, tf, length=num_points)
+    ts = range(0.0, tf; length=num_points)
     xs = [interpolator(t) for t in ts]
 
     return ts, reduce(hcat, xs), interpolator
 end
 
-
 # --- Execution and Setup ---
 
 # Solve direct problem first
-lc = compute_limit_cycle(vbp0; sense=+, save_everystep=true)
+lc = compute_limit_cycle(vbp0; sense=(+), save_everystep=true)
 factor = 5
 optim_ocp, optim_init = build_optim_ocp(lc; factor=factor)
 oc_kwargs = (grid_size=30, backend=:generic)
@@ -262,7 +261,9 @@ nv_dim = length(variable(optim_sol))
 
 # Setup indirect multiple shooting
 N_segments = 8
-ms_problem = MultipleShooting(flow_instance, f, generated_power, N_segments, nx_dim, nv_dim, TAU0)
+ms_problem = MultipleShooting(
+    flow_instance, f, generated_power, N_segments, nx_dim, nv_dim, TAU0
+)
 Y_guess = init_multiple_shooting(flow_instance, optim_sol, N_segments)
 
 # 1. Define the in-place residual matching the (res, u, p) signature
@@ -272,7 +273,7 @@ residual_f!(res, Y, p) = ms_problem(res, Y)
 prob_indirect = NonlinearProblem(residual_f!, Y_guess)
 
 # 3. Solve the problem using TrustRegion (the most stable workhorse for BVPs)
-sol_indirect = solve(prob_indirect, TrustRegion(); show_trace=Val(true),)
+sol_indirect = solve(prob_indirect, TrustRegion(); show_trace=Val(true))
 
 # 4. Extract solution and reconstruct
 if sol_indirect.retcode == ScalarSymbolic.Success # or check SciMLBase.successful_retcode(sol_indirect)
@@ -280,8 +281,8 @@ if sol_indirect.retcode == ScalarSymbolic.Success # or check SciMLBase.successfu
     ts, xs, state_interp = reconstruct_trajectory(ms_problem, Y_opt; num_points=100)
 
     # Access parameters
-    tf_opt = Y_opt[12*N_segments+1]
-    λ_opt = Y_opt[12*N_segments+2:end]
+    tf_opt = Y_opt[12 * N_segments + 1]
+    λ_opt = Y_opt[(12 * N_segments + 2):end]
     println("Optimized tf: ", tf_opt)
     println("Optimized parameters: ", λ_opt)
 else
