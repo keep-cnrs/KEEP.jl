@@ -6,7 +6,10 @@ using ForwardDiff: derivative
 using OptimalControl, NLPModelsIpopt
 using ComponentArrays: ComponentArray as CA
 using Plots
+using LinearAlgebra
+using OrdinaryDiffEq
 using NonlinearSolve
+include("common.jl")
 
 using KEEP.PointMassPara: build_vbpara, lmt
 using KEEP.PointMass4: dynamics
@@ -14,58 +17,7 @@ using KEEP.TorqueFunction: torque_function
 using KEEP.LimitCycle: compute_limit_cycle
 using KEEP: TAU0
 
-const vbp0 = build_vbpara()
-const syms = (:r, :I_eq, :torque_slope)
 
-begin  # Helper Functions
-    f(x, p) = begin
-        T = promote_type(eltype(vbp0), eltype(p))
-        vbp = CA(T.(vbp0); (syms .=> p)...)
-        x_dyn = vcat(x, 0)
-        return dynamics(x_dyn, vbp)[SOneTo(4)]
-    end
-
-    generated_power(dα, p) = begin
-        T = promote_type(eltype(vbp0), eltype(p))
-        vbp = CA(T.(vbp0); (syms .=> p)...)
-        L, M, T = lmt(vbp)
-        dα_adim = dα * T
-        return dα_adim * torque_function(dα_adim, vbp) * M * L^2 * T^-3
-    end
-
-    function calc_vars(lc)
-        tf = last(lc.t)
-        p = lc.prob.p[syms]
-        return [tf, p...]
-    end
-
-    function build_optim_ocp(lc; factor)
-        ocp = @def begin
-            vars ∈ R⁴, variable
-            tf = vars[1]
-            p = vars[2:4]
-            t ∈ [0, tf], time
-            X = (α, τ, dα, dτ) ∈ R⁴, state
-
-            calc_vars(lc) ./ factor <= vars <= calc_vars(lc) .* factor
-
-            τ(0) == TAU0
-            α(tf) - α(0) == 0
-            τ(tf) - τ(0) == 2π
-            dα(tf) - dα(0) == 0
-            dτ(tf) - dτ(0) == 0
-
-            Ẋ(t) == f(X(t), p)
-            ∫(generated_power(dα(t), p) / tf) → max
-        end
-
-        init = @init ocp begin
-            vars := calc_vars(lc)
-            X(t) := lc(t)[1:4]
-        end
-        return ocp, init
-    end
-end
 
 # Define structures for Indirect Multiple Shooting
 struct MultipleShooting{F,G,P}
@@ -251,19 +203,21 @@ lc = compute_limit_cycle(vbp0; sense=+, save_everystep=true)
 factor = 5
 optim_ocp, optim_init = build_optim_ocp(lc; factor=factor)
 oc_kwargs = (grid_size=30, backend=:generic)
-optim_init_sol = solve(optim_ocp; oc_kwargs..., init=optim_init, max_iter=0)
 optim_sol = solve(optim_ocp; oc_kwargs..., init=optim_init)
 
-const flow_instance = Flow(optim_ocp)
+const flow_instance = OptimalControl.Flow(optim_ocp; alg=Tsit5())
 
 # Infer dimensions automatically
 nx_dim = length(state(optim_sol)(0))
 nv_dim = length(variable(optim_sol))
 
 # Setup indirect multiple shooting
-N_segments = 8
+N_segments = 10
 ms_problem = MultipleShooting(flow_instance, f, generated_power, N_segments, nx_dim, nv_dim, TAU0)
 Y_guess = init_multiple_shooting(flow_instance, optim_sol, N_segments)
+# 60% of time is spent @set-ing parameters in f and generated_power (common.jl)
+@time @profview ms_problem(-ones(size(Y_guess)), Y_guess)
+ms_problem(-ones(size(Y_guess)), rand(length(Y_guess)))
 
 # 1. Define the in-place residual matching the (res, u, p) signature
 residual_f!(res, Y, p) = ms_problem(res, Y)
@@ -271,11 +225,18 @@ residual_f!(res, Y, p) = ms_problem(res, Y)
 # 2. Define the NonlinearProblem
 prob_indirect = NonlinearProblem(residual_f!, Y_guess)
 
-# 3. Solve the problem using TrustRegion (the most stable workhorse for BVPs)
-sol_indirect = solve(prob_indirect, TrustRegion(); show_trace=Val(true),)
+# 3. Quick check with maxiters=1 to verify structure
+println("\n--- Quick check: 1 iteration ---")
+@time @profview sol_init = solve(prob_indirect, NewtonRaphson(); show_trace=Val(true), maxiters=1)
+println("Initial residual norm: ", norm(sol_init.u))
+println("Retcode: ", sol_init.retcode)
 
-# 4. Extract solution and reconstruct
-if sol_indirect.retcode == ScalarSymbolic.Success # or check SciMLBase.successful_retcode(sol_indirect)
+# 4. Full solve
+println("\n--- Full solve ---")
+sol_indirect = solve(prob_indirect, NewtonRaphson(); show_trace=Val(true),)
+
+# 5. Extract solution and reconstruct
+if SciMLBase.successful_retcode(sol_indirect)
     Y_opt = sol_indirect.u
     ts, xs, state_interp = reconstruct_trajectory(ms_problem, Y_opt; num_points=100)
 

@@ -9,8 +9,8 @@ export VBPara, Para
 export NB_LINES
 
 # Type aliases for clarity (still ComponentArrays)
-const VBPara = ComponentArray
-const Para = ComponentArray
+const VBPara = Any
+const Para = Any
 
 # number of lines
 const NB_LINES = 4
