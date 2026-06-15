@@ -9,7 +9,7 @@ The KEEP.jl repo is part of the [control-toolbox ecosystem](https://github.com/c
 
 | **Category** | **Badge** |
 |-----------------------|-----------|
-| **Documentation** | [![Stable Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://abavoil.github.io/KEEP.jl/stable/) [![Dev Docs](https://img.shields.io/badge/docs-dev-8A2BE2.svg)](https://abavoil.github.io/KEEP.jl/dev/) |
+| **Documentation** | [![Stable Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://abavoil.github.io/KEEP.jl/stable/) [![Dev Docs](https://img.shields.io/badge/docs-dev-8A2BE2.svg)](https://abavoil.github.io/KEEP.jl/dev/) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/abavoil/KEEP.jl) |
 | **CI / Build** | [![Build Status](https://github.com/abavoil/KEEP.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/abavoil/KEEP.jl/actions/workflows/CI.yml?query=branch%3Amain) |
 | **Release / Version** | [![Release](https://img.shields.io/github/v/release/abavoil/KEEP.jl.svg)](https://github.com/abavoil/KEEP.jl/releases) |
 | **License** | [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/abavoil/KEEP.jl/blob/master/LICENSE) |
