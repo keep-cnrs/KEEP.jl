@@ -3,7 +3,7 @@ Pkg.activate("CT_keep")
 
 using OptimalControl
 # import ADNLPModels
-import NLPModelsIpopt
+using NLPModelsIpopt: NLPModelsIpopt
 using StaticArrays
 using ForwardDiff
 using LinearAlgebra
@@ -22,7 +22,7 @@ function p_c(q, p)
 end
 
 function p_p(q, p)
-    return SA[q[1]+p.l*sin(q[2]), p.l*cos(q[2])]
+    return SA[q[1] + p.l * sin(q[2]), p.l * cos(q[2])]
 end
 
 # ================================
@@ -83,7 +83,7 @@ function dyn(x, u, p)
     return vcat(dq, ddq)
 end
 
-const p = CA(m_c=5.0, m_p=1.0, l=2.0, g=9.81)
+const p = CA(; m_c=5.0, m_p=1.0, l=2.0, g=9.81)
 
 # ================================
 # 5. Interface to OptimalControl.jl
@@ -117,19 +117,18 @@ end
 sol = solve(ocp; display=true, grid_size=30, init=init, backend=:manual)
 
 # 2. Explicitly define your strategies
-disc = OptimalControl.Collocation(grid_size=100)
+disc = OptimalControl.Collocation(; grid_size=100)
 
 # 3. Specify ForwardDiffAD as the backend for the ADNLP modeler
 # If the option `backend` is not natively recognized in the metadata as an ADNLPModels type, 
 # you can use `bypass()` (or `force()`) to skip strict strategy validation and pass it directly.
-mod = OptimalControl.ADNLP(backend=bypass(:default))
+mod = OptimalControl.ADNLP(; backend=bypass(:default))
 
 # 4. Define the solver
-sol = OptimalControl.Ipopt(max_iter=1000, print_level=0)
+sol = OptimalControl.Ipopt(; max_iter=1000, print_level=0)
 
 # 5. Solve the problem
 result = solve(ocp; discretizer=disc, modeler=mod, solver=sol)
-
 
 # ================================
 # 6. Extraction & Plotting
@@ -142,8 +141,8 @@ X_mat = reduce(hcat, Xsol)
 q_sol = X_mat[1:2, :]'
 dq_sol = X_mat[3:4, :]'
 
-p1 = plot(tsol, q_sol, label=["x" "θ"], title="Configuration")
-p2 = plot(tsol, dq_sol, label=["v" "ω"], title="Velocities")
-p3 = plot(tsol, usol, label="u", title="Control", linetype=:steppost)
+p1 = plot(tsol, q_sol; label=["x" "θ"], title="Configuration")
+p2 = plot(tsol, dq_sol; label=["v" "ω"], title="Velocities")
+p3 = plot(tsol, usol; label="u", title="Control", linetype=:steppost)
 
-plot(p1, p2, p3, layout=(3, 1), size=(800, 700))
+plot(p1, p2, p3; layout=(3, 1), size=(800, 700))

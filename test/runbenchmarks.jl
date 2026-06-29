@@ -12,16 +12,16 @@ function main()
     p = build_para()
     vbp = build_vbpara(p)
 
-    α = 0.
-    τ = 1.
-    dα = 0.
-    dτ = 3.
+    α = 0.0
+    τ = 1.0
+    dα = 0.0
+    dτ = 3.0
 
-    u0_4d = SA[α, τ, dα, dτ, 0.]
+    u0_4d = SA[α, τ, dα, dτ, 0.0]
     u0_10d = PM10.init_u(τ, dτ, p)
 
-    @code_warntype PM10.dynamics!(similar(u0_10d), u0_10d, p, 0.)
-    @code_warntype PM4.dynamics(u0_4d, vbp, 0.)
+    @code_warntype PM10.dynamics!(similar(u0_10d), u0_10d, p, 0.0)
+    @code_warntype PM4.dynamics(u0_4d, vbp, 0.0)
 
     tf = 10
 

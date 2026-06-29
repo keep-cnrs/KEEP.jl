@@ -16,16 +16,25 @@ function rθφ2xyz(r, θ, φ)
     return SA[x, y, z]
 end
 
-τ = range(0, 2π, length=2001)
+τ = range(0, 2π; length=2001)
 eight_xyz = rθφ2xyz.(1, θ.(τ), φ.(τ))
 segments = stack(reduce.(hcat, (zero(eight_xyz), eight_xyz)); dims=2)
 
 camera_0 = [60, 50]
 camera_Δ = [10, 5]
 
-plot(Tuple.(eight_xyz), lw=3)
-plot!(eachslice(segments; dims=1)..., c=:black, alpha=20 / length(τ), label="")
-plot!(xlabel="x", ylabel="y", zlabel="z", xlims=(0, 1), ylims=(-1, 1), zlims=(0, 1), camera=camera_0, size=(600, 600))
+plot(Tuple.(eight_xyz); lw=3)
+plot!(eachslice(segments; dims=1)...; c=:black, alpha=20 / length(τ), label="")
+plot!(;
+    xlabel="x",
+    ylabel="y",
+    zlabel="z",
+    xlims=(0, 1),
+    ylims=(-1, 1),
+    zlims=(0, 1),
+    camera=camera_0,
+    size=(600, 600),
+)
 
 if false
     anim = @animate for α in range(0, 2π, length=60)
