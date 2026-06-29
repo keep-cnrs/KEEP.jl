@@ -3,7 +3,7 @@ using Pkg
 Pkg.activate("CT_keep")
 
 using StaticArrays
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 using ForwardDiff: derivative
 using OptimalControl, NLPModelsIpopt
 using ComponentArrays: ComponentArray as CA
@@ -20,7 +20,6 @@ using KEEP.TorqueFunction: torque_function
 using KEEP.LimitCycle: compute_limit_cycle, shoot as lc_shoot
 using KEEP.Optimization: optimize
 using KEEP: TAU0
-
 
 begin
     const vbp0 = build_vbpara()
@@ -113,38 +112,46 @@ begin
     end
 
     function make_var_plot(sol, sol_init, factor)
-        x_ticks = 1:length(syms)+1
+        x_ticks = 1:(length(syms) + 1)
         ratios = variable(sol) ./ variable(sol_init)
         x_labels = (x_ticks, (:tf, syms...))
 
-        plot(
+        plot(;
             yscale=:log10,
             xticks=x_labels,
             ylabel="Ratio (Optimized / Initial)",
             title="Parameter Optimization Results",
             framestyle=:box,
-            legend=:outertopright
+            legend=:outertopright,
         )
 
-        hline!([1 / factor], fillrange=[factor], color=:grey, alpha=0.15, label="Allowed Range")
-        hline!([1], c=:black, ls=:dash, lw=1.5, label="Baseline (1.0)")
+        hline!(
+            [1 / factor]; fillrange=[factor], color=:grey, alpha=0.15, label="Allowed Range"
+        )
+        hline!([1]; c=:black, ls=:dash, lw=1.5, label="Baseline (1.0)")
 
         for i in x_ticks
-            plot!([i, i], [1.0, ratios[i]], c=:grey, lw=1.0, label="")
+            plot!([i, i], [1.0, ratios[i]]; c=:grey, lw=1.0, label="")
         end
 
-        scatter!(x_ticks, ones(length(x_ticks)),
-            m=:circle, mc=:white, msc=:black, ms=6, label="Initial")
-        scatter!(x_ticks, ratios,
-            m=:circle, mc=:crimson, ms=7, label="Optimized")
+        scatter!(
+            x_ticks,
+            ones(length(x_ticks));
+            m=:circle,
+            mc=:white,
+            msc=:black,
+            ms=6,
+            label="Initial",
+        )
+        scatter!(x_ticks, ratios; m=:circle, mc=:crimson, ms=7, label="Optimized")
 
         ylims!(1 / factor / 1.2, factor * 1.2)
         return plot!()
     end
 
     function make_plots(sol_init, sol, factor; legend=true)
-        plot(sol_init, label="Initial")
-        state_plot = plot!(sol, label="Optimized")
+        plot(sol_init; label="Initial")
+        state_plot = plot!(sol; label="Optimized")
         plot!(; legend)
         var_plot = make_var_plot(sol, sol_init, factor)
         return state_plot, var_plot
@@ -155,7 +162,7 @@ oc_kwargs = (grid_size=30, backend=:generic)
 
 ## Computing a limit cycle (feasability)
 # Code from KEEP
-lc_keep = compute_limit_cycle(vbp0; sense=+, save_everystep=true);
+lc_keep = compute_limit_cycle(vbp0; sense=(+), save_everystep=true);
 
 # With ControlToolbox
 lc_ocp, lc_init = build_lc_ocp();
@@ -210,8 +217,7 @@ println("############")
 throw("broken from this point on")
 
 ## Indirect single shooting
-const flow = OptimalControl.Flow(optim_ocp, abstol=1e-12);
-
+const flow = OptimalControl.Flow(optim_ocp; abstol=1e-12);
 
 x_direct = state(optim_sol)
 p_direct = costate(optim_sol)
@@ -222,11 +228,10 @@ tf_direct, λ_direct... = variable(optim_sol)
     res[1] = x0[2] - TAU0
     res[2:5] = xf - x0 - [0, 2π, 0, 0]
     res[6] = pf' * f(xf, λ) - generated_power(xf[3], λ) / tf # Hf
-    res[7:9] = (pf-p0)[[1, 3, 4]]
+    res[7:9] = (pf - p0)[[1, 3, 4]]
     res[10:12] = pλf
     return res
 end
-
 
 @views function shoot!(res, x0, p0, tf, λ)
     # λ is previous p
@@ -280,7 +285,9 @@ function flow_jacobian(u0, tf, vbp; idxs=1:length(u0))
     u0_dual = SVector{N_total}(
         ForwardDiff.Dual{typeof(tag)}(
             u0[i],
-            ForwardDiff.Partials(ntuple(j -> j == partial_of[i] ? one(T) : zero(T), Val(N)))
+            ForwardDiff.Partials(
+                ntuple(j -> j == partial_of[i] ? one(T) : zero(T), Val(N))
+            ),
         ) for i in 1:N_total
     )
 
@@ -303,12 +310,25 @@ optim_vbp = CA(vbp0; (syms .=> p)...)
 # 4×4 monodromy (ignore accumulated work W)
 _, J4, ts4 = flow_jacobian(u0, tf, optim_vbp; idxs=1:4)
 svals4 = stack([svdvals(J4(t)) for t in ts4])'
-plot(ts4, svals4, yscale=:log10, xlabel="Time (t)", ylabel="Singular values",
-    label=["σ₁" "σ₂" "σ₃" "σ₄"], title="Monodromy matrix SVD over time (4×4)")
+plot(
+    ts4,
+    svals4;
+    yscale=:log10,
+    xlabel="Time (t)",
+    ylabel="Singular values",
+    label=["σ₁" "σ₂" "σ₃" "σ₄"],
+    title="Monodromy matrix SVD over time (4×4)",
+)
 
 # 5×5 monodromy (includes W: ∂W(t)/∂W(0) = 1)
 _, J5, ts5 = flow_jacobian(u0, tf, optim_vbp; idxs=1:5)
 svals5 = stack([svdvals(J5(t)) for t in ts5])'
-plot(ts5, svals5, yscale=:log10, xlabel="Time (t)", ylabel="Singular values",
+plot(
+    ts5,
+    svals5;
+    yscale=:log10,
+    xlabel="Time (t)",
+    ylabel="Singular values",
     label=["σ₁" "σ₂" "σ₃" "σ₄" "σ₅"],
-    title="Monodromy matrix SVD over time (5×5, σ₅≡1)")
+    title="Monodromy matrix SVD over time (5×5, σ₅≡1)",
+)
