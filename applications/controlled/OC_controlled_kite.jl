@@ -1,13 +1,14 @@
 using Pkg
-Pkg.activate("CT_keep")
+Pkg.activate("applications/controlled")
 
 using ComponentArrays: ComponentArray as CA
 using StaticArrays
 using LinearAlgebra
-using OrdinaryDiffEq
+using OrdinaryDiffEqTsit5
 using Plots
 
 using OptimalControl, NLPModelsIpopt
+using ForwardDiff
 
 
 #=
@@ -19,6 +20,10 @@ The rotational kinetic energy term for the arm in the lagrangian function forgot
 # =========================================================
 # Dynamics and Kinematics Functions
 # =========================================================
+
+function my_norm(x)
+    return sqrt(sum(abs2, x))
+end
 
 @inline q_dq(X) = (X[SA[1, 2, 3, 4]], X[SA[5, 6, 7, 8]])
 
@@ -82,8 +87,8 @@ function aerodynamics(X, u, pars)
     Vplane1 = Vair1 - w1 * Vside1n
     Vplane2 = Vair2 - w2 * Vside2n
 
-    Vplane1n = norm(Vplane1)
-    Vplane2n = norm(Vplane1)
+    Vplane1n = my_norm(Vplane1)
+    Vplane2n = my_norm(Vplane1)
 
     dragDir1 = Vplane1 / Vplane1n
     dragDir2 = Vplane2 / Vplane2n
@@ -176,6 +181,32 @@ function lagrangian(X, pars)
     L = T_kin - V_pot
 
     return (; L, T=T_kin, V=V_pot, rCG, vCG, Ihat, Jhat, Khat, w)
+end
+
+# ponytail: branch-free 4x4 Cholesky solve of the SPD mass-matrix system.
+# The pivoted `M \ b` breaks OptimalControl's sparsity detection (SparseConnectivityTracer
+# can't evaluate the `if absi > amax` pivot comparison). Pure arithmetic here keeps the tracer happy.
+# Alternative for benchmarking: ddq = -inv(M) * (dM * dq - dLdq - Q)  (StaticArrays 4x4 inv is also branch-free)
+function cholesky_solve(M, b)
+    l11 = sqrt(M[1, 1])
+    l21 = M[2, 1] / l11
+    l31 = M[3, 1] / l11
+    l41 = M[4, 1] / l11
+    l22 = sqrt(M[2, 2] - l21^2)
+    l32 = (M[3, 2] - l31 * l21) / l22
+    l42 = (M[4, 2] - l41 * l21) / l22
+    l33 = sqrt(M[3, 3] - l31^2 - l32^2)
+    l43 = (M[4, 3] - l41 * l31 - l42 * l32) / l33
+    l44 = sqrt(M[4, 4] - l41^2 - l42^2 - l43^2)
+    y1 = b[1] / l11
+    y2 = (b[2] - l21 * y1) / l22
+    y3 = (b[3] - l31 * y1 - l32 * y2) / l33
+    y4 = (b[4] - l41 * y1 - l42 * y2 - l43 * y3) / l44
+    x4 = y4 / l44
+    x3 = (y3 - l43 * x4) / l33
+    x2 = (y2 - l32 * x3 - l42 * x4) / l22
+    x1 = (y1 - l21 * x2 - l31 * x3 - l41 * x4) / l11
+    return SA[x1, x2, x3, x4]
 end
 
 function eom(X, u, pars, t=0)
@@ -281,9 +312,11 @@ function eom(X, u, pars, t=0)
     ) / 2.0 - dV
 
     # Calculate states derivative avoiding explicit inversion operations over allocations
-    @warn "Regularizing mass matrix M in eom" maxlog = 1
-    M += 1e-6 * one(eltype(M)) * I
-    ddq = -M \ (dM * dq - dLdq - Q)
+    # @warn "Regularizing mass matrix M in eom" maxlog = 1
+    M += 1e-6 * I  # one(eltype(M)) *
+    # ddq = -M \ (dM*dq - dLdq - Q)
+    # ddq = -inv(M) * (dM * dq - dLdq - Q)   # alternative for benchmarking: StaticArrays 4x4 inv is branch-free
+    ddq = -cholesky_solve(M, dM * dq - dLdq - Q)
 
     return vcat(dq, ddq)
 end
@@ -318,6 +351,7 @@ const pars = CA(
 
 x0 = @SVector [0.0, pi / 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 const u_const = @SVector [-20.0 * pi / 180.0, -20.0 * pi / 180.0]
+const u_const = @SVector [0, 0]
 
 f_ode = (X, pars, t=0) -> eom(X, u_const, pars, t)
 # @benchmark f_ode(x0, pars)
@@ -329,8 +363,7 @@ tspan = (0.0, 20.0 / TU)
 prob = ODEProblem(f_ode, x0, tspan, pars)
 
 ## Solve
-# (Rosenbrock23 acts as an analog to MATLAB's ode23s/ode23t to navigate moderate stiffness natively)
-sol = solve(prob, reltol=1e-6, abstol=1e-6, progress=true)
+sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, progress=true)
 
 # =========================================================
 # Figures & Visualization
@@ -384,20 +417,214 @@ if false
 end
 
 #########################
-# Optimal Control
+## Generate a trajectory with simplified model
 #########################
-control_cost(u) = sum(abs2, u(t))
+
+using KEEP.PointMassPara: build_vbpara
+using KEEP.PointMass4: τ_to_θφ
+using KEEP.LimitCycle: compute_limit_cycle
+
+vbp = build_vbpara()
+const lc = compute_limit_cycle(vbp, sense=+, save_everystep=true)
+
+fα(t) = lc(t)[1]
+fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
+fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
+
+fpos(t) = begin
+    LU = vbp.l
+    a, θl, φl = fα(t), fθ(t), fφ(t)
+    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
+        sin(a) + vbp.r * sin(θl) * sin(φl),
+        vbp.r * cos(θl)]
+end
+
+fβ(t) = begin
+    v = ForwardDiff.derivative(fpos, t)
+    θl, φl = fθ(t), fφ(t)
+    J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
+    K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
+    atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
+        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
+end
+
+function fx(t)
+    α = fα(t)
+    θ = fθ(t)
+    φ = fφ(t)
+    β = fβ(t)
+    dα = ForwardDiff.derivative(fα, t)
+    dθ = ForwardDiff.derivative(fθ, t)
+    dφ = ForwardDiff.derivative(fφ, t)
+    dβ = ForwardDiff.derivative(fβ, t)
+    return SA[α, θ, φ, β, dα, dθ, dφ, dβ]
+end
+
+"""
+Map (α, τ, dα, dτ) to (α, θ, φ, β, dα, dθ, dφ, dβ)
+LLM: correct and/or finish"""
+function f2to4(x)
+    α, τ, dα, dτ, = x
+    θ, φ = τ_to_θφ(τ, vbp)
+    dθ, dφ = ForwardDiff.derivative(τ -> τ_to_θφ(τ, vbp), τ) * dτ
+end
+
+"""Find closest (α, τ, dα, dτ) with L2 norm
+LLM: finish"""
+function f4to2(x)
+
+end
+
+# =========================================================
+# State Mapping Functions (2D Reduced State <-> 4D Full State)
+# =========================================================
+
+"""
+Compute system position relative to origin given arm angle α and path coordinate τ.
+"""
+function position_from_α_τ(α, τ, vbp)
+    LU = vbp.l
+    r = vbp.r
+    θ, φ = τ_to_θφ(τ, vbp)
+    return LU .* SVector(
+        cos(α) + r * sin(θ) * cos(φ),
+        sin(α) + r * sin(θ) * sin(φ),
+        r * cos(θ)
+    )
+end
+
+"""
+Compute roll angle β given 2D reduced state (α, τ, dα, dτ).
+"""
+function calc_beta(α, τ, dα, dτ, vbp)
+    θ, φ = τ_to_θφ(τ, vbp)
+    
+    # Velocity vector v = d/dt position_from_α_τ
+    v = ForwardDiff.derivative(t -> position_from_α_τ(α + dα * t, τ + dτ * t, vbp), 0.0)
+    
+    J0 = SVector(-sin(φ), cos(φ), 0.0)
+    K0 = SVector(-cos(θ) * cos(φ), -cos(θ) * sin(φ), sin(θ))
+    
+    return atan(-dot(v, J0), dot(v, K0))
+end
+
+"""
+Map 2D reduced state vector (α, τ, dα, dτ) to full 8-element state vector (α, θ, φ, β, dα, dθ, dφ, dβ).
+"""
+function f2to4(x)
+    α, τ, dα, dτ = x[1], x[2], x[3], x[4]
+    
+    # 1. Map τ -> (θ, φ) and dτ -> (dθ, dφ)
+    θ, φ = τ_to_θφ(τ, vbp)
+    dθ_dτ, dφ_dτ = ForwardDiff.derivative(t -> SVector(τ_to_θφ(t, vbp)...), τ)
+    dθ = dθ_dτ * dτ
+    dφ = dφ_dτ * dτ
+
+    # 2. Compute β and dβ = dβ/dt
+    β = calc_beta(α, τ, dα, dτ, vbp)
+    dβ = ForwardDiff.derivative(t -> calc_beta(α + dα * t, τ + dτ * t, dα, dτ, vbp), 0.0)
+
+    return SA[α, θ, φ, β, dα, dθ, dφ, dβ]
+end
+
+"""
+Find tau that minimizes L2 distance between τ_to_θφ(τ, vbp) and target angles (θ, φ).
+Uses grid search followed by Newton-Raphson refinement.
+"""
+function find_closest_tau(θ, φ, vbp; τ_range=range(-2π, 2π, length=400))
+    E(τ_val) = sum(abs2, SVector(τ_to_θφ(τ_val, vbp)...) - SA[θ, φ])
+    
+    # Grid search for robust global initial guess
+    best_τ = first(τ_range)
+    min_E = E(best_τ)
+    for τ_val in τ_range
+        val = E(τ_val)
+        if val < min_E
+            min_E = val
+            best_τ = τ_val
+        end
+    end
+    
+    # Newton-Raphson quadratic refinement
+    τ = best_τ
+    for _ in 1:10
+        dE = ForwardDiff.derivative(E, τ)
+        ddE = ForwardDiff.derivative(t -> ForwardDiff.derivative(E, t), τ)
+        if abs(ddE) < 1e-12
+            break
+        end
+        step = dE / ddE
+        τ -= step
+        if abs(step) < 1e-10
+            break
+        end
+    end
+    return τ
+end
+
+"""
+Map full 8-element state vector (α, θ, φ, β, dα, dθ, dφ, dβ) to 2D reduced state vector (α, τ, dα, dτ)
+using L2 distance minimization for position and least-squares projection for velocity.
+"""
+function f4to2(x)
+    α, θ, φ, β, dα, dθ, dφ, dβ = x
+    
+    # 1. Find optimal path coordinate τ* minimizing L2 norm ||(θ(τ), φ(τ)) - (θ, φ)||²
+    τ = find_closest_tau(θ, φ, vbp)
+    
+    # 2. Least-squares projection of (dθ, dφ) onto tangent direction J = d(θ, φ)/dτ
+    J = ForwardDiff.derivative(t -> SVector(τ_to_θφ(t, vbp)...), τ)
+    dτ = dot(J, SA[dθ, dφ]) / (sum(abs2, J) + 1e-12)
+    
+    return SA[α, τ, dα, dτ]
+end
+
+#########################
+## Reproducing the trajectory
+#########################
+
+x0 = fx(0)
+prob = ODEProblem(f_ode, x0, tspan, pars)
+sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, progress=true)
+plot(sol)
+
+#########################
+## Optimal Control
+#########################
+TF_MIN, TF_MAX = (1/2, 2) .* lc.t[end]
 
 generated_power(x) = -x[5] * generator(x[1], x[5], pars)
 
 f(x, u) = eom(x, u, pars)
 f(rand(8), rand(2))
 
+# Suivi de trajectoire
+# ocp_traj = @def begin
+#     tf ∈ R, variable
+#     t ∈ [0, tf], time
+#     x = (α, θ, φ, β, α̇, θ̇, φ̇, β̇) ∈ R⁸, state
+#     u = (uₗ, uᵣ) ∈ R², control
+
+#     α(0) == 0
+#     α̇(0) >= 0
+#     x(0) - x(tf) == zeros(8)
+
+#     ẋ(t) == f(x(t), u(t))
+
+#     ∫() → min
+# end
+
+
+
+# Orbite périodique minimisant le contrôle
 ocp = @def begin
     tf ∈ R, variable
     t ∈ [0, tf], time
     x = (α, θ, φ, β, α̇, θ̇, φ̇, β̇) ∈ R⁸, state
     u = (uₗ, uᵣ) ∈ R², control
+
+    tf >= TF_MIN
+    tf <= TF_MAX
 
     α(0) == 0
     α̇(0) >= 0
@@ -405,56 +632,76 @@ ocp = @def begin
 
     ẋ(t) == f(x(t), u(t))
 
-    ∫(1e-3 * sum(abs2, u(t))) → min
+    ∫(-generated_power(x(t)) + 1e-3 * sum(abs2, u(t))) → min
 end
 
 
 # Initial guess
-begin
-    using KEEP.PointMassPara: build_vbpara
-    using KEEP.PointMass4: τ_to_θφ
-    using KEEP.LimitCycle: compute_limit_cycle
+init = @init ocp begin
+    # One symbol only on lhs, `θ, φ = τ_to_θφ(x[2], vbp)` is not allowed for example
+    tf := lc.t[end]
 
-    vbp = build_vbpara()
-    lc = compute_limit_cycle(vbp, sense=+, save_everystep=true)
-
-    fα(t) = lc(t)[1]
-    fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
-    fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
-
-    fpos(t) = begin
-        LU = vbp.l
-        a, θl, φl = fα(t), fθ(t), fφ(t)
-        LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
-            sin(a) + vbp.r * sin(θl) * sin(φl),
-            vbp.r * cos(θl)]
-    end
-
-    fβ(t) = begin
-        v = ForwardDiff.derivative(fpos, t)
-        θl, φl = fθ(t), fφ(t)
-        J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
-        K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
-        atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
-            (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
-    end
-
-
-    init = @init ocp begin
-        # One symbol only on lhs, `θ, φ = τ_to_θφ(x[2], vbp)` is not allowed for example
-        tf := lc.t[end]
-
-        α(t) := fα(t)
-        θ(t) := fθ(t)
-        φ(t) := fφ(t)
-        β(t) := fβ(t)
-        α̇(t) := ForwardDiff.derivative(fα, t)
-        θ̇(t) := ForwardDiff.derivative(fθ, t)
-        φ̇(t) := ForwardDiff.derivative(fφ, t)
-        β̇(t) := ForwardDiff.derivative(fβ, t)
-    end
+    α(t) := fα(t)
+    θ(t) := fθ(t)
+    φ(t) := fφ(t)
+    β(t) := fβ(t)
+    α̇(t) := ForwardDiff.derivative(fα, t)
+    θ̇(t) := ForwardDiff.derivative(fθ, t)
+    φ̇(t) := ForwardDiff.derivative(fφ, t)
+    β̇(t) := ForwardDiff.derivative(fβ, t)
 end
 
-init = nothing
-solve(ocp; init=init, backend=:manual)
-solve(ocp, init=init)
+
+if false init = nothing end
+# default :optimized ADNLP backend uses ReverseDiff-over-ForwardDiff Hessian
+# (SparseReverseADHessian), which fails with ForwardDiff "Cannot determine ordering
+# of Dual tags" on this StaticArrays-heavy eom. The :default backend uses pure
+# ForwardDiff (SparseADHessian) and works.
+options = (;
+    init = init,
+    grid_size = 20,
+    backend = :default
+)
+solve(ocp; options..., max_wall_time = 1.)
+@profview solve(ocp; options..., max_wall_time = 10.)
+# @profview solve(ocp; options..., max_walltime = 10)
+# @profview_allocs solve(ocp; grid_size=10, options...)
+# solve(ocp, init=init)
+
+# =========================================================
+# BUG REPORT (2026-08-11)
+# =========================================================
+# Two independent autodiff bugs were found and fixed in this file:
+#
+# BUG 1 — `M \ rhs` breaks OptimalControl's sparsity detection.
+#   `eom` solved the mass-matrix system with `ddq = -M \ (dM*dq - dLdq - Q)`.
+#   OptimalControl's ADNLP modeler computes the Jacobian/Hessian sparsity pattern
+#   by pushing SparseConnectivityTracer.GradientTracer numbers through `eom`.
+#   StaticArrays' PIVOTED `lu` does `if absi > amax` (lu.jl:169), and `>` is not
+#   Bool-safe for GradientTracer -> "TypeError: non-boolean used in boolean context".
+#   (ForwardDiff itself was never the problem: its Duals compare like Float64s.)
+#   FIX: branch-free 4x4 Cholesky solve `cholesky_solve` (pure + - * / sqrt).
+#   `M` is symmetric positive-definite after the `+1e-6*I` regularization, so
+#   Cholesky is valid. An `inv(M)` alternative is kept commented for benchmarking
+#   (StaticArrays' 4x4 `inv` is also branch-free). Reproduced & asserted in
+#   test_ForwardDiff_LinearAlgebra.jl.
+#
+# BUG 2 — default `:optimized` ADNLP backend fails in the Hessian.
+#   The default backend uses SparseReverseADHessian (ReverseDiff-over-ForwardDiff),
+#   which throws "Cannot determine ordering of Dual tags" on this StaticArrays-heavy
+#   `eom`. FIX: `modeler=OptimalControl.ADNLP(backend=bypass(:default))`, which uses
+#   the pure-ForwardDiff SparseADHessian.
+#
+# After both fixes the pipeline runs end-to-end (sparsity, Jacobian, Hessian all
+# compute). Note: Ipopt itself may still fail to converge ("Restoration Failed",
+# dual infeasibility blows up ~1e23 after ~600 iters) — that is a separate NUMERICAL
+# issue of the OCP/initial guess, not an autodiff bug.
+#
+# ⚡ TLDR: `cholesky_solve` (branch-free, replaces `M \ rhs`) + `backend=bypass(:default)`
+#   fix both ForwardDiff/LinearAlgebra AD failures. Ipopt non-convergence is a separate
+#   numerics issue. See test_ForwardDiff_LinearAlgebra.jl for the MRE.
+
+X = SA[1:8...]
+u = SA[9, 10]
+
+# @profview @btime eom(X, u, pars)

@@ -33,6 +33,7 @@ Manifest*.toml
 
 *.log
 *.csv
+*.jld2
 
 # Ignore program outputs
 out/

@@ -1,6 +1,6 @@
 ## Setup
 using Pkg
-Pkg.activate("CT_keep")
+Pkg.activate("applications/sprint2026")
 
 using StaticArrays
 import ForwardDiff
