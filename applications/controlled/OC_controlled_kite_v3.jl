@@ -255,6 +255,128 @@ let X = SA[0.3, 0.5, 0.2, 0.6, 0.1, 0.2, 0.3, 0.4], u = SA[0.1, 0.0]
     @assert length(g) == 8
     println("sanity: eom OK, jacobian=", size(J), ", ddq = ", y[5:8])
 end
+# =========================================================
+# Helper functions for grid_size continuation
+# =========================================================
+
+"""
+    solve_cached(ocp; grid_size, init, cache_dir, prefix, force=false, solve_options...)
+
+Solves or loads a cached OCP solution for a single grid size.
+"""
+"""
+    cache_filepath(cache_dir, prefix, grid_size)
+
+Returns file path prefix (without extension) for a given cache entry.
+"""
+cache_filepath(cache_dir::String, prefix::String, grid_size::Int) = joinpath(cache_dir, "$(prefix)_grid_$(grid_size)")
+
+"""
+    solve_cached(ocp; grid_size, init, cache_dir, prefix, cache=:exact, solve_options...)
+
+Solves or loads a cached OCP solution for a single grid size according to the `cache` mode.
+"""
+function solve_cached(ocp;
+    grid_size::Int,
+    init,
+    cache_dir::String,
+    prefix::String,
+    cache::Symbol=:exact,
+    solve_options...)
+    fpath = cache_filepath(cache_dir, prefix, grid_size)
+    jld2_file = fpath * ".jld2"
+
+    if cache in (:exact, :latest) && isfile(jld2_file)
+        @info "Loading cached solution: grid = $grid_size ($jld2_file)"
+        return import_ocp_solution(ocp; filename=fpath)
+    end
+
+    @info "Solving OCP: grid = $grid_size..."
+    sol = solve(ocp; init=init, grid_size=grid_size, solve_options...)
+    export_ocp_solution(sol; filename=fpath)
+    return sol
+end
+
+"""
+    resolve_cache_plan(ocp, grid_schedule; init, cache_dir, prefix, cache)
+
+Determines the starting solution and remaining grid schedule based on the cache mode:
+- `:no`: Ignores all cache on disk. Returns `(init, grid_schedule)`.
+- `:exact`: Executes grid schedule sequentially, loading individual grid files if they exist.
+- `:latest`: Scans `grid_schedule` in descending order. If the finest grid is cached, 
+  loads it and returns an empty remaining schedule. Otherwise, warm-starts from the highest 
+  available intermediate grid and returns the remaining schedule.
+"""
+function resolve_cache_plan(ocp, grid_schedule; init, cache_dir::String, prefix::String, cache::Symbol)
+    cache in (:no, :exact, :latest) || throw(ArgumentError("cache must be :no, :exact, or :latest (got :$cache)"))
+
+    if cache == :no || !isdir(cache_dir)
+        return init, collect(grid_schedule)
+    end
+
+    if cache == :latest
+        grids = collect(grid_schedule)
+        for (i, N) in Iterators.reverse(enumerate(grids))
+            fpath = cache_filepath(cache_dir, prefix, N)
+            if isfile(fpath * ".jld2")
+                @info "Found latest cached solution: grid = $N ($fpath.jld2)"
+                cached_sol = import_ocp_solution(ocp; filename=fpath)
+                # If finest grid matches, no further solves required
+                remaining_grids = grids[(i+1):end]
+                return cached_sol, remaining_grids
+            end
+        end
+        return init, grids
+    end
+
+    # :exact mode evaluates per step inside the homotopy loop
+    return init, collect(grid_schedule)
+end
+
+"""
+    run_grid_homotopy(ocp, grid_schedule; init, cache=:exact, cache_dir="applications/controlled/solutions", prefix="ocp_half", solve_options...)
+
+Executes grid continuation over `grid_schedule` (e.g. `(8, 20, 50)`).
+
+# Cache Modes (`cache::Symbol`)
+- `:no` / `:none`: Completely ignores existing cache files and starts fresh from `init`. Newly computed solutions are written to disk.
+- `:exact`: Checks each grid in `grid_schedule` independently. Loads `prefix_grid_<N>.jld2` if present; solves and caches if missing.
+- `:latest`: Fast-forwards continuation by searching for the highest available grid in `grid_schedule`. If the final target grid exists, it is loaded immediately with zero solver calls. If an intermediate grid exists, it warm-starts directly from that grid and computes only the remaining finer steps.
+"""
+function run_grid_homotopy(ocp, grid_schedule;
+    init,
+    cache::Symbol=:exact,
+    cache_dir::String="applications/controlled/solutions",
+    prefix::String="ocp_half",
+    solve_options...)
+    mkpath(cache_dir)
+
+    start_sol, remaining_grids = resolve_cache_plan(
+        ocp, grid_schedule;
+        init=init, cache_dir=cache_dir, prefix=prefix, cache=cache
+    )
+
+    if isempty(remaining_grids)
+        println("✓ Latest solution already cached at finest grid ($((grid_schedule)[end])) — Objective: ", round(objective(start_sol), digits=4))
+        return start_sol
+    end
+
+    # Sequential continuation across remaining grids
+    sol_final = foldl(remaining_grids; init=start_sol) do warm_start, N
+        sol_current = solve_cached(ocp;
+            grid_size=N,
+            init=warm_start,
+            cache_dir=cache_dir,
+            prefix=prefix,
+            cache=cache,
+            solve_options...
+        )
+        println("✓ Grid $N converged — Objective: ", round(objective(sol_current), digits=4))
+        sol_current
+    end
+
+    return sol_final
+end
 
 # =========================================================
 # Minimal OCP (grid_size=8, loose tolerances) — validate the pipeline fast
@@ -363,52 +485,16 @@ solve_options = (
 
 )
 
-function get_ocp_hash(ocp)
-    io = IOBuffer()
-    print(io, MIME"plain/text", ocp)
-    return hash(String(take!(io)))
-end
+sol = run_grid_homotopy(
+    ocp,
+    (8, 20, 50);
+    init=init,
+    cache=:latest,                     # :no | :exact | :latest
+    cache_dir="applications/controlled/solutions",
+    prefix="kite_lemniscate",
+    solve_options...
+)
 
-USE_JLD2 = true
-base_filename="applications/controlled/solutions/solution_$(get_ocp_hash(ocp))_"
-
-filename = base_filename * "8"
-sol_ocp = try
-    @assert USE_JLD2
-    import_ocp_solution(ocp; filename)
-catch e
-    s = solve(ocp; init=init, grid_size=8,
-        solve_options...,
-        tol=1e-3
-    )
-    export_ocp_solution(s; filename)
-    s
-end
-
-println("OCP solve done (grid 8): objective = ", objective(sol_ocp))
-plot(sol_ocp)
-
-# --- grid continuation: warm-start the fine grid from the coarse solution ---
-for n in (20, 50)
-    try
-        filename = base_filename * string(n)
-        sol_next = try
-            @assert USE_JLD2
-            import_ocp_solution(ocp; filename)
-        catch e
-            s = solve(ocp; init=sol_ocp,
-                grid_size=n,
-                solve_options...)
-            export_ocp_solution(s; filename)
-            s
-        end
-        global sol_ocp = sol_next
-        println("OCP solve done (grid $n): objective = ", objective(sol_ocp))
-    catch e
-        println("grid $n failed: ", sprint(showerror, e)[1:min(end, 200)])
-        break
-    end
-end
 
 plot(sol_ocp)
 
@@ -418,6 +504,7 @@ plot(sol_ocp)
  - [x] Add phase-fixing
  - [x] Add state constraints : going right then left or the inverse
  - [x] simulate only half the trajectory to enforce symmetry
+ - [] add tests matlab-v1 et v1-v3
 
  - [x] GPU (ExaModel+MadNLP): Metal not supported
  - [x] AppleAccelerate: seems marginally slower
@@ -556,21 +643,34 @@ function plot_kite_3d(sol;
 
     return p3d
 end
-
 """
-    animate_kite_3d(sol; n_frames=120, fps=25, camera=(40, 25), size=(850, 700), filename="kite_trajectory_animation.gif")
+    animate_kite_3d(sol; fps=30, n_frames=nothing, camera=(40, 25), size=(850, 700), filename="kite_trajectory_animation.gif")
 
-Creates and saves an animated GIF of the kite trajectory over one full cycle.
+Renders and saves a 3D animated GIF of the kite trajectory.
+
+# Arguments
+- `sol`: Solution object or `NamedTuple` containing `time_grid` and `state`.
+
+# Keyword Arguments
+- `fps::Int = 30`: Playback frame rate (frames per second). Defaults to `30`.
+- `n_frames::Union{Int, Nothing} = nothing`: Total animation frames. If `nothing` (default), 
+  calculates `round(Int, tf * fps)` to guarantee 1:1 real-time playback matching trajectory duration.
+- `camera = (40, 25)`: Camera viewing angles (azimuth, elevation).
+- `size = (850, 700)`: Output figure dimensions in pixels.
+- `filename::String = "kite_trajectory_animation.gif"`: Filepath for the generated GIF.
 """
-function animate_kite_3d(
-    sol;
-    n_frames::Int=120,
+function animate_kite_3d(sol;
     fps::Int=30,
+    n_frames::Union{Int,Nothing}=nothing,
     camera=(40, 25),
     size=(850, 700),
     filename::String="kite_trajectory_animation.gif")
 
     tf_sol = time_grid(sol)[end]
+
+    # Guarantee 1:1 real-time playback speed by default
+    total_frames = n_frames === nothing ? max(2, round(Int, tf_sol * fps)) : n_frames
+
     N_static = 300
     t_static = range(0, tf_sol, length=N_static)
 
@@ -591,7 +691,7 @@ function animate_kite_3d(
     ymin, ymax = minimum([Y_cg; Y_arm; 0.0]) - pad, maximum([Y_cg; Y_arm; 0.0]) + pad
     zmin, zmax = 0.0, maximum([Z_cg; 0.0]) + pad
 
-    t_anim = range(0, tf_sol, length=n_frames)
+    t_anim = range(0, tf_sol, length=total_frames)
 
     anim = @animate for t in t_anim
         q_curr = state(sol)(t)[1:4]
@@ -641,7 +741,7 @@ function animate_kite_3d(
     end
 
     gif(anim, filename, fps=fps)
-    println("Animation saved to $filename")
+    println("Animation saved to $filename (Duration: $(round(total_frames / fps, digits=2)) s at $fps FPS)")
     return anim
 end
 
@@ -698,78 +798,70 @@ init_half = @init ocp_half begin
     φ̇(t) := ForwardDiff.derivative(fφ, t)
     β̇(t) := ForwardDiff.derivative(fβ, t)
 end
-
-# State reflection operator: S(x)
-const S_STATE_MASK = SVector(-1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0)
-reflect_state(x) = S_STATE_MASK .* x
-reflect_control(u) = SVector(u[2], u[1]) # Swap left and right ailerons
-
-struct ReconstructedFullSolution{T_GRID,F_STATE,F_CTRL}
-    time_grid::T_GRID
-    state_fn::F_STATE
-    control_fn::F_CTRL
-    tf_half::Float64
-    tf_full::Float64
-    half_objective::Float64
-end
-
-# Provide seamless accessors matching OptimalControl.jl interface
-OptimalControl.time_grid(sol::ReconstructedFullSolution) = sol.time_grid
-OptimalControl.state(sol::ReconstructedFullSolution) = sol.state_fn
-OptimalControl.control(sol::ReconstructedFullSolution) = sol.control_fn
-OptimalControl.objective(sol::ReconstructedFullSolution) = 2.0 * sol.half_objective
+# Reflection operators for half-period symmetry
+const S_STATE = SA[-1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0]
+sym_state(x) = S_STATE .* x
+sym_control(u) = SVector(u[2], u[1])
 
 function reconstruct_full_solution(sol_half)
-    t_grid_half = time_grid(sol_half)
-    th = t_grid_half[end]
-    t_full_end = 2.0 * th
+    th = time_grid(sol_half)[end]
+    T = 2.0 * th
 
-    # Reconstructed continuous state and control interpolations
-    x_half_fn = state(sol_half)
-    u_half_fn = control(sol_half)
+    x_half = state(sol_half)
+    u_half = control(sol_half)
 
-    full_state_fn = function (t)
-        # Periodic wrap-around within [0, 2*th]
-        t_mod = mod(t, t_full_end)
-        if t_mod <= th
-            return x_half_fn(t_mod)
-        else
-            return reflect_state(x_half_fn(t_mod - th))
+    # Periodic state & control closures across [0, 2*th]
+    x_full(t) =
+        let tm = mod(t, T)
+            tm <= th ? x_half(tm) : sym_state(x_half(tm - th))
         end
-    end
 
-    full_control_fn = function (t)
-        t_mod = mod(t, t_full_end)
-        if t_mod <= th
-            return u_half_fn(t_mod)
-        else
-            return reflect_control(u_half_fn(t_mod - th))
+    u_full(t) =
+        let tm = mod(t, T)
+            tm <= th ? u_half(tm) : sym_control(u_half(tm - th))
         end
-    end
 
-    # Concatenate time grid points
-    t_grid_second_half = t_grid_half[2:end] .+ th
-    full_time_grid = [t_grid_half; t_grid_second_half]
+    t_half = time_grid(sol_half)
+    t_full = [t_half; t_half[2:end] .+ th]
 
-    return ReconstructedFullSolution(
-        full_time_grid,
-        full_state_fn,
-        full_control_fn,
-        th,
-        t_full_end,
-        objective(sol_half)
+    return (;
+        time_grid=t_full,
+        state=x_full,
+        control=u_full,
+        tf=T,
+        objective=2.0 * objective(sol_half)
     )
 end
 
-# Solve on half period
-println("--- Solving Half-Period OCP ---")
-sol_half = solve(ocp_half; init=init_half, grid_size=8, solve_options..., tol=1e-3)
+# Make time_grid, state, control, objective work uniformly on the NamedTuple
+OptimalControl.time_grid(s::NamedTuple) = s.time_grid
+OptimalControl.state(s::NamedTuple) = s.state
+OptimalControl.control(s::NamedTuple) = s.control
+OptimalControl.objective(s::NamedTuple) = s.objective
 
-# Grid continuation on half-period
-for n in (20, 50)
-    global sol_half = solve(ocp_half; init=sol_half, grid_size=n, solve_options...)
-    println("Half-OCP grid $n solved: objective = ", objective(sol_half))
-end
+# =========================================================
+# Run Half-Period OCP with Grid Continuation
+# =========================================================
+println("--- Solving Half-Period OCP ---")
+
+# 1. Run grid homotopy (8 -> 20 -> 50) with automatic warm-starting and JLD2 caching
+sol_half = run_grid_homotopy(
+    ocp_half,
+    (8, 20, 50);
+    init=init_half,
+    cache=:latest,                     # :no | :exact | :latest
+    cache_dir="applications/controlled/solutions",
+    prefix="kite_half_lemniscate",
+    solve_options...
+)
+
+# 2. Reconstruct the full symmetric figure-8 orbit
+sol_full = reconstruct_full_solution(sol_half)
+
+println("\n=== Solution Summary ===")
+println("Half period  (tf/2) = $(round(sol_half.variable[1], digits=3)) s")
+println("Full period  (T)    = $(round(sol_full.tf, digits=3)) s")
+println("Total Power Output  = $(round(-sol_full.objective, digits=2)) W")
 
 # Reconstruct full figure-8 trajectory
 sol_full = reconstruct_full_solution(sol_half)
