@@ -290,38 +290,88 @@ ocp = @def begin
     ∫(-generated_power(x(t)) + 1e-3 * sum(abs2, u(t))) → min
 end
 
-tf_init = 3
-init = @init ocp begin
-    tf := tf_init
-    # genuinely periodic guess: α oscillates (drives the generator), others steady
-    A = 0.5
-    ω = 2π / tf_init
-    x(t) := SA[
-        A*sin(ω*t),
-        pi/6,
-        0.0,
-        0.0,
-        A*ω*cos(ω*t),
-        0.0,
-        0.0,
-        0.0
-    ]
-    u(t) := SVector(0.0, 0.0)
+## Generate an initial guess
+
+using KEEP.PointMassPara: build_vbpara
+using KEEP.PointMass4: τ_to_θφ
+using KEEP.LimitCycle: compute_limit_cycle
+
+vbp = build_vbpara()
+const lc = compute_limit_cycle(vbp, sense=(+), save_everystep=true)
+
+fα(t) = lc(t)[1]
+fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
+fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
+
+fpos(t) = begin
+    LU = vbp.l
+    a, θl, φl = fα(t), fθ(t), fφ(t)
+    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
+        sin(a) + vbp.r * sin(θl) * sin(φl),
+        vbp.r * cos(θl)]
 end
+
+fβ(t) = begin
+    v = ForwardDiff.derivative(fpos, t)
+    θl, φl = fθ(t), fφ(t)
+    J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
+    K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
+    atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
+        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
+end
+
+init = @init ocp begin
+    # One symbol only on lhs, `θ, φ = τ_to_θφ(x[2], vbp)` is not allowed for example
+    tf := lc.t[end]
+
+    α(t) := fα(t)
+    θ(t) := fθ(t)
+    φ(t) := fφ(t)
+    β(t) := fβ(t)
+    α̇(t) := ForwardDiff.derivative(fα, t)
+    θ̇(t) := ForwardDiff.derivative(fθ, t)
+    φ̇(t) := ForwardDiff.derivative(fφ, t)
+    β̇(t) := ForwardDiff.derivative(fβ, t)
+end
+
+# tf_init = 3
+# init = @init ocp begin
+#     tf := tf_init
+#     # genuinely periodic guess: α oscillates (drives the generator), others steady
+#     A = 0.5
+#     ω = 2π / tf_init
+#     x(t) := SA[
+#         A*sin(ω*t),
+#         pi/6,
+#         0.0,
+#         0.0,
+#         A*ω*cos(ω*t),
+#         0.0,
+#         0.0,
+#         0.0
+#     ]
+#     u(t) := SVector(0.0, 0.0)
+# end
 
 solve_options = (
     backend=:default,
     print_level=5,
     linear_solver="mumps",
     tol=1e-4,
-    maxiter=50
+    # maxiter=50
     # nlp_scaling_method="gradient-based"
 
 )
-base_filename="applications/controlled/solutions/solution_$(hash(ocp))_"
 
+function get_ocp_hash(ocp)
+    io = IOBuffer()
+    print(io, MIME"plain/text", ocp)
+    return hash(String(take!(io)))
+end
 
 USE_JLD2 = true
+base_filename="applications/controlled/solutions/solution_$(get_ocp_hash(ocp))_"
+
 filename = base_filename * "8"
 sol_ocp = try
     @assert USE_JLD2
@@ -360,6 +410,23 @@ for n in (20, 50)
     end
 end
 
+plot(sol_ocp)
+
+#= TODO
+
+ - [x] Initialize with PM2 trajectory
+ - [x] Add phase-fixing
+ - [x] Add state constraints : going right then left or the inverse
+ - [x] simulate only half the trajectory to enforce symmetry
+
+ - [x] GPU (ExaModel+MadNLP): Metal not supported
+ - [x] AppleAccelerate: seems marginally slower
+
+ - [] Transform state from 2 <-> 4
+ - [] Take parameters p2 and p4
+ - [] visualize
+=#
+
 # =========================================================
 # TLDR
 # =========================================================
@@ -373,14 +440,353 @@ end
 # To go full-scale: raise grid_size (with warm-start continuation) and tighten
 # Ipopt tolerances; if MUMPS struggles, try linear_solver="ma57".
 
-# Initialize with PM2 trajectory
-# Add phase-fixing: OK
-# Add state constraints : going right then left or the inverse
+##
+# =========================================================
+# 3D Visualization & Animation Functions
+# =========================================================
 
-# GPU (ExaModel+MadNLP): Metal not supported
-# AppleAccelerate: seems marginally slower
+"""
+    plot_arrow3d!(p, tip, dir; len=1.2, color=:darkblue, lw=2.0)
 
-# Transform state from 2 <-> 4
-# Take parameters p2 and p4
-#
-plot(sol_ocp)
+Helper to draw a 3D arrowhead at `tip` pointing along `dir`.
+"""
+function plot_arrow3d!(p, tip, dir; len=1.2, color=:darkblue, lw=2.0)
+    d = normalize(dir)
+    ref = abs(d[3]) < 0.9 ? SVector(0.0, 0.0, 1.0) : SVector(1.0, 0.0, 0.0)
+    n1 = normalize(cross(d, ref))
+    n2 = cross(d, n1)
+
+    base = tip - len * d
+    barb1 = base + 0.35 * len * n1
+    barb2 = base - 0.35 * len * n1
+    barb3 = base + 0.35 * len * n2
+    barb4 = base - 0.35 * len * n2
+
+    plot!(p, [base[1], tip[1]], [base[2], tip[2]], [base[3], tip[3]], color=color, lw=lw, label=false)
+    plot!(p, [barb1[1], tip[1], barb2[1]], [barb1[2], tip[2], barb2[2]], [barb1[3], tip[3], barb2[3]], color=color, lw=lw, label=false)
+    plot!(p, [barb3[1], tip[1], barb4[1]], [barb3[2], tip[2], barb4[2]], [barb3[3], tip[3], barb4[3]], color=color, lw=lw, label=false)
+end
+
+"""
+    plot_kite_3d(sol; N_pts=300, n_arrows=6, n_tethers=4, camera=(40, 25), size=(900, 750), filename=nothing)
+
+Generates a 3D plot of the kite trajectory showing:
+- 3D CG trajectory with directional arrows
+- Projections on bounding floor (XY), back wall (XZ), and side wall (YZ)
+- Arm trajectory and sample tethers
+"""
+function plot_kite_3d(sol;
+    N_pts::Int=300,
+    n_arrows::Int=6,
+    n_tethers::Int=4,
+    camera=(40, 25),
+    size=(900, 750),
+    filename::Union{String,Nothing}=nothing)
+
+    tf_sol = time_grid(sol)[end]
+    t_eval = range(0, tf_sol, length=N_pts)
+
+    q_eval = [state(sol)(t)[1:4] for t in t_eval]
+    pos_eval = [pos_CG(q) for q in q_eval]
+    arm_eval = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_eval]
+
+    X_cg = [p[1] for p in pos_eval]
+    Y_cg = [p[2] for p in pos_eval]
+    Z_cg = [p[3] for p in pos_eval]
+
+    X_arm = [p[1] for p in arm_eval]
+    Y_arm = [p[2] for p in arm_eval]
+    Z_arm = [p[3] for p in arm_eval]
+
+    # Compute bounding limits
+    pad = 2.0
+    all_x = [X_cg; X_arm; 0.0]
+    all_y = [Y_cg; Y_arm; 0.0]
+    all_z = [Z_cg; 0.0]
+
+    xmin, xmax = minimum(all_x) - pad, maximum(all_x) + pad
+    ymin, ymax = minimum(all_y) - pad, maximum(all_y) + pad
+    zmin, zmax = 0.0, maximum(all_z) + pad
+
+    p3d = plot(
+        title="Kite 3D Periodic Limit Cycle",
+        xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
+        xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+        camera=camera,
+        size=size,
+        grid=true,
+        legend=:topright
+    )
+
+    # 1. Arm pivot and circular path
+    scatter!(p3d, [0.0], [0.0], [0.0], color=:black, markersize=5, label="Pivot (0,0,0)")
+    plot!(p3d, X_arm, Y_arm, Z_arm, color=:gray30, lw=2, linestyle=:dash, label="Arm path")
+
+    # 2. Wall Projections
+    plot!(p3d, X_cg, Y_cg, fill(zmin, N_pts), color=:gray60, lw=1.5, linestyle=:dot, label="XY-floor proj")
+    plot!(p3d, X_cg, fill(ymax, N_pts), Z_cg, color=:gray60, lw=1.5, linestyle=:dashdot, label="XZ-back proj")
+    plot!(p3d, fill(xmin, N_pts), Y_cg, Z_cg, color=:gray60, lw=1.5, linestyle=:dash, label="YZ-side proj")
+
+    # 3. Sample Tethers
+    if n_tethers > 0
+        tether_indices = round.(Int, range(1, N_pts, length=n_tethers + 1))[1:n_tethers]
+        for (i, idx) in enumerate(tether_indices)
+            plot!(p3d, [X_arm[idx], X_cg[idx]], [Y_arm[idx], Y_cg[idx]], [Z_arm[idx], Z_cg[idx]],
+                color=:orange, lw=1.2, alpha=0.5, label=(i == 1 ? "Tether sample" : false))
+        end
+    end
+
+    # 4. Main Trajectory
+    plot!(p3d, X_cg, Y_cg, Z_cg, color=:crimson, lw=3.5, label="Kite CG trajectory")
+
+    # 5. Directional Arrows
+    if n_arrows > 0
+        arrow_indices = round.(Int, range(10, N_pts - 10, length=n_arrows))
+        for idx in arrow_indices
+            pt = pos_eval[idx]
+            pt_next = pos_eval[idx+2]
+            plot_arrow3d!(p3d, pt, pt_next - pt; len=1.3, color=:darkblue, lw=2.0)
+        end
+    end
+
+    if filename !== nothing
+        savefig(p3d, filename)
+        println("Plot saved to $filename")
+    end
+
+    return p3d
+end
+
+"""
+    animate_kite_3d(sol; n_frames=120, fps=25, camera=(40, 25), size=(850, 700), filename="kite_trajectory_animation.gif")
+
+Creates and saves an animated GIF of the kite trajectory over one full cycle.
+"""
+function animate_kite_3d(
+    sol;
+    n_frames::Int=120,
+    fps::Int=30,
+    camera=(40, 25),
+    size=(850, 700),
+    filename::String="kite_trajectory_animation.gif")
+
+    tf_sol = time_grid(sol)[end]
+    N_static = 300
+    t_static = range(0, tf_sol, length=N_static)
+
+    q_static = [state(sol)(t)[1:4] for t in t_static]
+    pos_static = [pos_CG(q) for q in q_static]
+    arm_static = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_static]
+
+    X_cg = [p[1] for p in pos_static]
+    Y_cg = [p[2] for p in pos_static]
+    Z_cg = [p[3] for p in pos_static]
+
+    X_arm = [p[1] for p in arm_static]
+    Y_arm = [p[2] for p in arm_static]
+    Z_arm = [p[3] for p in arm_static]
+
+    pad = 2.0
+    xmin, xmax = minimum([X_cg; X_arm; 0.0]) - pad, maximum([X_cg; X_arm; 0.0]) + pad
+    ymin, ymax = minimum([Y_cg; Y_arm; 0.0]) - pad, maximum([Y_cg; Y_arm; 0.0]) + pad
+    zmin, zmax = 0.0, maximum([Z_cg; 0.0]) + pad
+
+    t_anim = range(0, tf_sol, length=n_frames)
+
+    anim = @animate for t in t_anim
+        q_curr = state(sol)(t)[1:4]
+        p_cg = pos_CG(q_curr)
+        p_arm = SVector(pars.larm * cos(q_curr[1]), pars.larm * sin(q_curr[1]), 0.0)
+
+        # Kite body axes
+        Ihat, Jhat, _ = body_axes(q_curr)
+        wing_left = p_cg - 1.25 * Jhat
+        wing_right = p_cg + 1.25 * Jhat
+        chord_tail = p_cg - 0.40 * Ihat
+        chord_nose = p_cg + 0.40 * Ihat
+
+        p_frame = plot(
+            title="Kite Cycle (t = $(round(t, digits=2)) s / $(round(tf_sol, digits=2)) s)",
+            xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
+            xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+            camera=camera,
+            size=size,
+            legend=false
+        )
+
+        # Static background curves & shadows
+        plot!(p_frame, X_cg, Y_cg, Z_cg, color=:crimson, lw=1.5, alpha=0.4)
+        plot!(p_frame, X_cg, Y_cg, fill(zmin, N_static), color=:gray75, lw=1.0)
+        plot!(p_frame, X_cg, fill(ymax, N_static), Z_cg, color=:gray75, lw=1.0)
+        plot!(p_frame, fill(xmin, N_static), Y_cg, Z_cg, color=:gray75, lw=1.0)
+        plot!(p_frame, X_arm, Y_arm, Z_arm, color=:gray50, lw=1.2, linestyle=:dash)
+
+        # Generator arm & pivot
+        scatter!(p_frame, [0.0], [0.0], [0.0], color=:black, markersize=5)
+        plot!(p_frame, [0.0, p_arm[1]], [0.0, p_arm[2]], [0.0, p_arm[3]], color=:black, lw=4)
+        scatter!(p_frame, [p_arm[1]], [p_arm[2]], [p_arm[3]], color=:black, markersize=4)
+
+        # Dynamic Tether
+        plot!(p_frame, [p_arm[1], p_cg[1]], [p_arm[2], p_cg[2]], [p_arm[3], p_cg[3]], color=:orange, lw=2.5)
+
+        # Dynamic Kite Body
+        plot!(p_frame, [wing_left[1], wing_right[1]], [wing_left[2], wing_right[2]], [wing_left[3], wing_right[3]], color=:darkblue, lw=4.5)
+        plot!(p_frame, [chord_tail[1], chord_nose[1]], [chord_tail[2], chord_nose[2]], [chord_tail[3], chord_nose[3]], color=:red, lw=3.0)
+        scatter!(p_frame, [p_cg[1]], [p_cg[2]], [p_cg[3]], color=:darkred, markersize=4)
+
+        # Dynamic shadow dots on bounding planes
+        scatter!(p_frame, [p_cg[1]], [p_cg[2]], [zmin], color=:gray40, markersize=4)
+        scatter!(p_frame, [p_cg[1]], [ymax], [p_cg[3]], color=:gray40, markersize=4)
+        scatter!(p_frame, [xmin], [p_cg[2]], [p_cg[3]], color=:gray40, markersize=4)
+    end
+
+    gif(anim, filename, fps=fps)
+    println("Animation saved to $filename")
+    return anim
+end
+
+## Half period
+# Half-period bounds (half of full period [0.5, 20.0])
+TF_HALF_MIN, TF_HALF_MAX = 0.25, 10.0
+
+ocp_half = @def begin
+    p = (tf, p_) ∈ R², variable
+    t ∈ [0, tf], time
+    x = (α, θ, φ, β, α̇, θ̇, φ̇, β̇) ∈ R⁸, state
+    u = (uₗ, uᵣ) ∈ R², control
+
+    p_ == 0
+
+    tf >= TF_HALF_MIN
+    tf <= TF_HALF_MAX
+
+    -30 * pi / 180 ≤ uₗ(t) ≤ 30 * pi / 180
+    -30 * pi / 180 ≤ uᵣ(t) ≤ 30 * pi / 180
+
+    # Phase pinning at t = 0 (center crossing going to the left lobe)
+    α(0) == 0
+    α̇(0) >= 0
+    φ̇(0) >= 0
+    θ̇(0) <= 0
+    θ(t) >= 0
+
+    # --- Half-period symmetry boundary condition: x(tf) == S(x(0)) ---
+    α(tf) + α(0) == 0
+    θ(tf) - θ(0) == 0
+    φ(tf) + φ(0) == 0
+    β(tf) + β(0) == 0
+    α̇(tf) + α̇(0) == 0
+    θ̇(tf) - θ̇(0) == 0
+    φ̇(tf) + φ̇(0) == 0
+    β̇(tf) + β̇(0) == 0
+
+    ẋ(t) == f(x(t), u(t))
+
+    ∫(-generated_power(x(t)) + 1e-3 * sum(abs2, u(t))) → min
+end
+
+# Initial guess over [0, T/2] extracted from the limit cycle
+init_half = @init ocp_half begin
+    tf := lc.t[end] / 2.0
+
+    α(t) := fα(t)
+    θ(t) := fθ(t)
+    φ(t) := fφ(t)
+    β(t) := fβ(t)
+    α̇(t) := ForwardDiff.derivative(fα, t)
+    θ̇(t) := ForwardDiff.derivative(fθ, t)
+    φ̇(t) := ForwardDiff.derivative(fφ, t)
+    β̇(t) := ForwardDiff.derivative(fβ, t)
+end
+
+# State reflection operator: S(x)
+const S_STATE_MASK = SVector(-1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0)
+reflect_state(x) = S_STATE_MASK .* x
+reflect_control(u) = SVector(u[2], u[1]) # Swap left and right ailerons
+
+struct ReconstructedFullSolution{T_GRID,F_STATE,F_CTRL}
+    time_grid::T_GRID
+    state_fn::F_STATE
+    control_fn::F_CTRL
+    tf_half::Float64
+    tf_full::Float64
+    half_objective::Float64
+end
+
+# Provide seamless accessors matching OptimalControl.jl interface
+OptimalControl.time_grid(sol::ReconstructedFullSolution) = sol.time_grid
+OptimalControl.state(sol::ReconstructedFullSolution) = sol.state_fn
+OptimalControl.control(sol::ReconstructedFullSolution) = sol.control_fn
+OptimalControl.objective(sol::ReconstructedFullSolution) = 2.0 * sol.half_objective
+
+function reconstruct_full_solution(sol_half)
+    t_grid_half = time_grid(sol_half)
+    th = t_grid_half[end]
+    t_full_end = 2.0 * th
+
+    # Reconstructed continuous state and control interpolations
+    x_half_fn = state(sol_half)
+    u_half_fn = control(sol_half)
+
+    full_state_fn = function (t)
+        # Periodic wrap-around within [0, 2*th]
+        t_mod = mod(t, t_full_end)
+        if t_mod <= th
+            return x_half_fn(t_mod)
+        else
+            return reflect_state(x_half_fn(t_mod - th))
+        end
+    end
+
+    full_control_fn = function (t)
+        t_mod = mod(t, t_full_end)
+        if t_mod <= th
+            return u_half_fn(t_mod)
+        else
+            return reflect_control(u_half_fn(t_mod - th))
+        end
+    end
+
+    # Concatenate time grid points
+    t_grid_second_half = t_grid_half[2:end] .+ th
+    full_time_grid = [t_grid_half; t_grid_second_half]
+
+    return ReconstructedFullSolution(
+        full_time_grid,
+        full_state_fn,
+        full_control_fn,
+        th,
+        t_full_end,
+        objective(sol_half)
+    )
+end
+
+# Solve on half period
+println("--- Solving Half-Period OCP ---")
+sol_half = solve(ocp_half; init=init_half, grid_size=8, solve_options..., tol=1e-3)
+
+# Grid continuation on half-period
+for n in (20, 50)
+    global sol_half = solve(ocp_half; init=sol_half, grid_size=n, solve_options...)
+    println("Half-OCP grid $n solved: objective = ", objective(sol_half))
+end
+
+# Reconstruct full figure-8 trajectory
+sol_full = reconstruct_full_solution(sol_half)
+println("Reconstruction complete!")
+println("Full period T = ", sol_full.tf_full, " s, Full cycle objective = ", objective(sol_full))
+
+# Verify boundary periodic continuity
+x0 = state(sol_full)(0.0)
+xT = state(sol_full)(sol_full.tf_full)
+println("Periodic loop closure error ||x(0) - x(T)|| = ", norm(x0 - xT))
+
+plot_kite_3d(sol_full)
+animate_kite_3d(sol_full)
+
+tf_sol = time_grid(sol_full)[end]
+ts = range(0, tf_sol, length=300)
+
+# Evaluate states and body axes across the full figure-8
+q_eval = [state(sol_full)(t)[1:4] for t in ts]
+pos_eval = [pos_CG(q) for q in q_eval]
