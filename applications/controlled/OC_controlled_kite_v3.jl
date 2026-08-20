@@ -260,11 +260,6 @@ end
 # =========================================================
 
 """
-    solve_cached(ocp; grid_size, init, cache_dir, prefix, force=false, solve_options...)
-
-Solves or loads a cached OCP solution for a single grid size.
-"""
-"""
     cache_filepath(cache_dir, prefix, grid_size)
 
 Returns file path prefix (without extension) for a given cache entry.
@@ -274,7 +269,9 @@ cache_filepath(cache_dir::String, prefix::String, grid_size::Int) = joinpath(cac
 """
     solve_cached(ocp; grid_size, init, cache_dir, prefix, cache=:exact, solve_options...)
 
-Solves or loads a cached OCP solution for a single grid size according to the `cache` mode.
+Handles solution retrieval or execution for a single grid size according to `cache`:
+- `:exact`: Directly loads the cached solution without solving; throws an error if missing.
+- `:no` / `:latest`: Solves the OCP and exports the solution to disk.
 """
 function solve_cached(ocp;
     grid_size::Int,
@@ -286,7 +283,8 @@ function solve_cached(ocp;
     fpath = cache_filepath(cache_dir, prefix, grid_size)
     jld2_file = fpath * ".jld2"
 
-    if cache in (:exact, :latest) && isfile(jld2_file)
+    if cache == :exact
+        isfile(jld2_file) || error("Cached solution not found for grid = $grid_size: $jld2_file")
         @info "Loading cached solution: grid = $grid_size ($jld2_file)"
         return import_ocp_solution(ocp; filename=fpath)
     end
@@ -300,12 +298,10 @@ end
 """
     resolve_cache_plan(ocp, grid_schedule; init, cache_dir, prefix, cache)
 
-Determines the starting solution and remaining grid schedule based on the cache mode:
-- `:no`: Ignores all cache on disk. Returns `(init, grid_schedule)`.
-- `:exact`: Executes grid schedule sequentially, loading individual grid files if they exist.
-- `:latest`: Scans `grid_schedule` in descending order. If the finest grid is cached, 
-  loads it and returns an empty remaining schedule. Otherwise, warm-starts from the highest 
-  available intermediate grid and returns the remaining schedule.
+Determines the initial guess and schedule based on the cache mode:
+- `:no`: Ignores disk cache; returns `(init, grid_schedule)`.
+- `:exact`: Returns `(init, grid_schedule)` for direct loading across all target grids.
+- `:latest`: Finds the highest-grid cached solution matching `prefix` to use as `init`.
 """
 function resolve_cache_plan(ocp, grid_schedule; init, cache_dir::String, prefix::String, cache::Symbol)
     cache in (:no, :exact, :latest) || throw(ArgumentError("cache must be :no, :exact, or :latest (got :$cache)"))
@@ -315,21 +311,25 @@ function resolve_cache_plan(ocp, grid_schedule; init, cache_dir::String, prefix:
     end
 
     if cache == :latest
-        grids = collect(grid_schedule)
-        for (i, N) in Iterators.reverse(enumerate(grids))
-            fpath = cache_filepath(cache_dir, prefix, N)
-            if isfile(fpath * ".jld2")
-                @info "Found latest cached solution: grid = $N ($fpath.jld2)"
-                cached_sol = import_ocp_solution(ocp; filename=fpath)
-                # If finest grid matches, no further solves required
-                remaining_grids = grids[(i+1):end]
-                return cached_sol, remaining_grids
-            end
+        # Match any cache file with the given prefix and extract the highest grid number
+        pattern = Regex("^$(prefix)_grid_(\\d+)\\.jld2\$")
+        matched_grids = Int[]
+        for f in readdir(cache_dir)
+            m = match(pattern, f)
+            m !== nothing && push!(matched_grids, parse(Int, m.captures[1]))
         end
-        return init, grids
+
+        if !isempty(matched_grids)
+            latest_grid = maximum(matched_grids)
+            fpath = cache_filepath(cache_dir, prefix, latest_grid)
+            @info "Found latest cached solution: grid = $latest_grid ($fpath.jld2)"
+            cached_sol = import_ocp_solution(ocp; filename=fpath)
+            return cached_sol, collect(grid_schedule)
+        end
+        return init, collect(grid_schedule)
     end
 
-    # :exact mode evaluates per step inside the homotopy loop
+    # :exact mode verifies all required files exist before execution
     return init, collect(grid_schedule)
 end
 
@@ -339,12 +339,11 @@ end
 Executes grid continuation over `grid_schedule` (e.g. `(8, 20, 50)`).
 
 # Cache Modes (`cache::Symbol`)
-- `:no` / `:none`: Completely ignores existing cache files and starts fresh from `init`. Newly computed solutions are written to disk.
-- `:exact`: Checks each grid in `grid_schedule` independently. Loads `prefix_grid_<N>.jld2` if present; solves and caches if missing.
-- `:latest`: Fast-forwards continuation by searching for the highest available grid in `grid_schedule`. If the final target grid exists, it is loaded immediately with zero solver calls. If an intermediate grid exists, it warm-starts directly from that grid and computes only the remaining finer steps.
+- `:no`: Optimizes through `grid_schedule` starting from `init`, ignoring existing cache files.
+- `:exact`: Performs no optimization; loads each cached grid solution directly from disk.
+- `:latest`: Uses the highest available cached grid solution matching `prefix` as `init`, then optimizes through `grid_schedule`.
 """
-function run_grid_homotopy(ocp, grid_schedule;
-    init,
+function run_grid_homotopy(ocp, grid_schedule; init,
     cache::Symbol=:exact,
     cache_dir::String="applications/controlled/solutions",
     prefix::String="ocp_half",
@@ -496,7 +495,7 @@ sol = run_grid_homotopy(
 )
 
 
-plot(sol_ocp)
+plot(sol)
 
 #= TODO
 
@@ -504,14 +503,16 @@ plot(sol_ocp)
  - [x] Add phase-fixing
  - [x] Add state constraints : going right then left or the inverse
  - [x] simulate only half the trajectory to enforce symmetry
- - [] add tests matlab-v1 et v1-v3
 
  - [x] GPU (ExaModel+MadNLP): Metal not supported
  - [x] AppleAccelerate: seems marginally slower
 
+ - [] Give the function parameters
+ - [] Translate from PM2 params to controlled params
  - [] Transform state from 2 <-> 4
  - [] Take parameters p2 and p4
  - [] visualize
+ - [] add tests matlab-v1 et v1-v3
 =#
 
 # =========================================================
@@ -531,28 +532,6 @@ plot(sol_ocp)
 # =========================================================
 # 3D Visualization & Animation Functions
 # =========================================================
-
-"""
-    plot_arrow3d!(p, tip, dir; len=1.2, color=:darkblue, lw=2.0)
-
-Helper to draw a 3D arrowhead at `tip` pointing along `dir`.
-"""
-function plot_arrow3d!(p, tip, dir; len=1.2, color=:darkblue, lw=2.0)
-    d = normalize(dir)
-    ref = abs(d[3]) < 0.9 ? SVector(0.0, 0.0, 1.0) : SVector(1.0, 0.0, 0.0)
-    n1 = normalize(cross(d, ref))
-    n2 = cross(d, n1)
-
-    base = tip - len * d
-    barb1 = base + 0.35 * len * n1
-    barb2 = base - 0.35 * len * n1
-    barb3 = base + 0.35 * len * n2
-    barb4 = base - 0.35 * len * n2
-
-    plot!(p, [base[1], tip[1]], [base[2], tip[2]], [base[3], tip[3]], color=color, lw=lw, label=false)
-    plot!(p, [barb1[1], tip[1], barb2[1]], [barb1[2], tip[2], barb2[2]], [barb1[3], tip[3], barb2[3]], color=color, lw=lw, label=false)
-    plot!(p, [barb3[1], tip[1], barb4[1]], [barb3[2], tip[2], barb4[2]], [barb3[3], tip[3], barb4[3]], color=color, lw=lw, label=false)
-end
 
 """
     plot_kite_3d(sol; N_pts=300, n_arrows=6, n_tethers=4, camera=(40, 25), size=(900, 750), filename=nothing)
@@ -632,7 +611,8 @@ function plot_kite_3d(sol;
         for idx in arrow_indices
             pt = pos_eval[idx]
             pt_next = pos_eval[idx+2]
-            plot_arrow3d!(p3d, pt, pt_next - pt; len=1.3, color=:darkblue, lw=2.0)
+            plot!(p3d, [pt[1], pt_next[1]], [pt[2], pt_next[2]], [pt[3], pt_next[3]],
+                arrow=arrow(:closed, :head, 0.4, 0.4), color=:darkblue, lw=2.0, label=false)
         end
     end
 
@@ -643,6 +623,7 @@ function plot_kite_3d(sol;
 
     return p3d
 end
+
 """
     animate_kite_3d(sol; fps=30, n_frames=nothing, camera=(40, 25), size=(850, 700), filename="kite_trajectory_animation.gif")
 
@@ -766,9 +747,12 @@ ocp_half = @def begin
     # Phase pinning at t = 0 (center crossing going to the left lobe)
     α(0) == 0
     α̇(0) >= 0
-    φ̇(0) >= 0
     θ̇(0) <= 0
-    θ(t) >= 0
+    φ̇(0) <= 0
+
+    α(t) >= 0
+    # θ(t) <= π/2  # Kite above ground
+    φ(t) >= 0  # Only y > 0 lobe
 
     # --- Half-period symmetry boundary condition: x(tf) == S(x(0)) ---
     α(tf) + α(0) == 0
@@ -845,39 +829,37 @@ OptimalControl.objective(s::NamedTuple) = s.objective
 println("--- Solving Half-Period OCP ---")
 
 # 1. Run grid homotopy (8 -> 20 -> 50) with automatic warm-starting and JLD2 caching
-sol_half = run_grid_homotopy(
+sol_init_half = solve(ocp_half, init=init, maxiter=0, grid_size=50)
+@time sol_half = run_grid_homotopy(
     ocp_half,
     (8, 20, 50);
     init=init_half,
-    cache=:latest,                     # :no | :exact | :latest
+    cache=:no,                     # :no | :exact | :latest
     cache_dir="applications/controlled/solutions",
     prefix="kite_half_lemniscate",
     solve_options...
 )
 
+plot(sol_init_half)
+plot(sol_half)
+
 # 2. Reconstruct the full symmetric figure-8 orbit
 sol_full = reconstruct_full_solution(sol_half)
+tf_full = sol_full.tf
 
 println("\n=== Solution Summary ===")
-println("Half period  (tf/2) = $(round(sol_half.variable[1], digits=3)) s")
-println("Full period  (T)    = $(round(sol_full.tf, digits=3)) s")
+println("Full period  (T)    = $(round(tf_full, digits=3)) s")
 println("Total Power Output  = $(round(-sol_full.objective, digits=2)) W")
-
-# Reconstruct full figure-8 trajectory
-sol_full = reconstruct_full_solution(sol_half)
-println("Reconstruction complete!")
-println("Full period T = ", sol_full.tf_full, " s, Full cycle objective = ", objective(sol_full))
 
 # Verify boundary periodic continuity
 x0 = state(sol_full)(0.0)
-xT = state(sol_full)(sol_full.tf_full)
+xT = state(sol_full)(tf_full)
 println("Periodic loop closure error ||x(0) - x(T)|| = ", norm(x0 - xT))
 
 plot_kite_3d(sol_full)
 animate_kite_3d(sol_full)
 
-tf_sol = time_grid(sol_full)[end]
-ts = range(0, tf_sol, length=300)
+ts = range(0, tf_full, length=300)
 
 # Evaluate states and body axes across the full figure-8
 q_eval = [state(sol_full)(t)[1:4] for t in ts]
