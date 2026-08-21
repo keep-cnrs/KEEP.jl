@@ -243,3 +243,28 @@ function main()
 end
 
 main()
+
+#=
+Report — wind sweep methodology (see also `6_fixed_parametrized_optimization_rescaling.jl`):
+
+This script sweeps wind with `CA(p0; v_ref => value)`, i.e. it changes ONLY `v_ref`
+on a fixed kite. Since the characteristic time is T = l/v_ref, every T-normalized
+Vaschy-Buckingham group then shifts (g_n, Cmax_n, m_l_n ∝ 1/k², Ω_n, torque_slope_n ∝ 1/k
+for wind ratio k), while r_n, c_L, f, c_D_l, I_eq_n stay put. Each wind speed is
+therefore a genuinely DIFFERENT normalized problem (the Froude number changes), and
+the per-wind optima found above are genuinely different in normalized space.
+This is correct and intended for a fixed-kite study: the observed near power laws
+(ℓ ∝ 1/v, I ∝ 1/v, b ∝ v, P ∝ v³, tension ∝ v²) quantify how the optimum drifts as
+gravity becomes relatively weaker against aerodynamics — they are NOT a similarity law.
+
+An EXACT rescaling exists only along the fibers of `build_vbpara`: rescaling the whole
+system with l, r, h_ref ∝ k², I_eq ∝ k⁴, Cmax ∝ k², Ω ∝ 1/k, torque_slope ∝ k³,
+S ∝ 1/k², d_l ∝ 1/k⁴, ρ_l ∝ k⁶, m = const (gravity is not a free gauge: g' = k²g/λ,
+so λ = k² is forced for real gravity). There the normalized trajectory maps onto
+itself (rates ∝ 1/k, energy ∝ k²) and the optimum is wind-invariant in normalized
+space, with exact corollaries period ∝ v, power ∝ v, tension = const.
+
+`6_fixed_parametrized_optimization_rescaling.jl` implements this transform
+(`rescale_para`, `rescale_wind`), tests it against `PointMass4.dynamics` without
+integration, and verifies the exact laws on limit cycles.
+=#

@@ -507,6 +507,7 @@ plot(sol)
  - [x] GPU (ExaModel+MadNLP): Metal not supported
  - [x] AppleAccelerate: seems marginally slower
 
+ - [] load from cache: if ocp is the same as the one in cache: return directly, otherwise use as init for solve
  - [] Give the function parameters
  - [] Translate from PM2 params to controlled params
  - [] Transform state from 2 <-> 4
