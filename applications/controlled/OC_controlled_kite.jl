@@ -10,7 +10,6 @@ using Plots
 using OptimalControl, NLPModelsIpopt
 using ForwardDiff
 
-
 #=
 The Coriolis term computed the mass matrix temporal derivative dM using positions q instead of velocities dq. This has been corrected to use dq.
 
@@ -42,17 +41,21 @@ function aerodynamics(X, u, pars)
     cq = cos.(q)
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     W = SVector(
         dq[4] + cq[2] * dq[3],
         sq[4] * sq[2] * dq[3] + cq[4] * dq[2],
-        cq[4] * sq[2] * dq[3] - sq[4] * dq[2]
+        cq[4] * sq[2] * dq[3] - sq[4] * dq[2],
     )
 
     # Position and velocity of the panels
@@ -60,7 +63,7 @@ function aerodynamics(X, u, pars)
     vCG = SVector(
         -b * sq[1] * dq[1] + l * cq[2] * cq[3] * dq[2] - l * sq[2] * sq[3] * dq[3],
         b * cq[1] * dq[1] + l * cq[2] * sq[3] * dq[2] + l * sq[2] * cq[3] * dq[3],
-        -l * sq[2] * dq[2]
+        -l * sq[2] * dq[2],
     )
     vCGrel = vCG - SVector(wind(zCG), 0.0, 0.0)
 
@@ -131,7 +134,7 @@ function Caero(alpha)
     return SVector(
         1.0 * (alpha + 5.0 * pi / 180.0) * (abs(alpha) <= 30.0 * pi / 180.0),
         0.2 + 0.1 * (alpha + 5.0 * pi / 180.0)^2,
-        0.0
+        0.0,
     )
 end
 
@@ -148,34 +151,37 @@ function lagrangian(X, pars)
     cq = cos.(q)
     sq = sin.(q)
 
-    rCG = SVector(
-        b * cq[1] + l * sq[2] * cq[3],
-        b * sq[1] + l * sq[2] * sq[3],
-        l * cq[2]
-    )
+    rCG = SVector(b * cq[1] + l * sq[2] * cq[3], b * sq[1] + l * sq[2] * sq[3], l * cq[2])
     vCG = SVector(
         -b * sq[1] * dq[1] + l * cq[2] * cq[3] * dq[2] - l * sq[2] * sq[3] * dq[3],
         b * cq[1] * dq[1] + l * cq[2] * sq[3] * dq[2] + l * sq[2] * cq[3] * dq[3],
-        -l * sq[2] * dq[2]
+        -l * sq[2] * dq[2],
     )
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     w = SVector(
         dq[4] + cq[2] * dq[3],
         sq[4] * sq[2] * dq[3] + cq[4] * dq[2],
-        cq[4] * sq[2] * dq[3] - sq[4] * dq[2]
+        cq[4] * sq[2] * dq[3] - sq[4] * dq[2],
     )
 
     # NOTE: The original MATLAB code missed squaring the angular velocity (dq[1]) 
     # of the arm in the rotational kinetic energy. We've corrected this to dq[1]^2.
-    T_kin = 0.5 * m * sum(abs2, vCG) + 0.5 * dot(SVector(A, B, C), w .^ 2) + 0.5 * Iarm * dq[1]^2
+    T_kin =
+        0.5 * m * sum(abs2, vCG) +
+        0.5 * dot(SVector(A, B, C), w .^ 2) +
+        0.5 * Iarm * dq[1]^2
     V_pot = m * g * rCG[3]
 
     L = T_kin - V_pot
@@ -271,20 +277,25 @@ function eom(X, u, pars, t=0)
     dM = dq[1] * dM1 + dq[2] * dM2 + dq[3] * dM3 + dq[4] * dM4
 
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
 
     Rref2body = vcat(Ihat', Jhat', Khat')
 
-    deltaRcg = Rref2body * @SMatrix [
-        -b*sq[1] l*cq[2]*cq[3] -l*sq[2]*sq[3] 0.0;
-        b*cq[1] l*cq[2]*sq[3] l*sq[2]*cq[3] 0.0;
-        0.0 -l*sq[2] 0.0 0.0
-    ]
+    deltaRcg =
+        Rref2body * @SMatrix [
+            -b*sq[1] l*cq[2]*cq[3] -l*sq[2]*sq[3] 0.0;
+            b*cq[1] l*cq[2]*sq[3] l*sq[2]*cq[3] 0.0;
+            0.0 -l*sq[2] 0.0 0.0
+        ]
 
     deltaW = @SMatrix [
         0.0 0.0 cq[2] 1.0;
@@ -304,12 +315,10 @@ function eom(X, u, pars, t=0)
     Q = Qaero + Qgenerator + Qlines
 
     dV = SVector(0.0, -m * g * l * sq[2], 0.0, 0.0)
-    dLdq = SVector(
-        dot(dq, dM1 * dq),
-        dot(dq, dM2 * dq),
-        dot(dq, dM3 * dq),
-        dot(dq, dM4 * dq)
-    ) / 2.0 - dV
+    dLdq =
+        SVector(
+            dot(dq, dM1 * dq), dot(dq, dM2 * dq), dot(dq, dM3 * dq), dot(dq, dM4 * dq)
+        ) / 2.0 - dV
 
     # Calculate states derivative avoiding explicit inversion operations over allocations
     # @warn "Regularizing mass matrix M in eom" maxlog = 1
@@ -328,7 +337,7 @@ end
 LU = 1.0
 TU = 1.0
 
-const pars = CA(
+const pars = CA(;
     larm=2.0 / LU,
     lcg=20.0 / LU,
     mass=5.0,
@@ -341,13 +350,14 @@ const pars = CA(
     aero=(
         S=5.0 / LU^2,
         rho=1.225 / LU^3,
-        panels=[0.1/LU 0.1/LU;
+        panels=[
+            0.1/LU 0.1/LU;
             1.25/LU -1.25/LU;
-            0.0 0.0],
-        delta=30.0 * pi / 180.0
-    )
+            0.0 0.0
+        ],
+        delta=30.0 * pi / 180.0,
+    ),
 )
-
 
 x0 = @SVector [0.0, pi / 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 const u_const = @SVector [-20.0 * pi / 180.0, -20.0 * pi / 180.0]
@@ -363,17 +373,20 @@ tspan = (0.0, 20.0 / TU)
 prob = ODEProblem(f_ode, x0, tspan, pars)
 
 ## Solve
-sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, progress=true)
+sol = solve(prob, Tsit5(); reltol=1e-6, abstol=1e-6, progress=true)
 
 # =========================================================
 # Figures & Visualization
 # =========================================================
-t_plot = range(0.0, 20.0 / TU, length=101)
+t_plot = range(0.0, 20.0 / TU; length=101)
 x_plot = sol.(t_plot)
 
 # 1. Trajectory Animation (Replaces the drawnow interactive MATLAB loop)
 calc_OA(x, pars) = pars.larm * SVector(cos(x[1]), sin(x[1]), 0.0)
-calc_OG(x, pars) = calc_OA(x, pars) + pars.lcg * SVector(sin(x[2]) * cos(x[3]), sin(x[2]) * sin(x[3]), cos(x[2]))
+function calc_OG(x, pars)
+    return calc_OA(x, pars) +
+           pars.lcg * SVector(sin(x[2]) * cos(x[3]), sin(x[2]) * sin(x[3]), cos(x[2]))
+end
 
 OA = calc_OA.(x_plot, Ref(pars))
 OG = calc_OG.(x_plot, Ref(pars))
@@ -381,38 +394,83 @@ OG = calc_OG.(x_plot, Ref(pars))
 if false
     anim = @animate for j in 1:length(t_plot)
         plot(
-            [0.0, pars.larm], [0.0, 0.0], [0.0, 0.0],
-            color=:black, linewidth=2, label=false, aspect_ratio=:equal,
-            showaxis=false, grid=false
+            [0.0, pars.larm],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            color=:black,
+            linewidth=2,
+            label=false,
+            aspect_ratio=:equal,
+            showaxis=false,
+            grid=false,
         )
-        plot!([0.0, 0.0], [0.0, pars.larm], [0.0, 0.0], color=:black, linewidth=2, label=false)
-        plot!([0.0, 0.0], [0.0, 0.0], [0.0, pars.larm], color=:black, linewidth=2, label=false)
+        plot!(
+            [0.0, 0.0], [0.0, pars.larm], [0.0, 0.0], color=:black, linewidth=2, label=false
+        )
+        plot!(
+            [0.0, 0.0], [0.0, 0.0], [0.0, pars.larm], color=:black, linewidth=2, label=false
+        )
 
         # Arm and Lines
-        plot!([0.0, OA[j][1]], [0.0, OA[j][2]], [0.0, OA[j][3]], color=:red, linewidth=2, label=false)
-        plot!([OG[j][1], OA[j][1]], [OG[j][2], OA[j][2]], [OG[j][3], OA[j][3]], color=:blue, linewidth=2, label=false)
+        plot!(
+            [0.0, OA[j][1]],
+            [0.0, OA[j][2]],
+            [0.0, OA[j][3]],
+            color=:red,
+            linewidth=2,
+            label=false,
+        )
+        plot!(
+            [OG[j][1], OA[j][1]],
+            [OG[j][2], OA[j][2]],
+            [OG[j][3], OA[j][3]],
+            color=:blue,
+            linewidth=2,
+            label=false,
+        )
 
         xlims!(-pars.lcg, pars.lcg)
         ylims!(-pars.lcg, pars.lcg)
         zlims!(0, pars.lcg)
     end
-    g = gif(anim, fps=30) # Use this if you wish to dump a fluid video!
+    g = gif(anim; fps=30) # Use this if you wish to dump a fluid video!
     display(g)
 
     # 2. Beta angle plot
 
     get_beta(x) = x[2] * (180.0 / pi)
-    p_beta = plot(t_plot .* TU, get_beta.(x_plot), color=:black, linewidth=2,
-        xlabel="Time [s]", ylabel="β [deg]", framestyle=:box, legend=false)
+    p_beta = plot(
+        t_plot .* TU,
+        get_beta.(x_plot);
+        color=:black,
+        linewidth=2,
+        xlabel="Time [s]",
+        ylabel="β [deg]",
+        framestyle=:box,
+        legend=false,
+    )
     display(p_beta)
 
     # 3. Aerodynamic incidence plot
     get_i1(x, u, p) = aerodynamics(x, u, p).i1 * (180.0 / pi)
     get_i2(x, u, p) = aerodynamics(x, u, p).i2 * (180.0 / pi)
 
-    p_inc = plot(t_plot .* TU, get_i1.(x_plot, Ref(u_const), Ref(pars)), label="Panel 1", linewidth=2,
-        xlabel="Time [s]", ylabel="Incidence [deg]", framestyle=:box)
-    plot!(p_inc, t_plot .* TU, get_i2.(x_plot, Ref(u_const), Ref(pars)), label="Panel 2", linewidth=2)
+    p_inc = plot(
+        t_plot .* TU,
+        get_i1.(x_plot, Ref(u_const), Ref(pars));
+        label="Panel 1",
+        linewidth=2,
+        xlabel="Time [s]",
+        ylabel="Incidence [deg]",
+        framestyle=:box,
+    )
+    plot!(
+        p_inc,
+        t_plot .* TU,
+        get_i2.(x_plot, Ref(u_const), Ref(pars));
+        label="Panel 2",
+        linewidth=2,
+    )
     display(p_inc)
 end
 
@@ -425,27 +483,31 @@ using KEEP.PointMass4: τ_to_θφ
 using KEEP.LimitCycle: compute_limit_cycle
 
 vbp = build_vbpara()
-const lc = compute_limit_cycle(vbp, sense=+, save_everystep=true)
+const lc = compute_limit_cycle(vbp; sense=(+), save_everystep=true)
 
 fα(t) = lc(t)[1]
 fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
 fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
 
-fpos(t) = begin
+function fpos(t)
     LU = vbp.l
     a, θl, φl = fα(t), fθ(t), fφ(t)
-    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
+    return LU .* [
+        cos(a) + vbp.r * sin(θl) * cos(φl),
         sin(a) + vbp.r * sin(θl) * sin(φl),
-        vbp.r * cos(θl)]
+        vbp.r * cos(θl),
+    ]
 end
 
-fβ(t) = begin
+function fβ(t)
     v = ForwardDiff.derivative(fpos, t)
     θl, φl = fθ(t), fφ(t)
     J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
     K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
-    atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
-        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
+    return atan(
+        -(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
+        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]),
+    )
 end
 
 function fx(t)
@@ -466,14 +528,12 @@ LLM: correct and/or finish"""
 function f2to4(x)
     α, τ, dα, dτ, = x
     θ, φ = τ_to_θφ(τ, vbp)
-    dθ, dφ = ForwardDiff.derivative(τ -> τ_to_θφ(τ, vbp), τ) * dτ
+    return dθ, dφ = ForwardDiff.derivative(τ -> τ_to_θφ(τ, vbp), τ) * dτ
 end
 
 """Find closest (α, τ, dα, dτ) with L2 norm
 LLM: finish"""
-function f4to2(x)
-
-end
+function f4to2(x) end
 
 # =========================================================
 # State Mapping Functions (2D Reduced State <-> 4D Full State)
@@ -486,11 +546,8 @@ function position_from_α_τ(α, τ, vbp)
     LU = vbp.l
     r = vbp.r
     θ, φ = τ_to_θφ(τ, vbp)
-    return LU .* SVector(
-        cos(α) + r * sin(θ) * cos(φ),
-        sin(α) + r * sin(θ) * sin(φ),
-        r * cos(θ)
-    )
+    return LU .*
+           SVector(cos(α) + r * sin(θ) * cos(φ), sin(α) + r * sin(θ) * sin(φ), r * cos(θ))
 end
 
 """
@@ -498,13 +555,13 @@ Compute roll angle β given 2D reduced state (α, τ, dα, dτ).
 """
 function calc_beta(α, τ, dα, dτ, vbp)
     θ, φ = τ_to_θφ(τ, vbp)
-    
+
     # Velocity vector v = d/dt position_from_α_τ
     v = ForwardDiff.derivative(t -> position_from_α_τ(α + dα * t, τ + dτ * t, vbp), 0.0)
-    
+
     J0 = SVector(-sin(φ), cos(φ), 0.0)
     K0 = SVector(-cos(θ) * cos(φ), -cos(θ) * sin(φ), sin(θ))
-    
+
     return atan(-dot(v, J0), dot(v, K0))
 end
 
@@ -513,7 +570,7 @@ Map 2D reduced state vector (α, τ, dα, dτ) to full 8-element state vector (�
 """
 function f2to4(x)
     α, τ, dα, dτ = x[1], x[2], x[3], x[4]
-    
+
     # 1. Map τ -> (θ, φ) and dτ -> (dθ, dφ)
     θ, φ = τ_to_θφ(τ, vbp)
     dθ_dτ, dφ_dτ = ForwardDiff.derivative(t -> SVector(τ_to_θφ(t, vbp)...), τ)
@@ -531,9 +588,9 @@ end
 Find tau that minimizes L2 distance between τ_to_θφ(τ, vbp) and target angles (θ, φ).
 Uses grid search followed by Newton-Raphson refinement.
 """
-function find_closest_tau(θ, φ, vbp; τ_range=range(-2π, 2π, length=400))
+function find_closest_tau(θ, φ, vbp; τ_range=range(-2π, 2π; length=400))
     E(τ_val) = sum(abs2, SVector(τ_to_θφ(τ_val, vbp)...) - SA[θ, φ])
-    
+
     # Grid search for robust global initial guess
     best_τ = first(τ_range)
     min_E = E(best_τ)
@@ -544,7 +601,7 @@ function find_closest_tau(θ, φ, vbp; τ_range=range(-2π, 2π, length=400))
             best_τ = τ_val
         end
     end
-    
+
     # Newton-Raphson quadratic refinement
     τ = best_τ
     for _ in 1:10
@@ -568,14 +625,14 @@ using L2 distance minimization for position and least-squares projection for vel
 """
 function f4to2(x)
     α, θ, φ, β, dα, dθ, dφ, dβ = x
-    
+
     # 1. Find optimal path coordinate τ* minimizing L2 norm ||(θ(τ), φ(τ)) - (θ, φ)||²
     τ = find_closest_tau(θ, φ, vbp)
-    
+
     # 2. Least-squares projection of (dθ, dφ) onto tangent direction J = d(θ, φ)/dτ
     J = ForwardDiff.derivative(t -> SVector(τ_to_θφ(t, vbp)...), τ)
     dτ = dot(J, SA[dθ, dφ]) / (sum(abs2, J) + 1e-12)
-    
+
     return SA[α, τ, dα, dτ]
 end
 
@@ -585,7 +642,7 @@ end
 
 x0 = fx(0)
 prob = ODEProblem(f_ode, x0, tspan, pars)
-sol = solve(prob, Tsit5(), reltol=1e-6, abstol=1e-6, progress=true)
+sol = solve(prob, Tsit5(); reltol=1e-6, abstol=1e-6, progress=true)
 plot(sol)
 
 #########################
@@ -614,8 +671,6 @@ f(rand(8), rand(2))
 #     ∫() → min
 # end
 
-
-
 # Orbite périodique minimisant le contrôle
 ocp = @def begin
     tf ∈ R, variable
@@ -635,7 +690,6 @@ ocp = @def begin
     ∫(-generated_power(x(t)) + 1e-3 * sum(abs2, u(t))) → min
 end
 
-
 # Initial guess
 init = @init ocp begin
     # One symbol only on lhs, `θ, φ = τ_to_θφ(x[2], vbp)` is not allowed for example
@@ -651,19 +705,16 @@ init = @init ocp begin
     β̇(t) := ForwardDiff.derivative(fβ, t)
 end
 
-
-if false init = nothing end
+if false
+    init = nothing
+end
 # default :optimized ADNLP backend uses ReverseDiff-over-ForwardDiff Hessian
 # (SparseReverseADHessian), which fails with ForwardDiff "Cannot determine ordering
 # of Dual tags" on this StaticArrays-heavy eom. The :default backend uses pure
 # ForwardDiff (SparseADHessian) and works.
-options = (;
-    init = init,
-    grid_size = 20,
-    backend = :default
-)
-solve(ocp; options..., max_wall_time = 1.)
-@profview solve(ocp; options..., max_wall_time = 10.)
+options = (; init=init, grid_size=20, backend=:default)
+solve(ocp; options..., max_wall_time=1.0)
+@profview solve(ocp; options..., max_wall_time=10.0)
 # @profview solve(ocp; options..., max_walltime = 10)
 # @profview_allocs solve(ocp; grid_size=10, options...)
 # solve(ocp, init=init)

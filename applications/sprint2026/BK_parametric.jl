@@ -28,9 +28,9 @@ solution, stats, model = optimize(p0, syms, lb, ub)
 ## Reconstruct the dense ODE solution
 vbp = build_vbpara(CA(p0; solution.params...))
 shooting = solution[1:4]
-solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
+solution_sim = lc_shoot(shooting, vbp; save_everystep=true)
 
-x_optimization = t -> solution_sim(t, idxs=1:4)
+x_optimization = t -> solution_sim(t; idxs=1:4)
 tf_optimization = solution_sim.t[end]
 
 ## BVP model
@@ -59,21 +59,27 @@ model = BifurcationKit.BVP.BVPModel(F, g; n=STATE_SIZE)
 
 ## Collocation
 grid_size, degree = 30, 5
-const disc = BifurcationKit.BVP.Collocation(Ntst=grid_size, m=degree, meshadapt=true)
+const disc = BifurcationKit.BVP.Collocation(; Ntst=grid_size, m=degree, meshadapt=true)
 bvp = BifurcationKit.BVP.discretize(model, disc)
 
 params = nt_p0
 # we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
-x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization))
+x0 = BifurcationKit.BVP.generate_solution(
+    bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization)
+)
 
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BifurcationKit.BVP.BVPBifProblem(
+    bvp,
+    x0,
+    params,
+    (@optic _.v_ref);
     jacobian=BifurcationKit.DenseAnalytical(),
     # record_from_solution,
     # plot_solution_col
 )
 
 # @assert false
-optn = NewtonPar(tol=1e-10, verbose=true)
+optn = NewtonPar(; tol=1e-10, verbose=true)
 
 # J = BifurcationKit.jacobian(prob, prob.u0, prob.params)
 
@@ -83,7 +89,7 @@ sol = @time BifurcationKit.solve(prob, Newton(), optn);
 # plot_solution_col(sol.u, prob.params);
 
 # Continuation
-optc = ContinuationPar(
+optc = ContinuationPar(;
     p_min=0.0,
     p_max=25.0,
     dsmax=0.1,
@@ -93,25 +99,20 @@ optc = ContinuationPar(
     newton_options=optn,
     max_steps=100,
     nev=20,
-    n_inversion=6
+    n_inversion=6,
 )
 
-br = continuation(prob, PALC(), optc;
-    plot=true,
-    verbosity=1,
-    normC=norminf,
-    bothside=true,
-)
+br = continuation(prob, PALC(), optc; plot=true, verbosity=1, normC=norminf, bothside=true)
 plot(br)
-
 
 ## Multiple shooting
 function plot_solution_ms(x, p; kwargs...)
-    sol = BifurcationKit._get_shooting_solution(bvp.cache, reshape(x, 5, disc.M), 1, @set params.v_ref = p)
+    sol = BifurcationKit._get_shooting_solution(
+        bvp.cache, reshape(x, 5, disc.M), 1, @set params.v_ref = p
+    )
 
-    plot!(sol.t, sol.u[4, :]; ylabel="u(t)", title="Bratu Solution (p₁=)", kwargs...)
+    return plot!(sol.t, sol.u[4, :]; ylabel="u(t)", title="Bratu Solution (p₁=)", kwargs...)
 end
-
 
 odeprob = ODE.ODEProblem(F, u0_bif, (0, 1), nt_p0)
 model = BifurcationKit.BVP.BVPModel(odeprob, g; n=5)
@@ -121,17 +122,18 @@ disc2 = BifurcationKit.BVP.Shooting(10, ODE.Vern9(), true)
 bvp = BifurcationKit.BVP.discretize(model, disc2; abstol=1e-12, reltol=1e-10)
 #https://github.com/bifurcationkit/MultiParamContinuation.jl
 
-x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization))
-
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+x0 = BifurcationKit.BVP.generate_solution(
+    bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization)
 )
 
-optn = NewtonPar(tol=1e-10, verbose=true)
+prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);)
+
+optn = NewtonPar(; tol=1e-10, verbose=true)
 
 @error "un objet est mal initialisé lors du solve, exécuter plusieurs fois donne différents résultats"
 sol = @time BifurcationKit.solve(prob, Newton(), optn);
 
-optc = ContinuationPar(
+optc = ContinuationPar(;
     p_min=0.1,
     p_max=50.05,
     dsmax=0.1,
@@ -141,13 +143,8 @@ optc = ContinuationPar(
     newton_options=optn,
     max_steps=100,
     nev=20,
-    n_inversion=6
+    n_inversion=6,
 )
 
-br = continuation(prob, PALC(), optc;
-    plot=true,
-    verbosity=1,
-    normC=norminf,
-    bothside=true,
-)
+br = continuation(prob, PALC(), optc; plot=true, verbosity=1, normC=norminf, bothside=true)
 plot(br)
