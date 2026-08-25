@@ -124,7 +124,7 @@ FastPara(vbp) = FastPara{Float64}(
 
 # ponytail: single-entry cache keyed on v_ref; continuation evaluates many RHS
 # at one parameter value, so we rebuild only when v_ref actually changes.
-const FASTPARA_CACHE = Ref{Union{Nothing,Tuple{Float64,FastPara{Float64}}}}(nothing)
+const FASTPARA_CACHE = Ref{Union{Nothing,Tuple{Float64,FastPara{Float64}}}}(nothing)  # (vref, FastPara)
 
 @inline function get_fast_para(params)
     vref = params.v_ref
@@ -176,7 +176,7 @@ function damped_newton(prob, x0, params; tol=1e-8, max_iter=200, Δmax=1.0)
         try
             norminf(BifurcationKit.residual(prob, x_, params))
         catch
-            ; Inf
+            Inf
         end
     for _ in 1:max_iter
         r = BifurcationKit.residual(prob, x, params)
@@ -185,7 +185,7 @@ function damped_newton(prob, x0, params; tol=1e-8, max_iter=200, Δmax=1.0)
         δ = try
             BifurcationKit.jacobian(prob, x, params) \ (-r)
         catch
-            ; break
+            break
         end
         all(isfinite, δ) || break
         λ = min(1.0, Δmax / (norminf(δ) + eps()))
@@ -318,7 +318,8 @@ br_ms = @time continuation(prob_ms, PALC(), optc_ms;
     normC=norminf,
     bothside=true,
 )
-plot(br_ms)
+plot(br, label="Collocation")
+plot!(br_ms, label="Multiple shooting")
 
 # BifurcationKit has no converged(::ContResult); failed corrections abort the
 # branch, so recording >1 points means every correction converged (a 0-iteration
