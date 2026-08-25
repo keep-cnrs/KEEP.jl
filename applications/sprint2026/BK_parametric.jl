@@ -117,8 +117,8 @@ odeprob = ODE.ODEProblem(F, u0_bif, (0, 1), nt_p0)
 model = BifurcationKit.BVP.BVPModel(odeprob, g; n=5)
 # 4. Discretize using Collocation method
 # Using 201 points for better accuracy
-disc2 = BifurcationKit.BVP.Shooting(10, ODE.Vern9(), true)
-bvp = BifurcationKit.BVP.discretize(model, disc2; abstol=1e-12, reltol=1e-10)
+disc_ms = BifurcationKit.BVP.Shooting(10, ODE.Vern9(), true)
+bvp = BifurcationKit.BVP.discretize(model, disc_ms; abstol=1e-12, reltol=1e-10)
 #https://github.com/bifurcationkit/MultiParamContinuation.jl
 
 x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization))
@@ -144,10 +144,12 @@ optc = ContinuationPar(
     n_inversion=6
 )
 
-br = continuation(prob, PALC(), optc;
+br_ms = continuation(prob, PALC(), optc;
     plot=true,
     verbosity=1,
     normC=norminf,
     bothside=true,
 )
-plot(br)
+
+plot(br, label="Collocation")
+plot!(br_ms, label="Multiple shooting")
