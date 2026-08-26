@@ -35,4 +35,4 @@ Reset torque function   : \%.0f(sim_reset.u[end][5] / tf) W"
 @test sim_default.u == sim_reset.u
 
 # torque_function is type-stable (not type stable for Integer dα because of zero(dα).)
-@inferred torque_function(1., vbp)
+@inferred torque_function(1.0, vbp)

@@ -39,14 +39,31 @@ using JLD2
 # Parameters
 # =========================================================
 
-function kite_params(; larm=2.0, lcg=20.0, mass=5.0, inertia=(25.0, 0.5, 2.5),
-    inertiaarm=8.0, g=9.81, kgenerator=0.0, cgenerator=1.0, klines=0.0,
-    S=2.5, rho=1.225, delta=30.0 * pi / 180)
+function kite_params(;
+    larm=2.0,
+    lcg=20.0,
+    mass=5.0,
+    inertia=(25.0, 0.5, 2.5),
+    inertiaarm=8.0,
+    g=9.81,
+    kgenerator=0.0,
+    cgenerator=1.0,
+    klines=0.0,
+    S=2.5,
+    rho=1.225,
+    delta=30.0 * pi / 180,
+)
     panels = @SMatrix [0.1 0.1; 1.25 -1.25; 0.0 0.0]
     return (;
-        larm=larm, lcg=lcg, mass=mass, inertia=SA[inertia[1], inertia[2], inertia[3]],
+        larm=larm,
+        lcg=lcg,
+        mass=mass,
+        inertia=SA[inertia[1], inertia[2], inertia[3]],
         inertiaarm=inertiaarm,
-        g=g, kgenerator=kgenerator, cgenerator=cgenerator, klines=klines,
+        g=g,
+        kgenerator=kgenerator,
+        cgenerator=cgenerator,
+        klines=klines,
         aero=(S=S, rho=rho, panels=panels, delta=delta),
     )
 end
@@ -60,9 +77,13 @@ const pars = kite_params()
 @variables q[1:4] dq[1:4]
 
 # CG position and velocity (explicit chain rule)
-pos_CG(q) = [pars.lcg * sin(q[2]) * cos(q[3]) + pars.larm * cos(q[1]),
-    pars.lcg * sin(q[2]) * sin(q[3]) + pars.larm * sin(q[1]),
-    pars.lcg * cos(q[2])]
+function pos_CG(q)
+    return [
+        pars.lcg * sin(q[2]) * cos(q[3]) + pars.larm * cos(q[1]),
+        pars.lcg * sin(q[2]) * sin(q[3]) + pars.larm * sin(q[1]),
+        pars.lcg * cos(q[2]),
+    ]
+end
 
 function vel_CG(q, dq)
     l, b = pars.lcg, pars.larm
@@ -87,8 +108,10 @@ end
 function lagrangian(q, dq)
     vCG = vel_CG(q, dq)
     ω = omega(q, dq)
-    T = 0.5 * pars.mass * (vCG[1]^2 + vCG[2]^2 + vCG[3]^2) +
-        0.5 * (pars.inertia[1] * ω[1]^2 + pars.inertia[2] * ω[2]^2 + pars.inertia[3] * ω[3]^2) +
+    T =
+        0.5 * pars.mass * (vCG[1]^2 + vCG[2]^2 + vCG[3]^2) +
+        0.5 *
+        (pars.inertia[1] * ω[1]^2 + pars.inertia[2] * ω[2]^2 + pars.inertia[3] * ω[3]^2) +
         0.5 * pars.inertiaarm * dq[1]^2
     V = pars.mass * pars.g * pos_CG(q)[3]
     return T - V
@@ -107,8 +130,16 @@ dLdq_sym = Symbolics.simplify.(dLdq_sym)
 cross_sym = Symbolics.simplify.(cross_sym)
 J_CG_sym = Symbolics.simplify.(J_CG_sym)
 
-println("symbolic: M=", size(M_sym), " dLdq=", size(dLdq_sym),
-    " cross=", size(cross_sym), " J_CG=", size(J_CG_sym))
+println(
+    "symbolic: M=",
+    size(M_sym),
+    " dLdq=",
+    size(dLdq_sym),
+    " cross=",
+    size(cross_sym),
+    " J_CG=",
+    size(J_CG_sym),
+)
 
 # Codegen straight-line StaticArray functions
 Mf = Symbolics.build_function(M_sym, q; force_SA=true, expression=Val{false})[1]
@@ -123,25 +154,36 @@ JCGF = Symbolics.build_function(J_CG_sym, q; force_SA=true, expression=Val{false
 wind(z) = 20.0
 
 # smooth tanh window: ~1 inside |α5|≤30°, ~0 outside
-stall_factor(alpha) = 0.25 * (1.0 + tanh(30.0 * (alpha + 5.0 * pi / 180.0 + 30.0 * pi / 180.0))) *
-                      (1.0 - tanh(30.0 * (alpha + 5.0 * pi / 180.0 - 30.0 * pi / 180.0)))
+function stall_factor(alpha)
+    return 0.25 *
+           (1.0 + tanh(30.0 * (alpha + 5.0 * pi / 180.0 + 30.0 * pi / 180.0))) *
+           (1.0 - tanh(30.0 * (alpha + 5.0 * pi / 180.0 - 30.0 * pi / 180.0)))
+end
 
 function Caero(alpha)
     α5 = alpha + 5.0 * pi / 180.0
     return SVector(1.0 * α5 * stall_factor(alpha), 0.2 + 0.1 * α5^2, 0.0)
 end
 
-cross3(a, b) = SA[a[2]*b[3]-a[3]*b[2], a[3]*b[1]-a[1]*b[3], a[1]*b[2]-a[2]*b[1]]
+function cross3(a, b)
+    return SA[
+        a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1]
+    ]
+end
 
 function body_axes(q)
     sq, cq = sin.(q), cos.(q)
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
     return Ihat, Jhat, Khat
 end
 
@@ -264,7 +306,9 @@ end
 
 Returns file path prefix (without extension) for a given cache entry.
 """
-cache_filepath(cache_dir::String, prefix::String, grid_size::Int) = joinpath(cache_dir, "$(prefix)_grid_$(grid_size)")
+function cache_filepath(cache_dir::String, prefix::String, grid_size::Int)
+    return joinpath(cache_dir, "$(prefix)_grid_$(grid_size)")
+end
 
 """
     solve_cached(ocp; grid_size, init, cache_dir, prefix, cache=:exact, solve_options...)
@@ -273,18 +317,21 @@ Handles solution retrieval or execution for a single grid size according to `cac
 - `:exact`: Directly loads the cached solution without solving; throws an error if missing.
 - `:no` / `:latest`: Solves the OCP and exports the solution to disk.
 """
-function solve_cached(ocp;
+function solve_cached(
+    ocp;
     grid_size::Int,
     init,
     cache_dir::String,
     prefix::String,
     cache::Symbol=:exact,
-    solve_options...)
+    solve_options...,
+)
     fpath = cache_filepath(cache_dir, prefix, grid_size)
     jld2_file = fpath * ".jld2"
 
     if cache == :exact
-        isfile(jld2_file) || error("Cached solution not found for grid = $grid_size: $jld2_file")
+        isfile(jld2_file) ||
+            error("Cached solution not found for grid = $grid_size: $jld2_file")
         @info "Loading cached solution: grid = $grid_size ($jld2_file)"
         return import_ocp_solution(ocp; filename=fpath)
     end
@@ -303,8 +350,11 @@ Determines the initial guess and schedule based on the cache mode:
 - `:exact`: Returns `(init, grid_schedule)` for direct loading across all target grids.
 - `:latest`: Finds the highest-grid cached solution matching `prefix` to use as `init`.
 """
-function resolve_cache_plan(ocp, grid_schedule; init, cache_dir::String, prefix::String, cache::Symbol)
-    cache in (:no, :exact, :latest) || throw(ArgumentError("cache must be :no, :exact, or :latest (got :$cache)"))
+function resolve_cache_plan(
+    ocp, grid_schedule; init, cache_dir::String, prefix::String, cache::Symbol
+)
+    cache in (:no, :exact, :latest) ||
+        throw(ArgumentError("cache must be :no, :exact, or :latest (got :$cache)"))
 
     if cache == :no || !isdir(cache_dir)
         return init, collect(grid_schedule)
@@ -343,35 +393,44 @@ Executes grid continuation over `grid_schedule` (e.g. `(8, 20, 50)`).
 - `:exact`: Performs no optimization; loads each cached grid solution directly from disk.
 - `:latest`: Uses the highest available cached grid solution matching `prefix` as `init`, then optimizes through `grid_schedule`.
 """
-function run_grid_homotopy(ocp, grid_schedule; init,
+function run_grid_homotopy(
+    ocp,
+    grid_schedule;
+    init,
     cache::Symbol=:exact,
     cache_dir::String="applications/controlled/solutions",
     prefix::String="ocp_half",
-    solve_options...)
+    solve_options...,
+)
     mkpath(cache_dir)
 
     start_sol, remaining_grids = resolve_cache_plan(
-        ocp, grid_schedule;
-        init=init, cache_dir=cache_dir, prefix=prefix, cache=cache
+        ocp, grid_schedule; init=init, cache_dir=cache_dir, prefix=prefix, cache=cache
     )
 
     if isempty(remaining_grids)
-        println("✓ Latest solution already cached at finest grid ($((grid_schedule)[end])) — Objective: ", round(objective(start_sol), digits=4))
+        println(
+            "✓ Latest solution already cached at finest grid ($((grid_schedule)[end])) — Objective: ",
+            round(objective(start_sol); digits=4),
+        )
         return start_sol
     end
 
     # Sequential continuation across remaining grids
     sol_final = foldl(remaining_grids; init=start_sol) do warm_start, N
-        sol_current = solve_cached(ocp;
+        sol_current = solve_cached(
+            ocp;
             grid_size=N,
             init=warm_start,
             cache_dir=cache_dir,
             prefix=prefix,
             cache=cache,
-            solve_options...
+            solve_options...,
         )
-        println("✓ Grid $N converged — Objective: ", round(objective(sol_current), digits=4))
-        sol_current
+        println(
+            "✓ Grid $N converged — Objective: ", round(objective(sol_current); digits=4)
+        )
+        return sol_current
     end
 
     return sol_final
@@ -418,27 +477,31 @@ using KEEP.PointMass4: τ_to_θφ
 using KEEP.LimitCycle: compute_limit_cycle
 
 vbp = build_vbpara()
-const lc = compute_limit_cycle(vbp, sense=(+), save_everystep=true)
+const lc = compute_limit_cycle(vbp; sense=(+), save_everystep=true)
 
 fα(t) = lc(t)[1]
 fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
 fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
 
-fpos(t) = begin
+function fpos(t)
     LU = vbp.l
     a, θl, φl = fα(t), fθ(t), fφ(t)
-    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
+    return LU .* [
+        cos(a) + vbp.r * sin(θl) * cos(φl),
         sin(a) + vbp.r * sin(θl) * sin(φl),
-        vbp.r * cos(θl)]
+        vbp.r * cos(θl),
+    ]
 end
 
-fβ(t) = begin
+function fβ(t)
     v = ForwardDiff.derivative(fpos, t)
     θl, φl = fθ(t), fφ(t)
     J0 = [-sin(φl), cos(φl), 0.0] # Side axis at β=0
     K0 = [-cos(θl) * cos(φl), -cos(θl) * sin(φl), sin(θl)] # Up axis at β=0
-    atan(-(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
-        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]))
+    return atan(
+        -(v[1] * J0[1] + v[2] * J0[2] + v[3] * J0[3]),
+        (v[1] * K0[1] + v[2] * K0[2] + v[3] * K0[3]),
+    )
 end
 
 init = @init ocp begin
@@ -491,9 +554,8 @@ sol = run_grid_homotopy(
     cache=:latest,                     # :no | :exact | :latest
     cache_dir="applications/controlled/solutions",
     prefix="kite_lemniscate",
-    solve_options...
+    solve_options...,
 )
-
 
 plot(sol)
 
@@ -542,16 +604,17 @@ Generates a 3D plot of the kite trajectory showing:
 - Projections on bounding floor (XY), back wall (XZ), and side wall (YZ)
 - Arm trajectory and sample tethers
 """
-function plot_kite_3d(sol;
+function plot_kite_3d(
+    sol;
     N_pts::Int=300,
     n_arrows::Int=6,
     n_tethers::Int=4,
     camera=(40, 25),
     size=(900, 750),
-    filename::Union{String,Nothing}=nothing)
-
+    filename::Union{String,Nothing}=nothing,
+)
     tf_sol = time_grid(sol)[end]
-    t_eval = range(0, tf_sol, length=N_pts)
+    t_eval = range(0, tf_sol; length=N_pts)
 
     q_eval = [state(sol)(t)[1:4] for t in t_eval]
     pos_eval = [pos_CG(q) for q in q_eval]
@@ -575,45 +638,92 @@ function plot_kite_3d(sol;
     ymin, ymax = minimum(all_y) - pad, maximum(all_y) + pad
     zmin, zmax = 0.0, maximum(all_z) + pad
 
-    p3d = plot(
+    p3d = plot(;
         title="Kite 3D Periodic Limit Cycle",
-        xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
-        xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+        xlabel="X [m]",
+        ylabel="Y [m]",
+        zlabel="Z [m]",
+        xlims=(xmin, xmax),
+        ylims=(ymin, ymax),
+        zlims=(zmin, zmax),
         camera=camera,
         size=size,
         grid=true,
-        legend=:topright
+        legend=:topright,
     )
 
     # 1. Arm pivot and circular path
-    scatter!(p3d, [0.0], [0.0], [0.0], color=:black, markersize=5, label="Pivot (0,0,0)")
-    plot!(p3d, X_arm, Y_arm, Z_arm, color=:gray30, lw=2, linestyle=:dash, label="Arm path")
+    scatter!(p3d, [0.0], [0.0], [0.0]; color=:black, markersize=5, label="Pivot (0,0,0)")
+    plot!(p3d, X_arm, Y_arm, Z_arm; color=:gray30, lw=2, linestyle=:dash, label="Arm path")
 
     # 2. Wall Projections
-    plot!(p3d, X_cg, Y_cg, fill(zmin, N_pts), color=:gray60, lw=1.5, linestyle=:dot, label="XY-floor proj")
-    plot!(p3d, X_cg, fill(ymax, N_pts), Z_cg, color=:gray60, lw=1.5, linestyle=:dashdot, label="XZ-back proj")
-    plot!(p3d, fill(xmin, N_pts), Y_cg, Z_cg, color=:gray60, lw=1.5, linestyle=:dash, label="YZ-side proj")
+    plot!(
+        p3d,
+        X_cg,
+        Y_cg,
+        fill(zmin, N_pts);
+        color=:gray60,
+        lw=1.5,
+        linestyle=:dot,
+        label="XY-floor proj",
+    )
+    plot!(
+        p3d,
+        X_cg,
+        fill(ymax, N_pts),
+        Z_cg;
+        color=:gray60,
+        lw=1.5,
+        linestyle=:dashdot,
+        label="XZ-back proj",
+    )
+    plot!(
+        p3d,
+        fill(xmin, N_pts),
+        Y_cg,
+        Z_cg;
+        color=:gray60,
+        lw=1.5,
+        linestyle=:dash,
+        label="YZ-side proj",
+    )
 
     # 3. Sample Tethers
     if n_tethers > 0
-        tether_indices = round.(Int, range(1, N_pts, length=n_tethers + 1))[1:n_tethers]
+        tether_indices = round.(Int, range(1, N_pts; length=n_tethers + 1))[1:n_tethers]
         for (i, idx) in enumerate(tether_indices)
-            plot!(p3d, [X_arm[idx], X_cg[idx]], [Y_arm[idx], Y_cg[idx]], [Z_arm[idx], Z_cg[idx]],
-                color=:orange, lw=1.2, alpha=0.5, label=(i == 1 ? "Tether sample" : false))
+            plot!(
+                p3d,
+                [X_arm[idx], X_cg[idx]],
+                [Y_arm[idx], Y_cg[idx]],
+                [Z_arm[idx], Z_cg[idx]];
+                color=:orange,
+                lw=1.2,
+                alpha=0.5,
+                label=(i == 1 ? "Tether sample" : false),
+            )
         end
     end
 
     # 4. Main Trajectory
-    plot!(p3d, X_cg, Y_cg, Z_cg, color=:crimson, lw=3.5, label="Kite CG trajectory")
+    plot!(p3d, X_cg, Y_cg, Z_cg; color=:crimson, lw=3.5, label="Kite CG trajectory")
 
     # 5. Directional Arrows
     if n_arrows > 0
-        arrow_indices = round.(Int, range(10, N_pts - 10, length=n_arrows))
+        arrow_indices = round.(Int, range(10, N_pts - 10; length=n_arrows))
         for idx in arrow_indices
             pt = pos_eval[idx]
-            pt_next = pos_eval[idx+2]
-            plot!(p3d, [pt[1], pt_next[1]], [pt[2], pt_next[2]], [pt[3], pt_next[3]],
-                arrow=arrow(:closed, :head, 0.4, 0.4), color=:darkblue, lw=2.0, label=false)
+            pt_next = pos_eval[idx + 2]
+            plot!(
+                p3d,
+                [pt[1], pt_next[1]],
+                [pt[2], pt_next[2]],
+                [pt[3], pt_next[3]];
+                arrow=arrow(:closed, :head, 0.4, 0.4),
+                color=:darkblue,
+                lw=2.0,
+                label=false,
+            )
         end
     end
 
@@ -641,24 +751,27 @@ Renders and saves a 3D animated GIF of the kite trajectory.
 - `size = (850, 700)`: Output figure dimensions in pixels.
 - `filename::String = "kite_trajectory_animation.gif"`: Filepath for the generated GIF.
 """
-function animate_kite_3d(sol;
+function animate_kite_3d(
+    sol;
     fps::Int=30,
     n_frames::Union{Int,Nothing}=nothing,
     camera=(40, 25),
     size=(850, 700),
-    filename::String="kite_trajectory_animation.gif")
-
+    filename::String="kite_trajectory_animation.gif",
+)
     tf_sol = time_grid(sol)[end]
 
     # Guarantee 1:1 real-time playback speed by default
     total_frames = n_frames === nothing ? max(2, round(Int, tf_sol * fps)) : n_frames
 
     N_static = 300
-    t_static = range(0, tf_sol, length=N_static)
+    t_static = range(0, tf_sol; length=N_static)
 
     q_static = [state(sol)(t)[1:4] for t in t_static]
     pos_static = [pos_CG(q) for q in q_static]
-    arm_static = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_static]
+    arm_static = [
+        SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_static
+    ]
 
     X_cg = [p[1] for p in pos_static]
     Y_cg = [p[2] for p in pos_static]
@@ -673,7 +786,7 @@ function animate_kite_3d(sol;
     ymin, ymax = minimum([Y_cg; Y_arm; 0.0]) - pad, maximum([Y_cg; Y_arm; 0.0]) + pad
     zmin, zmax = 0.0, maximum([Z_cg; 0.0]) + pad
 
-    t_anim = range(0, tf_sol, length=total_frames)
+    t_anim = range(0, tf_sol; length=total_frames)
 
     anim = @animate for t in t_anim
         q_curr = state(sol)(t)[1:4]
@@ -689,11 +802,15 @@ function animate_kite_3d(sol;
 
         p_frame = plot(
             title="Kite Cycle (t = $(round(t, digits=2)) s / $(round(tf_sol, digits=2)) s)",
-            xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
-            xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+            xlabel="X [m]",
+            ylabel="Y [m]",
+            zlabel="Z [m]",
+            xlims=(xmin, xmax),
+            ylims=(ymin, ymax),
+            zlims=(zmin, zmax),
             camera=camera,
             size=size,
-            legend=false
+            legend=false,
         )
 
         # Static background curves & shadows
@@ -705,15 +822,38 @@ function animate_kite_3d(sol;
 
         # Generator arm & pivot
         scatter!(p_frame, [0.0], [0.0], [0.0], color=:black, markersize=5)
-        plot!(p_frame, [0.0, p_arm[1]], [0.0, p_arm[2]], [0.0, p_arm[3]], color=:black, lw=4)
+        plot!(
+            p_frame, [0.0, p_arm[1]], [0.0, p_arm[2]], [0.0, p_arm[3]], color=:black, lw=4
+        )
         scatter!(p_frame, [p_arm[1]], [p_arm[2]], [p_arm[3]], color=:black, markersize=4)
 
         # Dynamic Tether
-        plot!(p_frame, [p_arm[1], p_cg[1]], [p_arm[2], p_cg[2]], [p_arm[3], p_cg[3]], color=:orange, lw=2.5)
+        plot!(
+            p_frame,
+            [p_arm[1], p_cg[1]],
+            [p_arm[2], p_cg[2]],
+            [p_arm[3], p_cg[3]],
+            color=:orange,
+            lw=2.5,
+        )
 
         # Dynamic Kite Body
-        plot!(p_frame, [wing_left[1], wing_right[1]], [wing_left[2], wing_right[2]], [wing_left[3], wing_right[3]], color=:darkblue, lw=4.5)
-        plot!(p_frame, [chord_tail[1], chord_nose[1]], [chord_tail[2], chord_nose[2]], [chord_tail[3], chord_nose[3]], color=:red, lw=3.0)
+        plot!(
+            p_frame,
+            [wing_left[1], wing_right[1]],
+            [wing_left[2], wing_right[2]],
+            [wing_left[3], wing_right[3]],
+            color=:darkblue,
+            lw=4.5,
+        )
+        plot!(
+            p_frame,
+            [chord_tail[1], chord_nose[1]],
+            [chord_tail[2], chord_nose[2]],
+            [chord_tail[3], chord_nose[3]],
+            color=:red,
+            lw=3.0,
+        )
         scatter!(p_frame, [p_cg[1]], [p_cg[2]], [p_cg[3]], color=:darkred, markersize=4)
 
         # Dynamic shadow dots on bounding planes
@@ -722,8 +862,10 @@ function animate_kite_3d(sol;
         scatter!(p_frame, [xmin], [p_cg[2]], [p_cg[3]], color=:gray40, markersize=4)
     end
 
-    gif(anim, filename, fps=fps)
-    println("Animation saved to $filename (Duration: $(round(total_frames / fps, digits=2)) s at $fps FPS)")
+    gif(anim, filename; fps=fps)
+    println(
+        "Animation saved to $filename (Duration: $(round(total_frames / fps, digits=2)) s at $fps FPS)",
+    )
     return anim
 end
 
@@ -814,7 +956,7 @@ function reconstruct_full_solution(sol_half)
         state=x_full,
         control=u_full,
         tf=T,
-        objective=2.0 * objective(sol_half)
+        objective=2.0 * objective(sol_half),
     )
 end
 
@@ -830,7 +972,7 @@ OptimalControl.objective(s::NamedTuple) = s.objective
 println("--- Solving Half-Period OCP ---")
 
 # 1. Run grid homotopy (8 -> 20 -> 50) with automatic warm-starting and JLD2 caching
-sol_init_half = solve(ocp_half, init=init, maxiter=0, grid_size=50)
+sol_init_half = solve(ocp_half; init=init, maxiter=0, grid_size=50)
 @time sol_half = run_grid_homotopy(
     ocp_half,
     (8, 20, 50);
@@ -838,7 +980,7 @@ sol_init_half = solve(ocp_half, init=init, maxiter=0, grid_size=50)
     cache=:no,                     # :no | :exact | :latest
     cache_dir="applications/controlled/solutions",
     prefix="kite_half_lemniscate",
-    solve_options...
+    solve_options...,
 )
 
 plot(sol_init_half)
@@ -860,7 +1002,7 @@ println("Periodic loop closure error ||x(0) - x(T)|| = ", norm(x0 - xT))
 plot_kite_3d(sol_full)
 animate_kite_3d(sol_full)
 
-ts = range(0, tf_full, length=300)
+ts = range(0, tf_full; length=300)
 
 # Evaluate states and body axes across the full figure-8
 q_eval = [state(sol_full)(t)[1:4] for t in ts]
