@@ -512,7 +512,7 @@ plot(sol)
  - [] Translate from PM2 params to controlled params
  - [] Transform state from 2 <-> 4
  - [] Take parameters p2 and p4
- - [] visualize: one function to show arm + line + correctly oriented left and right planes + optional arrow for front
+ - [x] visualize: one function to show arm + line + correctly oriented left and right planes + optional arrow for front
  - [] add tests matlab-v1 et v1-v3
 =#
 
@@ -529,201 +529,190 @@ plot(sol)
 # To go full-scale: raise grid_size (with warm-start continuation) and tighten
 # Ipopt tolerances; if MUMPS struggles, try linear_solver="ma57".
 
-##
 # =========================================================
-# 3D Visualization & Animation Functions
+# 3D Kite visualization: arm + tether + correctly oriented wing panels
 # =========================================================
 
 """
-    plot_kite_3d(sol; N_pts=300, n_arrows=6, n_tethers=4, camera=(40, 25), size=(900, 750), filename=nothing)
+    plot_kite!(plt, q; u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false,
+               labels=true, shade=false, project=false, lims=nothing)
 
-Generates a 3D plot of the kite trajectory showing:
-- 3D CG trajectory with directional arrows
-- Projections on bounding floor (XY), back wall (XZ), and side wall (YZ)
-- Arm trajectory and sample tethers
+Draw one kite state `q = (α, θ, φ, β)` on `plt`: pivot→arm, arm→CG tether and
+the left (+y) / right (−y) wing panels with the same sweep `delta` and body
+orientation as the aerodynamic model. `u = (uₗ, uᵣ)` are the aileron
+deflections: each panel is rotated about its span axis with the aerodynamic
+sign convention (`i = atan(...) + uᵢ`, i.e. positive `uᵢ` increases that
+panel's angle of attack). `front=true` adds an arrow along the nose axis
+`Ihat`. When `lims` (the tuple returned in `kite_paths`) is given,
+`shade`/`project` add a small CG marker shadow on the floor / back & side
+walls.
 """
-function plot_kite_3d(sol;
-    N_pts::Int=300,
-    n_arrows::Int=6,
-    n_tethers::Int=4,
-    camera=(40, 25),
-    size=(900, 750),
-    filename::Union{String,Nothing}=nothing)
+function plot_kite!(plt, q;
+    u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false, labels=true,
+    shade=false, project=false, lims=nothing)
 
-    tf_sol = time_grid(sol)[end]
-    t_eval = range(0, tf_sol, length=N_pts)
+    Ihat, Jhat, Khat = body_axes(q)
+    cg = pos_CG(q)
+    w2w(p) = cg + p[1] * Ihat + p[2] * Jhat + p[3] * Khat   # body → world
 
-    q_eval = [state(sol)(t)[1:4] for t in t_eval]
-    pos_eval = [pos_CG(q) for q in q_eval]
-    arm_eval = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_eval]
+    # arm (pivot → arm tip) and tether (arm tip → CG)
+    arm = SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0)
+    plot!(plt, [0.0, arm[1]], [0.0, arm[2]], [0.0, arm[3]];
+        color=:black, lw=4, label=(labels ? "arm" : false))
+    plot!(plt, [arm[1], cg[1]], [arm[2], cg[2]], [arm[3], cg[3]];
+        color=:orange, lw=2, label=(labels ? "tether" : false))
 
-    X_cg = [p[1] for p in pos_eval]
-    Y_cg = [p[2] for p in pos_eval]
-    Z_cg = [p[3] for p in pos_eval]
+    # panels: span axis w and chord axis l, swept by delta; the aileron uᵢ rotates
+    # panel i about its span axis (same convention as aerodynamics(), where
+    # i = atan(...) + uᵢ: positive uᵢ increases the panel's angle of attack)
+    sd, cd = sincos(pars.aero.delta)
+    panels = ((pars.aero.panels[:, 1], SVector(-sd, cd, 0.0), SVector(cd, sd, 0.0), :royalblue, "left wing"),
+        (pars.aero.panels[:, 2], SVector(-sd, -cd, 0.0), SVector(cd, -sd, 0.0), :tomato, "right wing"))
+    for (i, (R, w, l, col, lbl)) in enumerate(panels)
+        l = l * cos(u[i]) + cross3(w, l) * sin(u[i])
+        corners = [w2w(R + a * halfspan * w + b * (chord / 2) * l)
+                   for a in (-1.0, 1.0), b in (-1.0, 1.0)]
+        quad = corners[[1, 3, 4, 2, 1]]     # closed rectangle loop (column-major)
+        plot!(plt, [p[1] for p in quad], [p[2] for p in quad], [p[3] for p in quad];
+            color=col, lw=1.5, label=(labels ? lbl : false))
+        # ponytail: GR can't png-export filled 3D quads (firstindex(::Surface)) —
+        # outline + span/chord cross reads as a plane; swap to surface! if backend allows
+        s1, s2 = w2w(R - halfspan * w), w2w(R + halfspan * w)
+        c1, c2 = w2w(R - (chord / 2) * l), w2w(R + (chord / 2) * l)
+        plot!(plt, [s1[1], s2[1]], [s1[2], s2[2]], [s1[3], s2[3]];
+            color=col, lw=1, alpha=0.6, label=false)
+        plot!(plt, [c1[1], c2[1]], [c1[2], c2[2]], [c1[3], c2[3]];
+            color=col, lw=1, alpha=0.6, label=false)
+    end
 
-    X_arm = [p[1] for p in arm_eval]
-    Y_arm = [p[2] for p in arm_eval]
-    Z_arm = [p[3] for p in arm_eval]
+    if front
+        tip = cg + 2.0 * Ihat
+        plot!(plt, [cg[1], tip[1]], [cg[2], tip[2]], [cg[3], tip[3]];
+            arrow=arrow(:closed, :head, 0.3, 0.3), color=:green, lw=2,
+            label=(labels ? "front (Ihat)" : false))
+    end
 
-    # Compute bounding limits
-    pad = 2.0
-    all_x = [X_cg; X_arm; 0.0]
-    all_y = [Y_cg; Y_arm; 0.0]
-    all_z = [Z_cg; 0.0]
-
-    xmin, xmax = minimum(all_x) - pad, maximum(all_x) + pad
-    ymin, ymax = minimum(all_y) - pad, maximum(all_y) + pad
-    zmin, zmax = 0.0, maximum(all_z) + pad
-
-    p3d = plot(
-        title="Kite 3D Periodic Limit Cycle",
-        xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
-        xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
-        camera=camera,
-        size=size,
-        grid=true,
-        legend=:topright
-    )
-
-    # 1. Arm pivot and circular path
-    scatter!(p3d, [0.0], [0.0], [0.0], color=:black, markersize=5, label="Pivot (0,0,0)")
-    plot!(p3d, X_arm, Y_arm, Z_arm, color=:gray30, lw=2, linestyle=:dash, label="Arm path")
-
-    # 2. Wall Projections
-    plot!(p3d, X_cg, Y_cg, fill(zmin, N_pts), color=:gray60, lw=1.5, linestyle=:dot, label="XY-floor proj")
-    plot!(p3d, X_cg, fill(ymax, N_pts), Z_cg, color=:gray60, lw=1.5, linestyle=:dashdot, label="XZ-back proj")
-    plot!(p3d, fill(xmin, N_pts), Y_cg, Z_cg, color=:gray60, lw=1.5, linestyle=:dash, label="YZ-side proj")
-
-    # 3. Sample Tethers
-    if n_tethers > 0
-        tether_indices = round.(Int, range(1, N_pts, length=n_tethers + 1))[1:n_tethers]
-        for (i, idx) in enumerate(tether_indices)
-            plot!(p3d, [X_arm[idx], X_cg[idx]], [Y_arm[idx], Y_cg[idx]], [Z_arm[idx], Z_cg[idx]],
-                color=:orange, lw=1.2, alpha=0.5, label=(i == 1 ? "Tether sample" : false))
+    # depth cues: CG marker shadowed on the floor / walls
+    if lims !== nothing && (shade || project)
+        xmin, xmax, ymin, ymax, zmin, zmax = lims
+        if shade
+            scatter!(plt, [cg[1]], [cg[2]], [zmin]; color=:gray40, markersize=3, label=false)
+        end
+        if project
+            scatter!(plt, [cg[1]], [ymax], [cg[3]]; color=:gray40, markersize=3, label=false)
+            scatter!(plt, [xmin], [cg[2]], [cg[3]]; color=:gray40, markersize=3, label=false)
         end
     end
 
-    # 4. Main Trajectory
-    plot!(p3d, X_cg, Y_cg, Z_cg, color=:crimson, lw=3.5, label="Kite CG trajectory")
-
-    # 5. Directional Arrows
-    if n_arrows > 0
-        arrow_indices = round.(Int, range(10, N_pts - 10, length=n_arrows))
-        for idx in arrow_indices
-            pt = pos_eval[idx]
-            pt_next = pos_eval[idx+2]
-            plot!(p3d, [pt[1], pt_next[1]], [pt[2], pt_next[2]], [pt[3], pt_next[3]],
-                arrow=arrow(:closed, :head, 0.4, 0.4), color=:darkblue, lw=2.0, label=false)
-        end
-    end
-
-    if filename !== nothing
-        savefig(p3d, filename)
-        println("Plot saved to $filename")
-    end
-
-    return p3d
+    return plt
 end
 
 """
-    animate_kite_3d(sol; fps=30, n_frames=nothing, camera=(40, 25), size=(850, 700), filename="kite_trajectory_animation.gif")
+    plot_kite(q; plt=plot(), kw...)   # single state q = (α, θ, φ, β)
+    plot_kite(sol, t; kw...)          # state of `sol` at time `t`
 
-Renders and saves a 3D animated GIF of the kite trajectory.
-
-# Arguments
-- `sol`: Solution object or `NamedTuple` containing `time_grid` and `state`.
-
-# Keyword Arguments
-- `fps::Int = 30`: Playback frame rate (frames per second). Defaults to `30`.
-- `n_frames::Union{Int, Nothing} = nothing`: Total animation frames. If `nothing` (default), 
-  calculates `round(Int, tf * fps)` to guarantee 1:1 real-time playback matching trajectory duration.
-- `camera = (40, 25)`: Camera viewing angles (azimuth, elevation).
-- `size = (850, 700)`: Output figure dimensions in pixels.
-- `filename::String = "kite_trajectory_animation.gif"`: Filepath for the generated GIF.
+Single-frame kite plot; see `plot_kite!` for the options.
 """
-function animate_kite_3d(sol;
-    fps::Int=30,
-    n_frames::Union{Int,Nothing}=nothing,
-    camera=(40, 25),
-    size=(850, 700),
-    filename::String="kite_trajectory_animation.gif")
+plot_kite(q; plt=plot(), kw...) = plot_kite!(plt, q; kw...)
+plot_kite(sol, t; kw...) = plot_kite(state(sol)(t)[1:4]; u=control(sol)(t), kw...)
 
-    tf_sol = time_grid(sol)[end]
+"""
+    kite_paths(sol; N_pts=300)
 
-    # Guarantee 1:1 real-time playback speed by default
-    total_frames = n_frames === nothing ? max(2, round(Int, tf_sol * fps)) : n_frames
-
-    N_static = 300
-    t_static = range(0, tf_sol, length=N_static)
-
-    q_static = [state(sol)(t)[1:4] for t in t_static]
-    pos_static = [pos_CG(q) for q in q_static]
-    arm_static = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in q_static]
-
-    X_cg = [p[1] for p in pos_static]
-    Y_cg = [p[2] for p in pos_static]
-    Z_cg = [p[3] for p in pos_static]
-
-    X_arm = [p[1] for p in arm_static]
-    Y_arm = [p[2] for p in arm_static]
-    Z_arm = [p[3] for p in arm_static]
-
+Evaluate `sol` on `N_pts` times; returns `(; t, qs, cgs, arms, lims)` with the
+CG and arm-tip positions and axis limits `(xmin, xmax, ymin, ymax, zmin, zmax)`
+shared by all plot functions below.
+"""
+function kite_paths(sol; N_pts=300)
+    tf = time_grid(sol)[end]
+    t = range(0.0, tf; length=N_pts)
+    qs = [state(sol)(t)[1:4] for t in t]
+    cgs = [pos_CG(q) for q in qs]
+    arms = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in qs]
+    all_pts = vcat(cgs, arms)
     pad = 2.0
-    xmin, xmax = minimum([X_cg; X_arm; 0.0]) - pad, maximum([X_cg; X_arm; 0.0]) + pad
-    ymin, ymax = minimum([Y_cg; Y_arm; 0.0]) - pad, maximum([Y_cg; Y_arm; 0.0]) + pad
-    zmin, zmax = 0.0, maximum([Z_cg; 0.0]) + pad
+    xmin, xmax = minimum(v -> v[1], all_pts) - pad, maximum(v -> v[1], all_pts) + pad
+    ymin, ymax = minimum(v -> v[2], all_pts) - pad, maximum(v -> v[2], all_pts) + pad
+    zmax = maximum(v -> v[3], cgs) + pad
+    return (; t, qs, cgs, arms, lims=(xmin, xmax, ymin, ymax, 0.0, zmax))
+end
 
-    t_anim = range(0, tf_sol, length=total_frames)
+"""
+    plot_background!(plt, paths; shade=false, project=false, camera=(40,25), size=(900,750))
+
+Faint CG trajectory + dashed arm path; sets axis limits and camera so every
+plot built on it shares the same framing. `shade=true` adds the floor shadow
+of the CG path (the arm already lies in the ground plane), `project=true`
+adds back-wall (y=ymax) and side-wall (x=xmin) projections.
+"""
+function plot_background!(plt, paths; shade=false, project=false,
+    camera=(40, 25), size=(900, 750))
+    xmin, xmax, ymin, ymax, zmin, zmax = paths.lims
+    n = length(paths.t)
+    X = [c[1] for c in paths.cgs]
+    Y = [c[2] for c in paths.cgs]
+    Z = [c[3] for c in paths.cgs]
+    plot!(plt; xlabel="x [m]", ylabel="y [m]", zlabel="z [m]",
+        xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+        camera=camera, size=size, legend=:topright)
+    if shade
+        plot!(plt, X, Y, fill(zmin, n); color=:gray50, lw=1.5, label=false)
+    end
+    if project
+        plot!(plt, X, fill(ymax, n), Z; color=:gray50, lw=1.5, label=false)
+        plot!(plt, fill(xmin, n), Y, Z; color=:gray50, lw=1.5, label=false)
+    end
+    plot!(plt, X, Y, Z; color=:crimson, lw=2.5, label="CG")
+    plot!(plt, [a[1] for a in paths.arms], [a[2] for a in paths.arms], [a[3] for a in paths.arms];
+        color=:gray30, lw=2, linestyle=:dash, label="arm path")
+    return plt
+end
+
+"""
+    plot_kite_positions(sol, times; shade=false, project=false, front=false,
+                        camera=(40,25), size=(900,750))
+    plot_kite_positions(sol, n::Int; kw...)   # n snapshots evenly spread over the period
+
+Static plot of several kite snapshots over the shared background.
+"""
+function plot_kite_positions(sol, times; shade=false, project=false, front=false,
+    camera=(40, 25), size=(900, 750))
+    paths = kite_paths(sol)
+    plt = plot()
+    plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
+    for (i, t) in enumerate(times)
+        plot_kite!(plt, state(sol)(t)[1:4]; labels=(i == 1), front=front,
+            u=control(sol)(t), shade=shade, project=project, lims=paths.lims)
+    end
+    return plt
+end
+plot_kite_positions(sol, n::Int; kw...) =
+    plot_kite_positions(sol, collect(range(0.0, time_grid(sol)[end]; length=n)); kw...)
+
+"""
+    animate_kite(sol; fps=30, shade=false, project=false, front=false,
+                 camera=(40,25), size=(900,750), filename="kite_animation.gif")
+
+Animated GIF of the kite (arm + tether + wing panels) over the full solution
+period, on the shared background. Real-time playback, same method as in
+`Visualization`: the number of frames is `round(tf * fps)`
+(period × points-per-second).
+"""
+function animate_kite(sol; fps=30, shade=false, project=false, front=false,
+    camera=(40, 25), size=(900, 750), filename="kite_animation.gif")
+    tf = time_grid(sol)[end]
+    paths = kite_paths(sol)
+    t_anim = range(0.0, tf; length=max(2, round(Int, tf * fps)))   # real-time: frames = period × fps
 
     anim = @animate for t in t_anim
-        q_curr = state(sol)(t)[1:4]
-        p_cg = pos_CG(q_curr)
-        p_arm = SVector(pars.larm * cos(q_curr[1]), pars.larm * sin(q_curr[1]), 0.0)
-
-        # Kite body axes
-        Ihat, Jhat, _ = body_axes(q_curr)
-        wing_left = p_cg - 1.25 * Jhat
-        wing_right = p_cg + 1.25 * Jhat
-        chord_tail = p_cg - 0.40 * Ihat
-        chord_nose = p_cg + 0.40 * Ihat
-
-        p_frame = plot(
-            title="Kite Cycle (t = $(round(t, digits=2)) s / $(round(tf_sol, digits=2)) s)",
-            xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]",
-            xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
-            camera=camera,
-            size=size,
-            legend=false
-        )
-
-        # Static background curves & shadows
-        plot!(p_frame, X_cg, Y_cg, Z_cg, color=:crimson, lw=1.5, alpha=0.4)
-        plot!(p_frame, X_cg, Y_cg, fill(zmin, N_static), color=:gray75, lw=1.0)
-        plot!(p_frame, X_cg, fill(ymax, N_static), Z_cg, color=:gray75, lw=1.0)
-        plot!(p_frame, fill(xmin, N_static), Y_cg, Z_cg, color=:gray75, lw=1.0)
-        plot!(p_frame, X_arm, Y_arm, Z_arm, color=:gray50, lw=1.2, linestyle=:dash)
-
-        # Generator arm & pivot
-        scatter!(p_frame, [0.0], [0.0], [0.0], color=:black, markersize=5)
-        plot!(p_frame, [0.0, p_arm[1]], [0.0, p_arm[2]], [0.0, p_arm[3]], color=:black, lw=4)
-        scatter!(p_frame, [p_arm[1]], [p_arm[2]], [p_arm[3]], color=:black, markersize=4)
-
-        # Dynamic Tether
-        plot!(p_frame, [p_arm[1], p_cg[1]], [p_arm[2], p_cg[2]], [p_arm[3], p_cg[3]], color=:orange, lw=2.5)
-
-        # Dynamic Kite Body
-        plot!(p_frame, [wing_left[1], wing_right[1]], [wing_left[2], wing_right[2]], [wing_left[3], wing_right[3]], color=:darkblue, lw=4.5)
-        plot!(p_frame, [chord_tail[1], chord_nose[1]], [chord_tail[2], chord_nose[2]], [chord_tail[3], chord_nose[3]], color=:red, lw=3.0)
-        scatter!(p_frame, [p_cg[1]], [p_cg[2]], [p_cg[3]], color=:darkred, markersize=4)
-
-        # Dynamic shadow dots on bounding planes
-        scatter!(p_frame, [p_cg[1]], [p_cg[2]], [zmin], color=:gray40, markersize=4)
-        scatter!(p_frame, [p_cg[1]], [ymax], [p_cg[3]], color=:gray40, markersize=4)
-        scatter!(p_frame, [xmin], [p_cg[2]], [p_cg[3]], color=:gray40, markersize=4)
+        plt = plot()
+        plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
+        plot_kite!(plt, state(sol)(t)[1:4]; labels=false, front=front,
+            u=control(sol)(t), shade=shade, project=project, lims=paths.lims)
+        plot!(plt; title="t = $(round(t, digits=2)) s / $(round(tf, digits=2)) s")
     end
-
     gif(anim, filename, fps=fps)
-    println("Animation saved to $filename (Duration: $(round(total_frames / fps, digits=2)) s at $fps FPS)")
+    println("Animation saved to $filename ($(length(t_anim)) frames = real-time at $fps fps)")
     return anim
 end
 
@@ -857,8 +846,9 @@ x0 = state(sol_full)(0.0)
 xT = state(sol_full)(tf_full)
 println("Periodic loop closure error ||x(0) - x(T)|| = ", norm(x0 - xT))
 
-plot_kite_3d(sol_full)
-animate_kite_3d(sol_full)
+plot_kite(sol_full, 0.3; front=true)                           # single frame (with aileron deflection)
+plot_kite_positions(sol_full, 5; shade=true, project=true)     # a few snapshots
+animate_kite(sol_full; shade=true, project=true)               # real-time gif
 
 ts = range(0, tf_full, length=300)
 
