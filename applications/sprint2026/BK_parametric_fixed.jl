@@ -21,11 +21,24 @@
 #    différents résultats". We override `bvp_residual` for `Shooting` to pin that
 #    auxiliary unknown to zero (residual row `X[end] = 0`), which also makes the
 #    dense Jacobian nonsingular (J[end,end] = 1).
+#
+# 3. EXPLICIT RECORD AND EXPLICIT TWO-DIRECTION CONTINUATION (replaces
+#    `bothside=true`). `bothside=true` looks equivalent to running ds>0 and
+#    ds<0, but is not — see the continuation section below. Findings:
+#
+#    * Family topology (physical units): main sheet tf(v_ref) ≈ 0.63 s at
+#      v_ref = 9 m/s falling monotonically to ≈ 0.12 s at 20 m/s; below 9 m/s
+#      the period grows without bound (tf ≈ 47.7 s at v_ref = 2.4585, still
+#      growing at continuation budget — no true low-wind endpoint found); a
+#      fold tangle (detected folds at v_ref ≈ 9.31, 9.30, 9.46, 9.54, 9.72)
+#      crowds sheets just above 9 m/s.
+#    * Collocation and multiple shooting agree on the period to ~1e-6 s
+#      wherever both track the same sheet (checked at v_ref = 8, 9, 10 m/s).
 
 using Pkg
 Pkg.activate("applications/sprint2026")
 
-import OrdinaryDiffEq as ODE
+import OrdinaryDiffEqTsit5 as ODE
 using BifurcationKit
 using LinearAlgebra
 using ComponentArrays: ComponentArray as CA
@@ -160,6 +173,14 @@ end
 
 u0_bif = SA[x_optimization_phys(0)..., tf_physical]
 
+# Record the physical period (5th state component) along branches. Without an
+# explicit record, `plot(br)` falls back to `norm(x)`, which is incomparable
+# between the two discretizations (different unknown-vector layouts) — the
+# "multiple-shooting values are much smaller" artifact. `raw_x` unwraps the
+# saved-solution wrapper that the Shooting discretizer stores per point.
+raw_x(x) = x isa BifurcationKit.BVPSavedSolutionAndState ? BifurcationKit.saved_solution(x) : x
+record_period(x, p; kwargs...) = raw_x(x)[5]
+
 const STATE_SIZE = length(u0_bif)
 model = BVP.BVPModel(F_fast, g; n=STATE_SIZE)
 
@@ -207,6 +228,7 @@ x0 = BVP.generate_solution(bvp, s -> vcat(x_optimization_phys(tf_physical * s), 
 
 prob = BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
     jacobian=BifurcationKit.DenseAnalytical(),
+    record_from_solution=record_period,
 )
 
 # linesearch is honored by the PALC continuation corrector
@@ -232,13 +254,37 @@ optc = ContinuationPar(
     n_inversion=6
 )
 
-br = @time continuation(prob, PALC(), optc;
-    plot=false,
-    verbosity=1,
-    normC=norminf,
-    bothside=true,
-)
-plot(br)
+# Continuation — TWO EXPLICIT SINGLE-DIRECTION RUNS, not `bothside=true`.
+#
+# `bothside=true` seems equivalent to running ds>0 and ds<0 and merging, but:
+# * BifurcationKit merges the legs as `_cat!(_reverse(backward), forward)`
+#   (Results.jl:464): the stored branch BEGINS at the backward leg's endpoint.
+#   Plotted, that reversed leg is indistinguishable from a second physical
+#   family — this produced the "both branches go right from v_ref = 9" artifact.
+# * The merged branch gives each leg neither its own budget nor a direction
+#   label; near the fold tangle at v_ref ≈ 8.7–9.7 the corrector can land on a
+#   different sheet (observed: a single recorded step moved Δp = 0.27 with
+#   dsmax = 0.1 — impossible for a true PALC step, whose tangent is a unit
+#   vector, so the Newton correction left the sheet) and then silently spend
+#   the whole budget on the wrong sheet.
+# Two separate runs give each direction its own budget and make the step-size
+# sanity check below meaningful (recorded points must satisfy |Δp| ≤ dsmax).
+continuation_side(ds) = continuation(prob, PALC(), @set optc.ds = ds;
+    plot=false, verbosity=1, normC=norminf)
+
+"Recorded PALC points satisfy |Δp| ≤ dsmax; larger gaps flag corrector
+sheet-jumps (only possible where sheets crowd, i.e. near folds)."
+function sheet_jumps(br; dsmax=0.1, factor=1.5)
+    return [i for i in 2:length(br)
+                  if abs(br.sol[i].p - br.sol[i-1].p) > factor * dsmax]
+end
+
+br_fwd = @time continuation_side(+0.01)
+br_bwd = @time continuation_side(-0.01)
+println("collocation sheet-jumps: ds>0 at indices ", sheet_jumps(br_fwd),
+    ", ds<0 at indices ", sheet_jumps(br_bwd))
+plot(br_fwd, label="collocation, ds>0")
+plot!(br_bwd, label="collocation, ds<0")
 
 
 ## Multiple shooting
@@ -269,8 +315,8 @@ end
 
 odeprob = ODE.ODEProblem(F_fast, u0_bif, (0, 1), nt_p0)
 model_ms = BVP.BVPModel(odeprob, g; n=5)
-disc2 = BVP.Shooting(10, ODE.Vern9(), true)
-bvp_ms = BVP.discretize(model_ms, disc2; abstol=1e-12, reltol=1e-10)
+disc2 = BVP.Shooting(10, ODE.Tsit5(), true)
+bvp_ms = BVP.discretize(model_ms, disc2; abstol=1e-10, reltol=1e-10)
 
 # Warm-start from the converged collocation orbit (it already satisfies the
 # ODE, unlike the raw optimization sampling) instead of the optimization cycle.
@@ -288,6 +334,7 @@ end
 x0_ms[end] = sol.u[5]  # period (tf), constant along the collocation solution
 
 prob_ms = BVP.BVPBifProblem(bvp_ms, x0_ms, params, (@optic _.v_ref);
+    record_from_solution=record_period,
     plot_solution=plot_solution_ms,
 )
 
@@ -312,20 +359,17 @@ optc_ms = ContinuationPar(
     n_inversion=6
 )
 
-br_ms = @time continuation(prob_ms, PALC(), optc_ms;
-    plot=true,
-    verbosity=1,
-    normC=norminf,
-    bothside=true,
-)
-plot(br, label="Collocation")
-plot!(br_ms, label="Multiple shooting")
+continuation_side_ms(ds) = continuation(prob_ms, PALC(), @set optc_ms.ds = ds;
+    plot=true, verbosity=1, normC=norminf)
 
-# BifurcationKit has no converged(::ContResult); failed corrections abort the
-# branch, so recording >1 points means every correction converged (a 0-iteration
-# step had a predictor already within tolerance).
-branch_converged(br) = length(br) > 1
+br_ms_fwd = @time continuation_side_ms(+0.01)
+br_ms_bwd = @time continuation_side_ms(-0.01)
+println("shooting sheet-jumps: ds>0 at indices ", sheet_jumps(br_ms_fwd),
+    ", ds<0 at indices ", sheet_jumps(br_ms_bwd))
 
-println("Collocation branch: ", length(br), " steps, converged: ", branch_converged(br))
-println("Shooting branch:    ", length(br_ms), " steps, converged: ", branch_converged(br_ms))
+plot!(br_ms_fwd, label="shooting, ds>0")
+plot!(br_ms_bwd, label="shooting, ds<0")
+
+println("Collocation branches: ds>0 ", length(br_fwd), " pts, ds<0 ", length(br_bwd), " pts")
+println("Shooting branches:    ds>0 ", length(br_ms_fwd), " pts, ds<0 ", length(br_ms_bwd), " pts")
 println("Period at reference wind (s): collocation = ", sol.u[5], " shooting = ", sol_ms.u[5])

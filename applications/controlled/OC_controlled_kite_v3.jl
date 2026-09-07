@@ -512,7 +512,7 @@ plot(sol)
  - [] Translate from PM2 params to controlled params
  - [] Transform state from 2 <-> 4
  - [] Take parameters p2 and p4
- - [] visualize
+ - [] visualize: one function to show arm + line + correctly oriented left and right planes + optional arrow for front
  - [] add tests matlab-v1 et v1-v3
 =#
 

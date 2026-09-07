@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate("applications/sprint2026")
 
-import OrdinaryDiffEq as ODE
+import OrdinaryDiffEqTsit5 as ODE
 using BifurcationKit
 using LinearAlgebra
 using ComponentArrays: ComponentArray as CA
@@ -117,7 +117,7 @@ odeprob = ODE.ODEProblem(F, u0_bif, (0, 1), nt_p0)
 model = BifurcationKit.BVP.BVPModel(odeprob, g; n=5)
 # 4. Discretize using Collocation method
 # Using 201 points for better accuracy
-disc_ms = BifurcationKit.BVP.Shooting(10, ODE.Vern9(), true)
+disc_ms = BifurcationKit.BVP.Shooting(10, ODE.Tsit5(), true)
 bvp = BifurcationKit.BVP.discretize(model, disc_ms; abstol=1e-12, reltol=1e-10)
 #https://github.com/bifurcationkit/MultiParamContinuation.jl
 
