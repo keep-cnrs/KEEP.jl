@@ -243,6 +243,209 @@ end
 
 f(X, u) = eom(X, u)
 
+begin  # plotting
+    """
+        plot_kite!(plt, q; u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false,
+                   labels=true, shade=false, project=false, lims=nothing)
+
+    Draw one kite state `q = (α, θ, φ, β)` on `plt`: pivot→arm, arm→CG tether and
+    the left (+y) / right (−y) wing panels with the same sweep `delta` and body
+    orientation as the aerodynamic model. `u = (uₗ, uᵣ)` are the aileron
+    deflections: each panel is rotated about its span axis with the aerodynamic
+    sign convention (`i = atan(...) + uᵢ`, i.e. positive `uᵢ` increases that
+    panel's angle of attack). `front=true` adds an arrow along the nose axis
+    `Ihat`. When `lims` (the tuple returned in `kite_paths`) is given,
+    `shade`/`project` add a small CG marker shadow on the floor / back & side
+    walls.
+    """
+    function plot_kite!(plt, q;
+        u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false, labels=true,
+        shade=false, project=false, lims=nothing)
+
+        Ihat, Jhat, Khat = body_axes(q)
+        cg = pos_CG(q)
+        w2w(p) = cg + p[1] * Ihat + p[2] * Jhat + p[3] * Khat   # body → world
+
+        # arm (pivot → arm tip) and tether (arm tip → CG)
+        arm = SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0)
+        plot!(plt, [0.0, arm[1]], [0.0, arm[2]], [0.0, arm[3]];
+            color=:black, lw=4, label=(labels ? "arm" : false))
+        plot!(plt, [arm[1], cg[1]], [arm[2], cg[2]], [arm[3], cg[3]];
+            color=:orange, lw=2, label=(labels ? "tether" : false))
+
+        # panels: span axis w and chord axis l, swept by delta; the aileron uᵢ rotates
+        # panel i about its span axis (same convention as aerodynamics(), where
+        # i = atan(...) + uᵢ: positive uᵢ increases the panel's angle of attack)
+        sd, cd = sincos(pars.aero.delta)
+        panels = ((pars.aero.panels[:, 1], SVector(-sd, cd, 0.0), SVector(cd, sd, 0.0), :royalblue, "left wing"),
+            (pars.aero.panels[:, 2], SVector(-sd, -cd, 0.0), SVector(cd, -sd, 0.0), :tomato, "right wing"))
+        for (i, (R, w, l, col, lbl)) in enumerate(panels)
+            l = l * cos(u[i]) + cross3(w, l) * sin(u[i])
+            corners = [w2w(R + a * halfspan * w + b * (chord / 2) * l)
+                       for a in (-1.0, 1.0), b in (-1.0, 1.0)]
+            quad = corners[[1, 3, 4, 2, 1]]     # closed rectangle loop (column-major)
+            plot!(plt, [p[1] for p in quad], [p[2] for p in quad], [p[3] for p in quad];
+                color=col, lw=1.5, label=(labels ? lbl : false))
+            # ponytail: GR can't png-export filled 3D quads (firstindex(::Surface)) —
+            # outline + span/chord cross reads as a plane; swap to surface! if backend allows
+            s1, s2 = w2w(R - halfspan * w), w2w(R + halfspan * w)
+            c1, c2 = w2w(R - (chord / 2) * l), w2w(R + (chord / 2) * l)
+            plot!(plt, [s1[1], s2[1]], [s1[2], s2[2]], [s1[3], s2[3]];
+                color=col, lw=1, alpha=0.6, label=false)
+            plot!(plt, [c1[1], c2[1]], [c1[2], c2[2]], [c1[3], c2[3]];
+                color=col, lw=1, alpha=0.6, label=false)
+        end
+
+        if front
+            tip = cg + 2.0 * Ihat
+            plot!(plt, [cg[1], tip[1]], [cg[2], tip[2]], [cg[3], tip[3]];
+                arrow=arrow(:closed, :head, 0.3, 0.3), color=:green, lw=2,
+                label=(labels ? "front (Ihat)" : false))
+        end
+
+        # depth cues: CG marker shadowed on the floor / walls
+        if lims !== nothing && (shade || project)
+            xmin, xmax, ymin, ymax, zmin, zmax = lims
+            if shade
+                scatter!(plt, [cg[1]], [cg[2]], [zmin]; color=:gray40, markersize=3, label=false)
+            end
+            if project
+                scatter!(plt, [cg[1]], [ymax], [cg[3]]; color=:gray40, markersize=3, label=false)
+                scatter!(plt, [xmin], [cg[2]], [cg[3]]; color=:gray40, markersize=3, label=false)
+            end
+        end
+
+        return plt
+    end
+
+    """
+        plot_kite(q; plt=plot(), kw...)   # single state q = (α, θ, φ, β)
+        plot_kite(sol, t; kw...)          # state of `sol` at time `t`
+
+    Single-frame kite plot; see `plot_kite!` for the options.
+    """
+    plot_kite(q; plt=plot(), kw...) = plot_kite!(plt, q; kw...)
+    plot_kite(sol, t; kw...) = plot_kite(state(sol)(t)[1:4]; u=control(sol)(t), kw...)
+
+    """
+        kite_paths(sol; N_pts=300)
+
+    Evaluate `sol` on `N_pts` times; returns `(; t, qs, cgs, arms, lims)` with the
+    CG and arm-tip positions and axis limits `(xmin, xmax, ymin, ymax, zmin, zmax)`
+    shared by all plot functions below.
+    """
+    function kite_paths(sol; N_pts=300)
+        tf = time_grid(sol)[end]
+        t = range(0.0, tf; length=N_pts)
+        qs = [state(sol)(t)[1:4] for t in t]
+        cgs = [pos_CG(q) for q in qs]
+        arms = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in qs]
+        all_pts = vcat(cgs, arms)
+        pad = 2.0
+        xmin, xmax = minimum(v -> v[1], all_pts) - pad, maximum(v -> v[1], all_pts) + pad
+        ymin, ymax = minimum(v -> v[2], all_pts) - pad, maximum(v -> v[2], all_pts) + pad
+        zmax = maximum(v -> v[3], cgs) + pad
+        return (; t, qs, cgs, arms, lims=(xmin, xmax, ymin, ymax, 0.0, zmax))
+    end
+
+    """
+        plot_background!(plt, paths; shade=false, project=false, camera=(40,25), size=(900,750))
+
+    Faint CG trajectory + dashed arm path; sets axis limits and camera so every
+    plot built on it shares the same framing. `shade=true` adds the floor shadow
+    of the CG path (the arm already lies in the ground plane), `project=true`
+    adds back-wall (y=ymax) and side-wall (x=xmin) projections.
+    """
+    function plot_background!(plt, paths; shade=false, project=false,
+        camera=(40, 25), size=(900, 750))
+        xmin, xmax, ymin, ymax, zmin, zmax = paths.lims
+        n = length(paths.t)
+        X = [c[1] for c in paths.cgs]
+        Y = [c[2] for c in paths.cgs]
+        Z = [c[3] for c in paths.cgs]
+        plot!(plt; xlabel="x [m]", ylabel="y [m]", zlabel="z [m]",
+            xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
+            camera=camera, size=size, legend=:topright)
+        if shade
+            plot!(plt, X, Y, fill(zmin, n); color=:gray50, lw=1.5, label=false)
+        end
+        if project
+            plot!(plt, X, fill(ymax, n), Z; color=:gray50, lw=1.5, label=false)
+            plot!(plt, fill(xmin, n), Y, Z; color=:gray50, lw=1.5, label=false)
+        end
+        plot!(plt, X, Y, Z; color=:crimson, lw=2.5, label="CG")
+        plot!(plt, [a[1] for a in paths.arms], [a[2] for a in paths.arms], [a[3] for a in paths.arms];
+            color=:gray30, lw=2, linestyle=:dash, label="arm path")
+        return plt
+    end
+
+    """
+        plot_kite_positions(sol, times; shade=false, project=false, front=false,
+                            camera=(40,25), size=(900,750))
+        plot_kite_positions(sol, n::Int; kw...)   # n snapshots evenly spread over the period
+
+    Static plot of several kite snapshots over the shared background.
+    """
+    function plot_kite_positions(sol, times; shade=false, project=false, front=false,
+        camera=(40, 25), size=(900, 750))
+        paths = kite_paths(sol)
+        plt = plot()
+        plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
+        for (i, t) in enumerate(times)
+            plot_kite!(plt, state(sol)(t)[1:4]; labels=(i == 1), front=front,
+                u=control(sol)(t), shade=shade, project=project, lims=paths.lims)
+        end
+        return plt
+    end
+    plot_kite_positions(sol, n::Int; kw...) =
+        plot_kite_positions(sol, collect(range(0.0, time_grid(sol)[end]; length=n)); kw...)
+
+    """
+        animate_kite(sol; fps=30, trail_length=1, trail_step=nothing,
+                     start_camera=(30,30), end_camera=(40,30), size=(900,750),
+                     shade=false, project=false, front=false, filename="kite_animation.gif")
+
+    Animated GIF of the kite (arm + tether + wing panels) over the full solution
+    period, on the shared background, in the style of
+    `Visualization.animate_trajectory_4D`: fading trail behind the kite and a
+    camera sweeping from `start_camera` to `end_camera` across the cycle.
+
+    `fps` plays three consistent roles (same method as in `Visualization`):
+    - frame count = `round(tf * fps)` → 1:1 real-time playback (deliberately no
+      min-points clamp: it would slow down short cycles),
+    - playback rate of the gif,
+    - trail spacing: `trail_step` defaults to `1 / (5 * fps)`, so the trail holds
+      ~`5 * trail_length` samples at any fps.
+    """
+    function animate_kite(sol; fps=30, trail_length=1, trail_step=nothing,
+        start_camera=(30, 30), end_camera=(40, 30), size=(900, 750),
+        shade=false, project=false, front=false, filename="kite_animation.gif")
+        tf = time_grid(sol)[end]
+        paths = kite_paths(sol)
+        t_anim = range(0.0, tf; length=max(2, round(Int, tf * fps)))   # real-time: frames = period × fps
+        trail_step = trail_step === nothing ? 1 / (5 * fps) : trail_step
+
+        anim = @animate for t_ in t_anim
+            τ = t_ / tf
+            camera = start_camera .* (1 - τ) .+ end_camera .* τ
+            t_trail = [max(0.0, t_-trail_length):trail_step:t_; t_]
+            trail_cgs = [pos_CG(state(sol)(t)[1:4]) for t in t_trail]
+            width = range(0.0, 1.0; length=length(t_trail))
+
+            plt = plot()
+            plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
+            plot!(plt, [c[1] for c in trail_cgs], [c[2] for c in trail_cgs], [c[3] for c in trail_cgs];
+                msw=0, lw=4 .* width, alpha=width, color=:crimson, label=false)
+            plot_kite!(plt, state(sol)(t_)[1:4]; labels=false, front=front,
+                u=control(sol)(t_), shade=shade, project=project, lims=paths.lims)
+            plot!(plt; title="t = $(round(t_, digits=2)) s / $(round(tf, digits=2)) s")
+        end fps = fps
+        gif(anim, filename, fps=fps)
+        println("Animation saved to $filename ($(length(t_anim)) frames = real-time at $fps fps)")
+        return anim
+    end
+end  # plotting
+
 # =========================================================
 # Minimal sanity checks
 # =========================================================
@@ -256,126 +459,10 @@ let X = SA[0.3, 0.5, 0.2, 0.6, 0.1, 0.2, 0.3, 0.4], u = SA[0.1, 0.0]
     println("sanity: eom OK, jacobian=", size(J), ", ddq = ", y[5:8])
 end
 # =========================================================
-# Helper functions for grid_size continuation
+# Fingerprint-aware solution cache (load only exact problem+init+options,
+# solve the rest) — functions live in solutions_cache.jl
 # =========================================================
-
-"""
-    cache_filepath(cache_dir, prefix, grid_size)
-
-Returns file path prefix (without extension) for a given cache entry.
-"""
-cache_filepath(cache_dir::String, prefix::String, grid_size::Int) = joinpath(cache_dir, "$(prefix)_grid_$(grid_size)")
-
-"""
-    solve_cached(ocp; grid_size, init, cache_dir, prefix, cache=:exact, solve_options...)
-
-Handles solution retrieval or execution for a single grid size according to `cache`:
-- `:exact`: Directly loads the cached solution without solving; throws an error if missing.
-- `:no` / `:latest`: Solves the OCP and exports the solution to disk.
-"""
-function solve_cached(ocp;
-    grid_size::Int,
-    init,
-    cache_dir::String,
-    prefix::String,
-    cache::Symbol=:exact,
-    solve_options...)
-    fpath = cache_filepath(cache_dir, prefix, grid_size)
-    jld2_file = fpath * ".jld2"
-
-    if cache == :exact
-        isfile(jld2_file) || error("Cached solution not found for grid = $grid_size: $jld2_file")
-        @info "Loading cached solution: grid = $grid_size ($jld2_file)"
-        return import_ocp_solution(ocp; filename=fpath)
-    end
-
-    @info "Solving OCP: grid = $grid_size..."
-    sol = solve(ocp; init=init, grid_size=grid_size, solve_options...)
-    export_ocp_solution(sol; filename=fpath)
-    return sol
-end
-
-"""
-    resolve_cache_plan(ocp, grid_schedule; init, cache_dir, prefix, cache)
-
-Determines the initial guess and schedule based on the cache mode:
-- `:no`: Ignores disk cache; returns `(init, grid_schedule)`.
-- `:exact`: Returns `(init, grid_schedule)` for direct loading across all target grids.
-- `:latest`: Finds the highest-grid cached solution matching `prefix` to use as `init`.
-"""
-function resolve_cache_plan(ocp, grid_schedule; init, cache_dir::String, prefix::String, cache::Symbol)
-    cache in (:no, :exact, :latest) || throw(ArgumentError("cache must be :no, :exact, or :latest (got :$cache)"))
-
-    if cache == :no || !isdir(cache_dir)
-        return init, collect(grid_schedule)
-    end
-
-    if cache == :latest
-        # Match any cache file with the given prefix and extract the highest grid number
-        pattern = Regex("^$(prefix)_grid_(\\d+)\\.jld2\$")
-        matched_grids = Int[]
-        for f in readdir(cache_dir)
-            m = match(pattern, f)
-            m !== nothing && push!(matched_grids, parse(Int, m.captures[1]))
-        end
-
-        if !isempty(matched_grids)
-            latest_grid = maximum(matched_grids)
-            fpath = cache_filepath(cache_dir, prefix, latest_grid)
-            @info "Found latest cached solution: grid = $latest_grid ($fpath.jld2)"
-            cached_sol = import_ocp_solution(ocp; filename=fpath)
-            return cached_sol, collect(grid_schedule)
-        end
-        return init, collect(grid_schedule)
-    end
-
-    # :exact mode verifies all required files exist before execution
-    return init, collect(grid_schedule)
-end
-
-"""
-    run_grid_homotopy(ocp, grid_schedule; init, cache=:exact, cache_dir="applications/controlled/solutions", prefix="ocp_half", solve_options...)
-
-Executes grid continuation over `grid_schedule` (e.g. `(8, 20, 50)`).
-
-# Cache Modes (`cache::Symbol`)
-- `:no`: Optimizes through `grid_schedule` starting from `init`, ignoring existing cache files.
-- `:exact`: Performs no optimization; loads each cached grid solution directly from disk.
-- `:latest`: Uses the highest available cached grid solution matching `prefix` as `init`, then optimizes through `grid_schedule`.
-"""
-function run_grid_homotopy(ocp, grid_schedule; init,
-    cache::Symbol=:exact,
-    cache_dir::String="applications/controlled/solutions",
-    prefix::String="ocp_half",
-    solve_options...)
-    mkpath(cache_dir)
-
-    start_sol, remaining_grids = resolve_cache_plan(
-        ocp, grid_schedule;
-        init=init, cache_dir=cache_dir, prefix=prefix, cache=cache
-    )
-
-    if isempty(remaining_grids)
-        println("✓ Latest solution already cached at finest grid ($((grid_schedule)[end])) — Objective: ", round(objective(start_sol), digits=4))
-        return start_sol
-    end
-
-    # Sequential continuation across remaining grids
-    sol_final = foldl(remaining_grids; init=start_sol) do warm_start, N
-        sol_current = solve_cached(ocp;
-            grid_size=N,
-            init=warm_start,
-            cache_dir=cache_dir,
-            prefix=prefix,
-            cache=cache,
-            solve_options...
-        )
-        println("✓ Grid $N converged — Objective: ", round(objective(sol_current), digits=4))
-        sol_current
-    end
-
-    return sol_final
-end
+include(joinpath(@__DIR__, "solutions_cache.jl"))
 
 # =========================================================
 # Minimal OCP (grid_size=8, loose tolerances) — validate the pipeline fast
@@ -488,7 +575,7 @@ sol = run_grid_homotopy(
     ocp,
     (8, 20, 50);
     init=init,
-    cache=:latest,                     # :no | :exact | :latest
+    cache=:auto,                       # :auto | :exact | :no | :warm (see solutions_cache.jl)
     cache_dir="applications/controlled/solutions",
     prefix="kite_lemniscate",
     solve_options...
@@ -496,6 +583,7 @@ sol = run_grid_homotopy(
 
 
 plot(sol)
+animate_kite(sol; filename="kite_animation.gif", end_camera=(30, 30))   # first solve (full period)
 
 #= TODO
 
@@ -507,7 +595,7 @@ plot(sol)
  - [x] GPU (ExaModel+MadNLP): Metal not supported
  - [x] AppleAccelerate: seems marginally slower
 
- - [] load from cache: if ocp is the same as the one in cache: return directly, otherwise use as init for solve
+ - [x] load from cache: fingerprint (problem + init + solver options) exact-match loads directly; :warm opt-in reuses same-problem solutions across inits
  - [] Give the function parameters
  - [] Translate from PM2 params to controlled params
  - [] Transform state from 2 <-> 4
@@ -532,189 +620,6 @@ plot(sol)
 # =========================================================
 # 3D Kite visualization: arm + tether + correctly oriented wing panels
 # =========================================================
-
-"""
-    plot_kite!(plt, q; u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false,
-               labels=true, shade=false, project=false, lims=nothing)
-
-Draw one kite state `q = (α, θ, φ, β)` on `plt`: pivot→arm, arm→CG tether and
-the left (+y) / right (−y) wing panels with the same sweep `delta` and body
-orientation as the aerodynamic model. `u = (uₗ, uᵣ)` are the aileron
-deflections: each panel is rotated about its span axis with the aerodynamic
-sign convention (`i = atan(...) + uᵢ`, i.e. positive `uᵢ` increases that
-panel's angle of attack). `front=true` adds an arrow along the nose axis
-`Ihat`. When `lims` (the tuple returned in `kite_paths`) is given,
-`shade`/`project` add a small CG marker shadow on the floor / back & side
-walls.
-"""
-function plot_kite!(plt, q;
-    u=(0.0, 0.0), chord=1.0, halfspan=1.25, front=false, labels=true,
-    shade=false, project=false, lims=nothing)
-
-    Ihat, Jhat, Khat = body_axes(q)
-    cg = pos_CG(q)
-    w2w(p) = cg + p[1] * Ihat + p[2] * Jhat + p[3] * Khat   # body → world
-
-    # arm (pivot → arm tip) and tether (arm tip → CG)
-    arm = SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0)
-    plot!(plt, [0.0, arm[1]], [0.0, arm[2]], [0.0, arm[3]];
-        color=:black, lw=4, label=(labels ? "arm" : false))
-    plot!(plt, [arm[1], cg[1]], [arm[2], cg[2]], [arm[3], cg[3]];
-        color=:orange, lw=2, label=(labels ? "tether" : false))
-
-    # panels: span axis w and chord axis l, swept by delta; the aileron uᵢ rotates
-    # panel i about its span axis (same convention as aerodynamics(), where
-    # i = atan(...) + uᵢ: positive uᵢ increases the panel's angle of attack)
-    sd, cd = sincos(pars.aero.delta)
-    panels = ((pars.aero.panels[:, 1], SVector(-sd, cd, 0.0), SVector(cd, sd, 0.0), :royalblue, "left wing"),
-        (pars.aero.panels[:, 2], SVector(-sd, -cd, 0.0), SVector(cd, -sd, 0.0), :tomato, "right wing"))
-    for (i, (R, w, l, col, lbl)) in enumerate(panels)
-        l = l * cos(u[i]) + cross3(w, l) * sin(u[i])
-        corners = [w2w(R + a * halfspan * w + b * (chord / 2) * l)
-                   for a in (-1.0, 1.0), b in (-1.0, 1.0)]
-        quad = corners[[1, 3, 4, 2, 1]]     # closed rectangle loop (column-major)
-        plot!(plt, [p[1] for p in quad], [p[2] for p in quad], [p[3] for p in quad];
-            color=col, lw=1.5, label=(labels ? lbl : false))
-        # ponytail: GR can't png-export filled 3D quads (firstindex(::Surface)) —
-        # outline + span/chord cross reads as a plane; swap to surface! if backend allows
-        s1, s2 = w2w(R - halfspan * w), w2w(R + halfspan * w)
-        c1, c2 = w2w(R - (chord / 2) * l), w2w(R + (chord / 2) * l)
-        plot!(plt, [s1[1], s2[1]], [s1[2], s2[2]], [s1[3], s2[3]];
-            color=col, lw=1, alpha=0.6, label=false)
-        plot!(plt, [c1[1], c2[1]], [c1[2], c2[2]], [c1[3], c2[3]];
-            color=col, lw=1, alpha=0.6, label=false)
-    end
-
-    if front
-        tip = cg + 2.0 * Ihat
-        plot!(plt, [cg[1], tip[1]], [cg[2], tip[2]], [cg[3], tip[3]];
-            arrow=arrow(:closed, :head, 0.3, 0.3), color=:green, lw=2,
-            label=(labels ? "front (Ihat)" : false))
-    end
-
-    # depth cues: CG marker shadowed on the floor / walls
-    if lims !== nothing && (shade || project)
-        xmin, xmax, ymin, ymax, zmin, zmax = lims
-        if shade
-            scatter!(plt, [cg[1]], [cg[2]], [zmin]; color=:gray40, markersize=3, label=false)
-        end
-        if project
-            scatter!(plt, [cg[1]], [ymax], [cg[3]]; color=:gray40, markersize=3, label=false)
-            scatter!(plt, [xmin], [cg[2]], [cg[3]]; color=:gray40, markersize=3, label=false)
-        end
-    end
-
-    return plt
-end
-
-"""
-    plot_kite(q; plt=plot(), kw...)   # single state q = (α, θ, φ, β)
-    plot_kite(sol, t; kw...)          # state of `sol` at time `t`
-
-Single-frame kite plot; see `plot_kite!` for the options.
-"""
-plot_kite(q; plt=plot(), kw...) = plot_kite!(plt, q; kw...)
-plot_kite(sol, t; kw...) = plot_kite(state(sol)(t)[1:4]; u=control(sol)(t), kw...)
-
-"""
-    kite_paths(sol; N_pts=300)
-
-Evaluate `sol` on `N_pts` times; returns `(; t, qs, cgs, arms, lims)` with the
-CG and arm-tip positions and axis limits `(xmin, xmax, ymin, ymax, zmin, zmax)`
-shared by all plot functions below.
-"""
-function kite_paths(sol; N_pts=300)
-    tf = time_grid(sol)[end]
-    t = range(0.0, tf; length=N_pts)
-    qs = [state(sol)(t)[1:4] for t in t]
-    cgs = [pos_CG(q) for q in qs]
-    arms = [SVector(pars.larm * cos(q[1]), pars.larm * sin(q[1]), 0.0) for q in qs]
-    all_pts = vcat(cgs, arms)
-    pad = 2.0
-    xmin, xmax = minimum(v -> v[1], all_pts) - pad, maximum(v -> v[1], all_pts) + pad
-    ymin, ymax = minimum(v -> v[2], all_pts) - pad, maximum(v -> v[2], all_pts) + pad
-    zmax = maximum(v -> v[3], cgs) + pad
-    return (; t, qs, cgs, arms, lims=(xmin, xmax, ymin, ymax, 0.0, zmax))
-end
-
-"""
-    plot_background!(plt, paths; shade=false, project=false, camera=(40,25), size=(900,750))
-
-Faint CG trajectory + dashed arm path; sets axis limits and camera so every
-plot built on it shares the same framing. `shade=true` adds the floor shadow
-of the CG path (the arm already lies in the ground plane), `project=true`
-adds back-wall (y=ymax) and side-wall (x=xmin) projections.
-"""
-function plot_background!(plt, paths; shade=false, project=false,
-    camera=(40, 25), size=(900, 750))
-    xmin, xmax, ymin, ymax, zmin, zmax = paths.lims
-    n = length(paths.t)
-    X = [c[1] for c in paths.cgs]
-    Y = [c[2] for c in paths.cgs]
-    Z = [c[3] for c in paths.cgs]
-    plot!(plt; xlabel="x [m]", ylabel="y [m]", zlabel="z [m]",
-        xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
-        camera=camera, size=size, legend=:topright)
-    if shade
-        plot!(plt, X, Y, fill(zmin, n); color=:gray50, lw=1.5, label=false)
-    end
-    if project
-        plot!(plt, X, fill(ymax, n), Z; color=:gray50, lw=1.5, label=false)
-        plot!(plt, fill(xmin, n), Y, Z; color=:gray50, lw=1.5, label=false)
-    end
-    plot!(plt, X, Y, Z; color=:crimson, lw=2.5, label="CG")
-    plot!(plt, [a[1] for a in paths.arms], [a[2] for a in paths.arms], [a[3] for a in paths.arms];
-        color=:gray30, lw=2, linestyle=:dash, label="arm path")
-    return plt
-end
-
-"""
-    plot_kite_positions(sol, times; shade=false, project=false, front=false,
-                        camera=(40,25), size=(900,750))
-    plot_kite_positions(sol, n::Int; kw...)   # n snapshots evenly spread over the period
-
-Static plot of several kite snapshots over the shared background.
-"""
-function plot_kite_positions(sol, times; shade=false, project=false, front=false,
-    camera=(40, 25), size=(900, 750))
-    paths = kite_paths(sol)
-    plt = plot()
-    plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
-    for (i, t) in enumerate(times)
-        plot_kite!(plt, state(sol)(t)[1:4]; labels=(i == 1), front=front,
-            u=control(sol)(t), shade=shade, project=project, lims=paths.lims)
-    end
-    return plt
-end
-plot_kite_positions(sol, n::Int; kw...) =
-    plot_kite_positions(sol, collect(range(0.0, time_grid(sol)[end]; length=n)); kw...)
-
-"""
-    animate_kite(sol; fps=30, shade=false, project=false, front=false,
-                 camera=(40,25), size=(900,750), filename="kite_animation.gif")
-
-Animated GIF of the kite (arm + tether + wing panels) over the full solution
-period, on the shared background. Real-time playback, same method as in
-`Visualization`: the number of frames is `round(tf * fps)`
-(period × points-per-second).
-"""
-function animate_kite(sol; fps=30, shade=false, project=false, front=false,
-    camera=(40, 25), size=(900, 750), filename="kite_animation.gif")
-    tf = time_grid(sol)[end]
-    paths = kite_paths(sol)
-    t_anim = range(0.0, tf; length=max(2, round(Int, tf * fps)))   # real-time: frames = period × fps
-
-    anim = @animate for t in t_anim
-        plt = plot()
-        plot_background!(plt, paths; shade=shade, project=project, camera=camera, size=size)
-        plot_kite!(plt, state(sol)(t)[1:4]; labels=false, front=front,
-            u=control(sol)(t), shade=shade, project=project, lims=paths.lims)
-        plot!(plt; title="t = $(round(t, digits=2)) s / $(round(tf, digits=2)) s")
-    end
-    gif(anim, filename, fps=fps)
-    println("Animation saved to $filename ($(length(t_anim)) frames = real-time at $fps fps)")
-    return anim
-end
 
 ## Half period
 # Half-period bounds (half of full period [0.5, 20.0])
@@ -824,7 +729,7 @@ sol_init_half = solve(ocp_half, init=init, maxiter=0, grid_size=50)
     ocp_half,
     (8, 20, 50);
     init=init_half,
-    cache=:no,                     # :no | :exact | :latest
+    cache=:no,                     # force a fresh solve (modes: :auto | :exact | :no | :warm)
     cache_dir="applications/controlled/solutions",
     prefix="kite_half_lemniscate",
     solve_options...
@@ -848,7 +753,7 @@ println("Periodic loop closure error ||x(0) - x(T)|| = ", norm(x0 - xT))
 
 plot_kite(sol_full, 0.3; front=true)                           # single frame (with aileron deflection)
 plot_kite_positions(sol_full, 5; shade=true, project=true)     # a few snapshots
-animate_kite(sol_full; shade=true, project=true)               # real-time gif
+animate_kite(sol_full; filename="kite_animation_half.gif", shade=true, project=true, end_camera=(30, 30))               # real-time gif
 
 ts = range(0, tf_full, length=300)
 
