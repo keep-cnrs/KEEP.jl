@@ -67,9 +67,9 @@ solution, stats, model = optimize(p0, syms, lb, ub)
 ## Reconstruct the dense ODE solution (in normalized time)
 vbp = build_vbpara(CA(p0; solution.params...))
 shooting = solution[1:4]
-solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
+solution_sim = lc_shoot(shooting, vbp; save_everystep=true)
 
-x_optimization = t -> solution_sim(t, idxs=1:4)  # normalized time
+x_optimization = t -> solution_sim(t; idxs=1:4)  # normalized time
 tf_optimization = solution_sim.t[end]            # normalized period
 
 ## Conversion to physical time
@@ -79,7 +79,7 @@ tf_physical = tf_optimization * T0
 "Sample the optimized cycle at physical time `t`: (α, τ, dα, dτ) in rad, rad/s."
 function x_optimization_phys(t)
     s = x_optimization(t / T0)
-    return SA[s[1], s[2], T0*s[3], T0*s[4]]
+    return SA[s[1], s[2], T0 * s[3], T0 * s[4]]
 end
 
 ## BVP model — physical time
@@ -90,9 +90,9 @@ end
 function F_reference(u, params, t=0)
     α, τ, dα, dτ, tf = u
     T = params.l / params.v_ref  # characteristic time of the CURRENT parameters
-    u_dyn = SA[α, τ, T*dα, T*dτ, 0]
+    u_dyn = SA[α, τ, T * dα, T * dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, build_vbpara(params))
-    out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
+    out = tf .* SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2, 0]
     # OrdinaryDiffEq requires typeof(du) === typeof(u); the multiple-shooting
     # discretizer feeds plain Vector slices of the unknown vector, so match
     # the container to the input.
@@ -129,11 +129,31 @@ struct FastPara{T}
     Δφ::T
 end
 
-FastPara(vbp) = FastPara{Float64}(
-    vbp.l, vbp.m, vbp.v_ref, vbp.g, vbp.h_ref, vbp.r, vbp.c_L, vbp.f, vbp.c_D_l,
-    vbp.m_l, vbp.I_eq, vbp.Cmax, vbp.Ωmin, vbp.Ωmax, vbp.Ωlim, vbp.torque_slope,
-    vbp.n_wind, vbp.θ0, vbp.φ0, vbp.Δθ, vbp.Δφ,
-)
+function FastPara(vbp)
+    return FastPara{Float64}(
+        vbp.l,
+        vbp.m,
+        vbp.v_ref,
+        vbp.g,
+        vbp.h_ref,
+        vbp.r,
+        vbp.c_L,
+        vbp.f,
+        vbp.c_D_l,
+        vbp.m_l,
+        vbp.I_eq,
+        vbp.Cmax,
+        vbp.Ωmin,
+        vbp.Ωmax,
+        vbp.Ωlim,
+        vbp.torque_slope,
+        vbp.n_wind,
+        vbp.θ0,
+        vbp.φ0,
+        vbp.Δθ,
+        vbp.Δφ,
+    )
+end
 
 # ponytail: single-entry cache keyed on v_ref; continuation evaluates many RHS
 # at one parameter value, so we rebuild only when v_ref actually changes.
@@ -152,9 +172,9 @@ end
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
     T = params.l / params.v_ref
-    u_dyn = SA[α, τ, T*dα, T*dτ, 0]
+    u_dyn = SA[α, τ, T * dα, T * dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, get_fast_para(params))
-    out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
+    out = tf .* SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2, 0]
     # OrdinaryDiffEq requires typeof(du) === typeof(u); the multiple-shooting
     # discretizer feeds plain Vector slices of the unknown vector, so match
     # the container to the input.
@@ -178,7 +198,13 @@ u0_bif = SA[x_optimization_phys(0)..., tf_physical]
 # between the two discretizations (different unknown-vector layouts) — the
 # "multiple-shooting values are much smaller" artifact. `raw_x` unwraps the
 # saved-solution wrapper that the Shooting discretizer stores per point.
-raw_x(x) = x isa BifurcationKit.BVPSavedSolutionAndState ? BifurcationKit.saved_solution(x) : x
+function raw_x(x)
+    return if x isa BifurcationKit.BVPSavedSolutionAndState
+        BifurcationKit.saved_solution(x)
+    else
+        x
+    end
+end
 record_period(x, p; kwargs...) = raw_x(x)[5]
 
 const STATE_SIZE = length(u0_bif)
@@ -220,19 +246,25 @@ end
 
 ## Collocation
 grid_size, degree = 30, 5
-const disc = BVP.Collocation(Ntst=grid_size, m=degree, meshadapt=true)
+const disc = BVP.Collocation(; Ntst=grid_size, m=degree, meshadapt=true)
 bvp = BVP.discretize(model, disc)
 
 params = nt_p0
-x0 = BVP.generate_solution(bvp, s -> vcat(x_optimization_phys(tf_physical * s), tf_physical))
+x0 = BVP.generate_solution(
+    bvp, s -> vcat(x_optimization_phys(tf_physical * s), tf_physical)
+)
 
-prob = BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BVP.BVPBifProblem(
+    bvp,
+    x0,
+    params,
+    (@optic _.v_ref);
     jacobian=BifurcationKit.DenseAnalytical(),
     record_from_solution=record_period,
 )
 
 # linesearch is honored by the PALC continuation corrector
-optn = NewtonPar(tol=1e-10, verbose=true, linesearch=true)
+optn = NewtonPar(; tol=1e-10, verbose=true, linesearch=true)
 
 x0, res_pre = damped_newton(prob, x0, params; tol=1e-9)
 println("Collocation damped pre-solve residual: ", res_pre)
@@ -242,7 +274,7 @@ sol = @time BifurcationKit.solve(prob, Newton(), optn);
 @assert BifurcationKit.converged(sol) "Collocation Newton did not converge"
 
 # Continuation
-optc = ContinuationPar(
+optc = ContinuationPar(;
     p_min=0.0,
     p_max=25.0,
     dsmax=0.1,
@@ -251,7 +283,7 @@ optc = ContinuationPar(
     newton_options=optn,
     max_steps=100,
     nev=20,
-    n_inversion=6
+    n_inversion=6,
 )
 
 # Continuation — TWO EXPLICIT SINGLE-DIRECTION RUNS, not `bothside=true`.
@@ -269,19 +301,25 @@ optc = ContinuationPar(
 #   the whole budget on the wrong sheet.
 # Two separate runs give each direction its own budget and make the step-size
 # sanity check below meaningful (recorded points must satisfy |Δp| ≤ dsmax).
-continuation_side(ds) = continuation(prob, PALC(), @set optc.ds = ds;
-    plot=false, verbosity=1, normC=norminf)
+function continuation_side(ds)
+    return continuation(
+        prob, PALC(), @set optc.ds = ds; plot=false, verbosity=1, normC=norminf
+    )
+end
 
 "Recorded PALC points satisfy |Δp| ≤ dsmax; larger gaps flag corrector
 sheet-jumps (only possible where sheets crowd, i.e. near folds)."
 function sheet_jumps(br; dsmax=0.1, factor=1.5)
-    return [i for i in 2:length(br)
-                  if abs(br.sol[i].p - br.sol[i-1].p) > factor * dsmax]
+    return [i for i in 2:length(br) if abs(br.sol[i].p - br.sol[i - 1].p) > factor * dsmax]
 end
 
 br_fwd = @time continuation_side(+0.01)
 br_bwd = @time continuation_side(-0.01)
-println("collocation sheet-jumps: ds>0 at indices ", sheet_jumps(br_fwd),
-    ", ds<0 at indices ", sheet_jumps(br_bwd))
-plot(br_fwd, label="collocation, ds>0")
-plot!(br_bwd, label="collocation, ds<0")
+println(
+    "collocation sheet-jumps: ds>0 at indices ",
+    sheet_jumps(br_fwd),
+    ", ds<0 at indices ",
+    sheet_jumps(br_bwd),
+)
+plot(br_fwd; label="collocation, ds>0")
+plot!(br_bwd; label="collocation, ds<0")
