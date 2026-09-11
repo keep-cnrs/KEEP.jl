@@ -53,7 +53,7 @@ end
 """
 The Poincaré section is defined as {x | poincare_section(x) = 0}."""
 function poincare_section(τ)
-    sin((τ - TAU0) / 2)
+    return sin((τ - TAU0) / 2)
 end
 
 """
@@ -77,18 +77,23 @@ Let tol_int be the tolerance used for integration. Then tol > max(10 * tol_int, 
 function build_affect(tol=10DEFAULT_TOLERANCE)
     function affect!(integrator)
         u = integrator.sol.u
-        length(u) < 2 && return
-        distance_on_section(u[end-1], u[end]) > tol && return
-        terminate!(integrator)
+        length(u) < 2 && return nothing
+        distance_on_section(u[end - 1], u[end]) > tol && return nothing
+        return terminate!(integrator)
     end
 end
 
 """
 Return a callback that saves the states when passing through section = 0. If two subsequent states are within `tol` of each other, terminate the integration."""
 function build_poincare_callback(tol=DEFAULT_TOLERANCE; section=poincare_section)
-    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=tol / 10)
+    return ContinuousCallback(
+        (τ, t, integrator) -> section(τ),
+        build_affect(tol);
+        save_positions=(true, false),
+        idxs=2,
+        abstol=tol / 10,
+    )
 end
-
 
 """
 shooting = [α0, dα0, dτ0, T] -> u0, T"""
@@ -119,7 +124,6 @@ end
 default_sense(shooting) = ifelse(shooting[3] > 0, +, -)
 default_sense(u0, u1) = ifelse(u1[2] > u0[2], +, -)
 
-
 """
 Sense is either `+` or `-`, the expected sign of dτ."""
 function endpoint_residuals(u0, u1; sense=default_sense(u0, u1))
@@ -127,13 +131,17 @@ function endpoint_residuals(u0, u1; sense=default_sense(u0, u1))
     Δτ = u1[2] - u0[2] - sense(2π)
     return SA[Δα, Δτ, Δdα, Δdτ]
 end
-endpoint_residuals(sol; sense=default_sense(build_shooting(sol))) = endpoint_residuals(sol.u[1], sol.u[end]; sense)
+function endpoint_residuals(sol; sense=default_sense(build_shooting(sol)))
+    return endpoint_residuals(sol.u[1], sol.u[end]; sense)
+end
 
 """
 Compute the residuals of a limit cycle from a shooting by integrating. Specify
 
 Sense is either `+` or `-`, the expected sign of dτ."""
-function shooting_residuals(shooting, vbp; sense=default_sense(shooting), tol=DEFAULT_TOLERANCE)
+function shooting_residuals(
+    shooting, vbp; sense=default_sense(shooting), tol=DEFAULT_TOLERANCE
+)
     u0, T = unpack_shooting(shooting)
     res = endpoint_residuals(PM4.integrate(u0, T, vbp; tol=tol / 10); sense=sense)
     if maximum(abs, res) < tol
@@ -161,7 +169,6 @@ function compute_limit_cycle(vbp; sense, tol=DEFAULT_TOLERANCE, kwargs...)
     return first(filter(lc -> sense(lc.u[1][4]) > 0, all_lcs))
 end
 
-
 """
 shooting -> average power"""
 function average_power(shooting, vbp; tol=DEFAULT_TOLERANCE)
@@ -174,17 +181,24 @@ Comptue all limit cycles by sampling `N` initial conditions within a region of t
  - A rough integration with low precision (sqrt(tol))
  - Clusterize and take centroids
  - Integrate each centroid with high precision (tol)"""
-function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=5, N=100, tol=DEFAULT_TOLERANCE, kwargs...)
+function all_limit_cycles(
+    vbp; αmin=0.0, αmax=1π, vmax=5, N=100, tol=DEFAULT_TOLERANCE, kwargs...
+)
     dαmin, dαmax = dτmin, dτmax = -vmax, vmax
 
     samples = sample(N, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
     u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
-    rough_shootings = [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s]
+    rough_shootings = [
+        build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s
+    ]
 
     clusters = dbscan(reduce(hcat, rough_shootings), 100sqrt(tol))
     rough_centroids = [mean(rough_shootings[c.core_indices]) for c in clusters.clusters]
 
-    limit_cycles = [compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for s in rough_centroids]
+    limit_cycles = [
+        compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for
+        s in rough_centroids
+    ]
     return limit_cycles
 end
 

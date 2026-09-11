@@ -34,7 +34,7 @@ function collect_tests()
             push!(files, joinpath(dir, f))
         end
     end
-    sort(files)
+    return sort(files)
 end
 
 """
