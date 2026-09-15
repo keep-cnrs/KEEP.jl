@@ -121,8 +121,9 @@ Runtimes (MacBook Pro, Apple Silicon): FastPara-typed RHS 387 ns/eval
 | file | role |
 |---|---|
 | `applications/sprint2026/BK_parametric_fixed.jl` | deliverable: optimization → physical-time BVP → collocation + multiple-shooting continuation |
+| `applications/sprint2026/BK_tests_0910.jl` | diagnostics: method switch, manual block shooting Jacobian (`ManualJacFwd`/`ManualJacFD`), ground-truth Floquet (`floquet_true`, segment-wise `monodromy`), fold-vs-homoclinic fit (`fit_fold`/`fit_homoclinic`), coexisting cycles, equilibria/Hopf (Findings) |
 | `test/publications/ECC2026/6_fixed_parametrized_optimization_rescaling.jl` | VB derivation, `rescale_para`/`rescale_wind`, Tests A–C (32/32) |
-| `applications/sprint2026/_order2_tmp.jl` | topology diagnostics behind figures 1–2 (CSVs in the scratch dir) |
+| `applications/sprint2026/scratch/` | archived investigation traces (superseded `_*_tmp.jl` / `_*_keep.jl` diagnostics + their `.jls` data); topology diagnostics behind figures 1–2 in `scratch/_order2_tmp.jl` |
 | `fig_branch.png`, `fig_ms_vs_coll.png`, `fig_vb_rescale.png` | figures shown above |
 | `applications/sprint2026/REPORT.md` | this report |
 
@@ -176,5 +177,5 @@ Methodological choices that stuck: fast typed parameter struct + `v_ref`-keyed
 cache (84% of residual cost), container-matched RHS (`SVector`/`Vector`),
 damped-Armijo pre-solve Newton with step capping, warm-starting MS from the
 converged collocation orbit, and doing all diagnostics on *one* persistent
-parameter set (snapshot `_opt_result_tmp.jl`) so any discrepancy is
+parameter set (snapshot `scratch/_opt_result_tmp.jl`) so any discrepancy is
 methodological, not setup noise.

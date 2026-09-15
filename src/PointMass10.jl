@@ -90,7 +90,7 @@ Compute the aerodynamical force on the solid kite + lines
 function Faero_func(q, dq, p)
     # test OK with compute_pos2 & compute_speed2 to compute z (height of kite) and app_wind (apparent wind)
     z = compute_pos1(q, p)[3]
-    wind = SA[p.v_ref*abs(z / p.h_ref)^(1/p.n_wind), 0, 0]
+    wind = SA[p.v_ref*abs(z/p.h_ref)^(1/p.n_wind), 0, 0]
     kite_speed = compute_speed1(q, dq, p)
     app_wind = wind - kite_speed  # We
     r_hat = rot2(q)[:, 1]  # er
@@ -170,7 +170,7 @@ function residuals(q, dq, ddq, p; Fgrav, Faero, torque)
     ## Use automatic differentiation
     Fapp = p.m * (
         Jv(q_ -> compute_speed2(q_, dq, p), q, dq) +
-        Jv(q_ -> compute_pos2(q_, p), q, ddq)
+            Jv(q_ -> compute_pos2(q_, p), q, ddq)
     )
     Ftension_kite = SA[(p.I_eq*ddα+torque)/(p.l*sin(θ2)*sin(φ2)), 0, 0]
     Fres = Fapp - Fgrav - Faero + rot2(q) * Ftension_kite
@@ -182,7 +182,7 @@ function residuals(q, dq, ddq, p; Fgrav, Faero, torque)
     resid2 = Fres ⋅ ∂OK∂τ / R
     resid3, resid4, resid5 = (
         Jv(q_ -> compute_speed_diff(q_, dq, p), q, dq) +
-        Jv(q_ -> compute_pos_diff(q_, p), q, ddq)
+            Jv(q_ -> compute_pos_diff(q_, p), q, ddq)
     )
     return SA[resid1, resid2, resid3, resid4, resid5]
 end
@@ -315,7 +315,7 @@ end
 """
 Make a callback that projects the manifold onto the tangent space of the manifold.
 
-`y_prototype` is used to determine the type of `resid_prototype`.
+`y_prototype` is used to determine the type of `resid_prototype`, give eg. the initial state, size does not matter.
 """
 function build_manifold_projection(y_prototype; nlsolve=NewtonRaphson(), tol=DEFAULT_TOLERANCE, kwargs...)
     return ManifoldProjection(manifold_residuals!; autodiff=AutoForwardDiff(), resid_prototype=similar(y_prototype, 6), nlsolve=nlsolve, abstol=tol, reltol=tol, kwargs...)

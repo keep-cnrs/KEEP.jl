@@ -105,7 +105,7 @@ KEEP.PointMass4.dynamics reads (all its parameter access is by getproperty,
 so a plain struct drops the ComponentArray machinery entirely).
 Values are bit-identical to `build_vbpara`.
 """
-struct FastPara{T}
+Base.@kwdef struct FastPara{T}
     l::T
     m::T
     v_ref::T
@@ -179,7 +179,7 @@ u0_bif = SA[x_optimization_phys(0)..., tf_physical]
 # "multiple-shooting values are much smaller" artifact. `raw_x` unwraps the
 # saved-solution wrapper that the Shooting discretizer stores per point.
 raw_x(x) = x isa BifurcationKit.BVPSavedSolutionAndState ? BifurcationKit.saved_solution(x) : x
-record_period(x, p; kwargs...) = raw_x(x)[5]
+record_period(x, p; kwargs...) = (tf=raw_x(x)[5],)
 
 const STATE_SIZE = length(u0_bif)
 model = BVP.BVPModel(F_fast, g; n=STATE_SIZE)
@@ -306,17 +306,25 @@ function BVP.bvp_residual(d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shootin
     return out
 end
 
-function plot_solution_ms(x, p; kwargs...)
-    um = reshape(@view(x[1:(5*disc2.M)]), 5, disc2.M)
-    sol = BifurcationKit._get_shooting_solution(bvp_ms.cache, um, 1, @set params.v_ref = p)
+function plot_solution_ms(x, p; iter, state, k...)
+    my_params = BifurcationKit.getparams(iter, state)
+    prob = BifurcationKit.getprob(iter)
+    bvp = BifurcationKit.BVP.get_bvp(prob)
+    disc = BifurcationKit.BVP.get_discretizer(bvp)
+    um = reshape(@view(x[1:(5*disc.M)]), 5, disc.M)
+    sol = BifurcationKit._get_shooting_solution(bvp.cache, um, 1, my_params)
 
-    plot!(sol.t .* tf_physical, sol.u[4, :]; ylabel="dτ", title="Multiple shooting (v_ref=)", kwargs...)
+    tf_physical = x[5]
+
+    plot!(sol.t .* tf_physical, sol.u[4, :]; ylabel="dτ", title="Multiple shooting (v_ref=)", k...)
 end
 
 odeprob = ODE.ODEProblem(F_fast, u0_bif, (0, 1), nt_p0)
 model_ms = BVP.BVPModel(odeprob, g; n=5)
 disc2 = BVP.Shooting(10, ODE.Tsit5(), true)
-bvp_ms = BVP.discretize(model_ms, disc2; abstol=1e-10, reltol=1e-10)
+# grid_size, degree = 30, 5
+# const disc = BVP.Collocation(Ntst=grid_size, m=degree, meshadapt=true)
+bvp_ms = BVP.discretize(model_ms, disc2; abstol=1e-12, reltol=1e-10)
 
 # Warm-start from the converged collocation orbit (it already satisfies the
 # ODE, unlike the raw optimization sampling) instead of the optimization cycle.
@@ -352,24 +360,35 @@ optc_ms = ContinuationPar(
     p_max=50.05,
     dsmax=0.1,
     ds=0.01,
-    detect_bifurcation=0,
+    detect_bifurcation=2,
     newton_options=optn_ms,
     max_steps=100,
     nev=20,
     n_inversion=6
 )
 
-continuation_side_ms(ds) = continuation(prob_ms, PALC(), @set optc_ms.ds = ds;
-    plot=true, verbosity=1, normC=norminf)
+continuation_side_ms() = continuation(prob_ms, PALC(), optc_ms;
+    plot=true, verbosity=1, normC=norminf, bothside=true)
 
-br_ms_fwd = @time continuation_side_ms(+0.01)
-br_ms_bwd = @time continuation_side_ms(-0.01)
+# br_ms_fwd = @time continuation_side_ms(+0.01)
+br_ms_bwd = @time continuation_side_ms()
 println("shooting sheet-jumps: ds>0 at indices ", sheet_jumps(br_ms_fwd),
     ", ds<0 at indices ", sheet_jumps(br_ms_bwd))
 
-plot!(br_ms_fwd, label="shooting, ds>0")
-plot!(br_ms_bwd, label="shooting, ds<0")
+plot(br_ms_bwd)
 
-println("Collocation branches: ds>0 ", length(br_fwd), " pts, ds<0 ", length(br_bwd), " pts")
-println("Shooting branches:    ds>0 ", length(br_ms_fwd), " pts, ds<0 ", length(br_ms_bwd), " pts")
-println("Period at reference wind (s): collocation = ", sol.u[5], " shooting = ", sol_ms.u[5])
+#=
+pourquoi tf@v_ref=9 != tf_optimization ? tf_physical vs tf_optimization vs T0? -> Mettre ça au clair
+
+Fold at v_ref = +2.45866014, step index 5->6, continue it ? Log plot ? What does the solution look like, is it an unstable limit cycle ?!
+
+what are pink points?
+
+one line switch between MS and collocation with adaptive mesh with `disc`
+
+Base.@kwdef?
+=#
+
+# println("Collocation branches: ds>0 ", length(br_fwd), " pts, ds<0 ", length(br_bwd), " pts")
+# println("Shooting branches:    ds>0 ", length(br_ms_fwd), " pts, ds<0 ", length(br_ms_bwd), " pts")
+# println("Period at reference wind (s): collocation = ", sol.u[5], " shooting = ", sol_ms.u[5])
