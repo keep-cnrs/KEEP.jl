@@ -5,4 +5,4 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PyFormattedStrings = "5f89f4a4-a228-4886-b223-c468a82ed5b9"
 
 [sources]
-KEEP = {rev = "main", url = "../.."}
+KEEP = {path = "../.."}

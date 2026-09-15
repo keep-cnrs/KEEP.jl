@@ -77,9 +77,7 @@ function compute_Rτ(q, p)
     dot_prod = compute_αhat(α) ⋅ compute_τhat(τ, p)
     # ε = 1e-5
     # my_sqrt(x) = sqrt(sqrt(x^2 + ε^2))
-    return SA[
-        L*(dot_prod+nm.sqrt(p.r^2 - (1 - dot_prod^2))), q[2]
-    ]
+    return SA[L*(dot_prod+nm.sqrt(p.r^2-(1-dot_prod^2))), q[2]]
 end
 
 @doc raw"""
@@ -122,7 +120,7 @@ function dynamics(u, p, t=0)
     Fgrav = SA[0, 0, -p.g-p.m_l*p.r] * M * L * T^-2
 
     # Compute aerodynamical force
-    wind = SA[abs(OK[3] / (p.h_ref * L))^(1/p.n_wind), 0, 0] * L * T^-1
+    wind = SA[abs(OK[3]/(p.h_ref*L))^(1/p.n_wind), 0, 0] * L * T^-1
     kite_speed = D_OK * dRτ
     app_wind = wind - kite_speed  # apparent wind, We
 
@@ -149,8 +147,7 @@ function dynamics(u, p, t=0)
 
     D_OK_D_Rτ = D_OK * D_Rτ
     A = D_OK_D_Rτ .* M .- A_tension
-    b = (
-        ddOK * M +
+    b = (ddOK * M +
         D_OK * ddRτ * M +
         -b_tension - Fgrav - Faero
     )
@@ -186,7 +183,7 @@ function create_u(α, τ, dα, dτ, W)
     return SA[α, τ, dα, dτ, W]
 end
 
-function init_u(α, dα, dτ; τ=TAU0, W=0.0)
+function init_u(α=0, dα=0, dτ=0; τ=TAU0, W=0.0)
     return create_u(α, τ, dα, dτ, W)
 end
 
