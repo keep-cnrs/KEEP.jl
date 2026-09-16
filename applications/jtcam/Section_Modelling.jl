@@ -51,10 +51,10 @@ fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
 
 # set of possible arm-tip positions: circle of radius l in the xy-plane
 θc = range(0, 2π, length=200)
-plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); c=:blue, lw=3, label="arm-tip circle (radius l)")
+plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); c=:blue, lw=3, label="arm-tip locus")
 
 # example arm and kite at α = 0, β = 30°
-plot!(fig, [0, l], [0, 0], [0, 0]; c=:black, lw=3, label="arm (length l)")
+plot!(fig, [0, l], [0, 0], [0, 0]; c=:black, lw=3, label="arm")
 plot!(fig, [l, kite_pos[1]], [0, 0], [0, kite_pos[3]]; c=:red, lw=2, ls=:dash, label="kite line")
 
 # COMMENT/UNCOMMENT to identify easily those lines
