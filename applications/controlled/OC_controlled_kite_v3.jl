@@ -363,7 +363,7 @@ begin  # plotting
         X = [c[1] for c in paths.cgs]
         Y = [c[2] for c in paths.cgs]
         Z = [c[3] for c in paths.cgs]
-        plot!(plt; xlabel="x [m]", ylabel="y [m]", zlabel="z [m]",
+        plot!(plt; xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
             xlims=(xmin, xmax), ylims=(ymin, ymax), zlims=(zmin, zmax),
             camera=camera, size=size, legend=:topright)
         if shade

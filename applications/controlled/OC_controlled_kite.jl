@@ -30,12 +30,12 @@ end
 function aerodynamics(X, u, pars)
     q, dq = q_dq(X)
 
-    b = pars.larm              # Length generator arm [m]
-    l = pars.lcg               # distance bottom generator arm to CG ~ Length lines [m]
+    b = pars.larm              # Length generator arm (m)
+    l = pars.lcg               # distance bottom generator arm to CG ~ Length lines (m)
     S = pars.aero.S / 2.0      # Total wing surface [m^2]
     rho = pars.aero.rho          # Atmospheric density [kg / m^3]
     Rp = SMatrix{3,2}(pars.aero.panels) # Relative position
-    delta = pars.aero.delta        # Dihedral angle [rad]
+    delta = pars.aero.delta        # Dihedral angle (rad)
 
     # Rotation matrix components and angular velocity
     sq = sin.(q)
@@ -403,7 +403,7 @@ if false
 
     get_beta(x) = x[2] * (180.0 / pi)
     p_beta = plot(t_plot .* TU, get_beta.(x_plot), color=:black, linewidth=2,
-        xlabel="Time [s]", ylabel="β [deg]", framestyle=:box, legend=false)
+        xlabel="Time (s)", ylabel="β (deg)", framestyle=:box, legend=false)
     display(p_beta)
 
     # 3. Aerodynamic incidence plot
@@ -411,7 +411,7 @@ if false
     get_i2(x, u, p) = aerodynamics(x, u, p).i2 * (180.0 / pi)
 
     p_inc = plot(t_plot .* TU, get_i1.(x_plot, Ref(u_const), Ref(pars)), label="Panel 1", linewidth=2,
-        xlabel="Time [s]", ylabel="Incidence [deg]", framestyle=:box)
+        xlabel="Time (s)", ylabel="Incidence (deg)", framestyle=:box)
     plot!(p_inc, t_plot .* TU, get_i2.(x_plot, Ref(u_const), Ref(pars)), label="Panel 2", linewidth=2)
     display(p_inc)
 end

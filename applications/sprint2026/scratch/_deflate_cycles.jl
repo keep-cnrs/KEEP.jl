@@ -134,7 +134,7 @@ function main()
     end
     sort!(rows, by=r -> r.tf)
     @printf("\nv_ref=%.4f : %d distinct prograde BVP cycle(s) (%d beyond the seeds)\n", VREF, length(rows), found)
-    @printf("%-4s %-10s %-10s %-10s %-11s %-10s\n", "#", "tf [s]", "α0 [rad]", "|μ|max", "power [W]", "cycle res")
+    @printf("%-4s %-10s %-10s %-10s %-11s %-10s\n", "#", "tf (s)", "α0 (rad)", "|μ|max", "power (W)", "cycle res")
     for r in rows
         @printf("%-4d %-10.4f %-+10.5f %-10.3e %-11.1f %-10.2e\n", r.tag, r.tf, r.α0, r.mu, r.power, r.cres)
     end

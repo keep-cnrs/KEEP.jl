@@ -72,7 +72,7 @@ println("=== A. ground-truth |mu| of the tracked stable sheet, v_ref ∈ [8.8, 1
 println("     (a genuine fold of this sheet needs max nontrivial |mu| -> 1)")
 rows_up = sweep(S9, collect(9.0:0.02:10.2))
 rows_dn = sweep(S9, collect(9.0:-0.02:8.8))
-@printf("  v_ref     tf [s]     max|mu|!=1\n")
+@printf("  v_ref     tf (s)     max|mu|!=1\n")
 for r in vcat(reverse(rows_dn[2:end]), rows_up)
     @printf("  %6.2f   %9.5f   %.3e\n", r.vr, r.tf, r.mmax)
 end

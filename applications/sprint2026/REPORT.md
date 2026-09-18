@@ -224,16 +224,24 @@ full-tol branches the branch turns a *second* time, at a `p` **maximum**
 (`i2 = argmax p[1:i0]`). Identical at M=40 and M=80, so it is genuine, not a
 discretization artifact:
 
-| fold | `tf` [s] | `v_ref` | type |
+| fold | `tf` (s) | `v_ref` | type (Floquet) |
 |---|---|---|---|
-| 1 | 14.44 | 2.45848 | `p` min (low-wind saddle–node) |
-| 2 | 67.67 | 2.48168 | `p` max (long-sheet saddle–node) |
+| 1 | 14.44 | 2.45848 | `p` min — stable + saddle merge |
+| 2 | 67.67 | 2.48168 | `p` max — saddle + saddle merge |
+
+Both turns are saddle–nodes of the branch (a nontrivial Floquet multiplier passes
+through `+1`, quadratic tangency above). What differs is the *global* stability of
+the merging pair: at fold 1 the stable short cycle meets the unstable long cycle,
+while at fold 2 the long and long-long sheets — **both unstable** — merge, so the
+second fold annihilates two saddles and leaves only the stable short cycle for
+`v_ref > 2.48168`. Counts in §3.5.
 
 The branch is therefore an **S-curve**: short leg (tf 0.07→14.44), long sheet
 (14.44→67.67, `p` rising), and a **long-long sheet** (67.67→111+, `p` falling,
-still budget-truncated at `tf≈111.4`). For every `v_ref ∈ (2.45848, 2.48168)` a
-horizontal cut meets it **three times**, i.e. three coexisting prograde periods
-(see §3.3).
+still budget-truncated at `tf≈111.4`). A horizontal cut meets the *computed*
+branch **three times** for `v_ref ∈ (2.4785, 2.48168)` — i.e. three coexisting
+prograde periods; below that the third (long-long) crossing lies beyond the
+budget truncation (see §3.3, §3.5).
 
 ### 3.3 The Poincaré sampler reproduces the branch (a units trap), and three periods at the second fold
 
@@ -247,7 +255,7 @@ The BVP boundary condition (line 167 of `BK_tests_0910.jl`) enforces
 velocities physical×`T0`). Converting to the branch's PHYSICAL/SI convention,
 `tf_SI = T·T0`, `dα_SI = dα0/T0`, `dτ_SI = dτ0/T0`:
 
-| `v_ref` | cycles | `T` (norm.) | `tf = T·T0` (SI) | branch short `tf` (SI) | `α0` | `dα0`(SI) | `dτ0`(SI) | power [W] |
+| `v_ref` | cycles | `T` (norm.) | `tf = T·T0` (SI) | branch short `tf` (SI) | `α0` | `dα0`(SI) | `dτ0`(SI) | power (W) |
 |---|---|---|---|---|---|---|---|---|
 | 2.42 | **0** | — | — | (below fold) | — | — | — | — |
 | 2.45 | **0** | — | — | (below fold) | — | — | — | — |
@@ -281,9 +289,10 @@ Data: `scratch/bvp_cycles_poincare.jls`; branch column from
   section crossings agree, so it only sees *attracting* cycles. It therefore
   finds the stable short branch and **misses** the long / long-long saddle
   sheets. Enumerating those needs deflation (§3.4).
-- **Three periods coexist** for `v_ref ∈ (2.45848, 2.48168)` (the two folds of
-  §3.2). A cut at `v_ref = 2.480` meets the S-curve three times — short
-  `10.83 s`, long `49.22 s`, long-long `96.35 s` (§3.5).
+- **Three periods coexist** for `v_ref ∈ (2.4785, 2.48168)` (the computed part of
+  the two folds of §3.2; below `2.4785` the long-long crossing is budget-truncated).
+  A cut at `v_ref = 2.480` meets the S-curve three times — short `10.83 s`, long
+  `49.22 s`, long-long `96.35 s` (§3.5).
 - A retrograde attractor also exists below the fold (`T ≈ 8.5 s`; diagnostic
   `scratch/attractor_family.jls`, probe `scratch/_attractor_probe_tmp.jl`). It is
   a real limit cycle but fails the BVP boundary condition, so it is not counted.
@@ -295,7 +304,7 @@ Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, pena
 `‖u−u_i‖^{-2p}+α`) is what reaches them. `scratch/_deflate_cycles.jl`
 (M=20, physical/SI BVP) at the two anchors:
 
-| `v_ref` | # cycles | `tf` [s] | `α0` [rad] | max non-trivial \|μ\| | power [W] | cycle res |
+| `v_ref` | # cycles | `tf` (s) | `α0` (rad) | max non-trivial \|μ\| | power (W) | cycle res |
 |---|---|---|---|---|---|---|
 | 2.47 | 2 | 11.3658 | −0.22521 | 2.94e−01 | 47.3 | 1.6e−16 |
 | 2.47 | | 28.8205 | −0.19298 | 3.47e+16 | 24.4 | 1.9e−12 |
@@ -318,7 +327,8 @@ Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, pena
 
 ### 3.5 Three coexisting periods at the second fold
 
-Within `v_ref ∈ (2.45848, 2.48168)` the S-curve is cut three times. Crossings
+Within `v_ref ∈ (2.4785, 2.48168)` the S-curve is cut three times (below
+`2.4785` the long-long crossing is past the budget). Crossings
 from the M=40 full-tol branch (`tf` interpolated at fixed `v_ref`):
 
 | `v_ref` | cycle 1 (short) | cycle 2 (long) | cycle 3 (long-long) |
@@ -333,9 +343,27 @@ The three merge at the second fold (`tf = 67.67 s`) and cycle 1's value
 `10.833 s` matches the independent deflation/sampler result `10.8232 s`. The
 long-long sheet is **budget-truncated** at `tf ≈ 111.4 s` (it is still
 descending in `v_ref`), not closed by a fold, so a third fold or a homoclinic
-terminus beyond `tf = 111` is unresolved. Its stability was not measured (the
-state would have to come from a continuation); only the two 2.47 sheets were
-deflated.
+terminus beyond `tf = 111` is unresolved.
+
+**Floquet stability of the three cycles** (`scratch/_floquet_index.jl`): the
+tangent map is assembled from per-arc flow Jacobians and QR-reorthonormalised
+over 25 periods, so the trivial direction converges to ≈0 and the strongly
+unstable sheets do not overflow:
+
+| sheet | `tf` (s) | Floquet exponents (per period, M=40) | # stable dirs | # unstable dirs |
+|---|---|---|---|---|
+| short | 10.82 | `+0.09*`, −1.48, −7.99, −35.70 | **3** | 0 |
+| long | 49.22 | **+78.84**, `−0.07*`, −2.01, −183.91 | **2** | 1 |
+| long-long | 96.35 | **+174.37**, `−0.09*`, −6.81, −364.22 | **2** | 1 |
+
+`*` marks the trivial (≈0) direction. Counts are discretization-independent:
+the 2.47 pair at M=20 and M=40 agree (short: 3 stable; long: 2 stable / 1
+unstable). So the short cycle is attracting, while the long and long-long sheets
+each carry **one strongly unstable direction** — both are saddles, which is why
+fold 2 annihilates an unstable pair. Caveat: a fold requires the merging pair to
+differ in index by one, but this finite-time spectrum does not cleanly separate
+the near-`+1` fold-2 multiplier from the trivial, so the long-long index is a
+lower bound (≥1).
 
 ### 3.6 Two-cycle extraction at M=40 (and a silent non-convergence, fixed)
 
@@ -354,7 +382,7 @@ M=40 run was a tolerance/candidate-selection failure, not a different solution.
 Fix: `_regen` now tries candidates ordered by proximity to `v_ref` and accepts
 only an orbit that closes (cycle residual < `1e-7`). Rerun at M=40:
 
-| cycle | tf [s] | max non-trivial \|μ\| |
+| cycle | tf (s) | max non-trivial \|μ\| |
 |---|---|---|
 | short | 11.36577 | 0.2943 |
 | long | 28.82052 | 3.47e16 |

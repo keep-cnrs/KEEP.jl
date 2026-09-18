@@ -73,7 +73,7 @@ x_optimization = t -> solution_sim(t, idxs=1:4)  # normalized time
 tf_optimization = solution_sim.t[end]            # normalized period
 
 ## Conversion to physical time
-const T0 = p0.l / p0.v_ref        # characteristic time [s] at reference wind
+const T0 = p0.l / p0.v_ref        # characteristic time (s) at reference wind
 tf_physical = tf_optimization * T0
 
 "Sample the optimized cycle at physical time `t`: (α, τ, dα, dτ) in rad, rad/s."

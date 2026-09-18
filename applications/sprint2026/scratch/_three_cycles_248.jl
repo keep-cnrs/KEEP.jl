@@ -9,7 +9,7 @@
 #
 # Serializes scratch/three_cycles_shooting.jls in the SAME layout as
 # scratch/two_cycles_shooting.jls: (; short, long, longlong, v_ref), each
-#   (; x, t, u, p, tf)  with x = shooting unknown, t = PHYSICAL time [s],
+#   (; x, t, u, p, tf)  with x = shooting unknown, t = PHYSICAL time (s),
 #   u = 5×N BVP orbit.
 #
 # Run: MSTAR=40 julia --project=applications/sprint2026 scratch/_three_cycles_248.jl

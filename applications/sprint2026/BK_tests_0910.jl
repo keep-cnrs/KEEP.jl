@@ -83,8 +83,8 @@ function make_setup(; factor=5, opt=nothing)
     vbp = build_vbpara(CA(p0; params_opt...))
     solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
     tf = solution_sim.t[end]     # NORMALIZED period [units of T0]
-    T0 = lmt(vbp)[3]             # characteristic time [s] = l/v_ref (SI s per normalized unit)
-    tf_physical = tf * T0        # PHYSICAL period [s] at the reference wind
+    T0 = lmt(vbp)[3]             # characteristic time (s) = l/v_ref (SI s per normalized unit)
+    tf_physical = tf * T0        # PHYSICAL period (s) at the reference wind
 
     nt_p0 = NamedTuple(p0)::PARA_NT
     u0 = SA[x_optimization_phys(solution_sim, T0, 0.0)..., tf_physical]
@@ -657,7 +657,7 @@ function landscape(disc, bvp, x0, br, setup, plt_land; make_plots=true)
     good(rows) = [r.res < 1e-6 ? r.mu[2] : NaN for r in rows]   # mu sorted desc, [1] = trivial
 
     if make_plots
-        pa = plot(pc, tfc; label=string(nameof(typeof(disc))), xlabel="v_ref", ylabel="tf [s]",
+        pa = plot(pc, tfc; label=string(nameof(typeof(disc))), xlabel="v_ref", ylabel="tf (s)",
             title="limit-cycle branch (default params, optimization warm start)")
         pb = plot([r.v_ref for r in rows_down], good(rows_down); label="from v_ref=9 ↓",
             color=1, yscale=:log10, xlabel="v_ref", ylabel="max nontrivial |mu|",
@@ -741,10 +741,10 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
         plt2 = plot(layout=(2, 1), size=(800, 620))
         plot!(plt2[1], t1 ./ t1[end] .* tf1, u1[1, :]; label="short tf=$(round(tf1, digits=2)) s")
         plot!(plt2[1], t2 ./ t2[end] .* tf2, u2[1, :]; label="long  tf=$(round(tf2, digits=2)) s", lw=2,
-            xlabel="t [s]", ylabel="α [rad]", title="$discname: two cycles at v_ref=$VRT")
+            xlabel="t (s)", ylabel="α (rad)", title="$discname: two cycles at v_ref=$VRT")
         plot!(plt2[2], u1[1, :], u1[4, :]; label="short")
         plot!(plt2[2], u2[1, :], u2[4, :]; label="long", lw=2,
-            xlabel="α [rad]", ylabel="dτ [rad/s]", title="phase portrait")
+            xlabel="α (rad)", ylabel="dτ (rad/s)", title="phase portrait")
         savefig(plt2, joinpath(@__DIR__, "BK_tests_0910_two_cycles.png"))
     end
     verbose && println("two-cycles at v_ref=", VRT, ": tf = ", round(tf1, digits=2), " s (short), ",
@@ -797,7 +797,7 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
     t_orb, u_orb = orbit(method, bvp, raw_x(sol.u), setup.nt_p0)
     if make_plots
         plot(t_orb ./ t_orb[end] .* raw_x(sol.u)[5], u_orb[4, :];
-            label=string(discname), xlabel="t [s]", ylabel="dτ [rad/s]",
+            label=string(discname), xlabel="t (s)", ylabel="dτ (rad/s)",
             title="converged cycle at v_ref = $(setup.nt_p0.v_ref)")
         savefig(joinpath(@__DIR__, "BK_tests_0910_orbit.png"))
     end

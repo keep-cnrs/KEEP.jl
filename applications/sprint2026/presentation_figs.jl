@@ -15,8 +15,9 @@
 #
 # Dotted convention: a curve is dotted where it leaves the "solid window" set
 # for its panel (see dot_end). Windows are chosen so the short branch is dotted
-# for v_ref > 2.55 (zoom) / > 24 (full scale) and the long-long sheet for
-# tf > 105 s — i.e. where continuation stopped but the arc continues.
+# for v_ref > 2.55 (zoom) / > 24 (full scale), the long sheet for tf > 27 s on
+# the fold-1 zoom, and the long-long sheet for tf > 105 s — i.e. where the
+# curve continues past the point we chose to show.
 #
 # Run: julia --project=applications/sprint2026 applications/sprint2026/presentation_figs.jl
 
@@ -89,8 +90,10 @@ end
 Split a curve at ONE end against a window `(x_min, y_min, x_max, y_max)`:
 samples inside the window are solid, samples outside are dotted, stopping at
 the first sample that is back inside — so the middle of the series is never
-dotted. `where` is `:begin` (dot the head) or `:end` (dot the tail).
-Returns `(solid::UnitRange, dotted::UnitRange)`.
+dotted. `where` is `:begin` (dot the head) or `:end` (dot the tail). The
+boundary point is shared by both runs so the connector segment is drawn (no
+gap), and no dotted run is emitted when nothing actually leaves the window.
+Returns `(solid::UnitRange, dotted::UnitRange)` (an empty range for "none").
 """
 function dot_end(x, y, where::Symbol, window::NTuple{4,Real})
     xmin, ymin, xmax, ymax = window
@@ -98,10 +101,14 @@ function dot_end(x, y, where::Symbol, window::NTuple{4,Real})
     n = length(x)
     if where === :begin
         k = findfirst(inside)
-        return k === nothing ? (1:0, 1:n) : (k:n, 1:k-1)
+        k === nothing && return (1:0, 1:n)            # nothing inside → all dotted
+        k == 1 && return (1:n, 1:0)                    # nothing dotted
+        return (k:n, 1:k)                              # dotted head 1:k (shared k)
     elseif where === :end
         k = findlast(inside)
-        return k === nothing ? (1:0, 1:n) : (1:k, k+1:n)
+        k === nothing && return (1:0, 1:n)
+        k == n && return (1:n, 1:0)
+        return (1:k, k:n)                              # dotted tail k:n (shared k)
     end
     throw(ArgumentError("where must be :begin or :end, got $where"))
 end
@@ -114,9 +121,6 @@ function plot_end!(sp, x, y, where::Symbol, window::NTuple{4,Real};
     isempty(solid) || plot!(sp, x[solid], y[solid]; color=color, lw=lw, label=label)
     return sp
 end
-
-"y-position at fraction `f` of a (possibly log) axis with limits `yl`."
-yfrac(yl, f) = 10.0^(log10(yl[1]) + f * (log10(yl[2]) - log10(yl[1])))
 
 ## ===================================================================== ##
 ## Fig 1 — the branch and the coexisting flow attractor                    ##
@@ -133,69 +137,71 @@ end
 # rad/s. The LimitCycle/Poincaré helpers work in NORMALIZED units (L=2 m, M=6 kg,
 # time T0 = l/v_ref s): tf_SI = T_norm * T0, dα_SI = dα_norm / T0.
 const X_SHORT_ZOOM = 2.55      # short branch dotted beyond this on the zoom panels
-const TF_LL_DOT = 105.0        # long-long sheet dotted above this period
 const X_SHORT_FULL = 24.0      # short branch dotted beyond this on the full-scale panel
+const TF_LONG_DOT = 27.0      # long sheet dotted above this on the fold-1 zoom
+const TF_LL_DOT = 105.0        # long-long sheet dotted above this period
 
 function fig_fold_zoom(M=M_FIG)
     p, tf, i0, i2 = branch_layout(M)
     p1f, tf1f = p[i0], tf[i0]
     p2f, tf2f = p[i2], tf[i2]
 
-    PANELS = (
-        (xlims=(2.44, 2.56), ylims=(0.05, 200.0),
-            title="overview — S-curve with both folds"),
-        (xlims=(2.44, 2.56), ylims=(5.0, 40.0),
-            title="fold 1 zoom — low-wind saddle–node"),
-        (xlims=(2.4755, 2.4835), ylims=(40.0, 120.0),
-            title="fold 2 zoom — three coexisting periods"),
-    )
-    plt = plot(layout=(3, 1), size=(880, 1400), legend=:topright,
+    plt = plot(layout=(3, 1), size=(900, 1420), legend=:topright,
         plot_title="Limit-cycle branch: two folds ⇒ three periods in (v_ref*₁, v_ref*₂)")
 
-    for (k, spec) in enumerate(PANELS)
-        sp = plt[k]
-        xl, yl = spec.xlims, spec.ylims
-        plot!(sp; xlabel="v_ref [m/s]", ylabel="period  tf [s] (Physical SI, log)",
-            xlims=xl, ylims=yl, yscale=:log10, title=spec.title)
-        short_win = (xl[1], yl[1], X_SHORT_ZOOM, yl[2])
-        ll_win = (xl[1], yl[1], xl[2], TF_LL_DOT)
-        # short branch (stable) — dotted right tail (budget) on panels 1–2
-        if k == 3
-            plot!(sp, p[i0:end], tf[i0:end]; color=C_SHORT, lw=2.5, label="")
-        else
-            plot_end!(sp, p[i0:end], tf[i0:end], :end, short_win; color=C_SHORT, lw=2.5,
-                label=k == 1 ? "short branch, stable" : "",
-                dotted_label=k == 1 ? "  continues → (budget)" : "")
-        end
-        # long sheet (saddle) between the two folds
-        plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5,
-            label=k == 1 ? "long sheet, saddle" : "")
-        # long-long sheet (beyond fold 2) — dotted head (tf > 105 s, budget)
-        plot_end!(sp, p[1:i2], tf[1:i2], :begin, ll_win; color=C_LL, lw=2.5,
-            label=k == 1 ? "long-long, beyond fold 2" : "")
-        # fold tangents (vertical) coloured by the branch each fold belongs to
-        vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5,
-            label=k == 1 ? "fold 1  v_ref*₁ = $(round(p1f, digits=4))" : "")
-        vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5,
-            label=k == 1 ? "fold 2  v_ref*₂ = $(round(p2f, digits=4))" : "")
-        scatter!(sp, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
-            markerstrokecolor=:white, label="")
-        vline!(sp, [TWO_P]; color=:black, ls=:dashdot, lw=1.0,
-            label=k == 1 ? "anchor  v_ref = $(round(TWO_P, digits=2))" : "")
-        annotate!(sp, p1f + 0.004, yfrac(yl, 0.60),
-            text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
-        annotate!(sp, p2f + 0.0008, yfrac(yl, 0.87),
-            text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :left, 8, :gray30))
-        if k == 1
-            annotate!(sp, 2.505, yfrac(yl, 0.22), text("short branch →\n(budget past 2.55)", :left, 8, C_SHORT))
-            annotate!(sp, 2.4705, yfrac(yl, 0.96),
-                text("long-long continues ↑\n(past tf=$(round(TF_LL_DOT, digits=0)) s, budget)", :left, 8, C_LL))
-        end
-        if k == 3
-            annotate!(sp, 2.4758, yfrac(yl, 0.75),
-                text("anchor = 2.480 cuts\n3 times → 3 periods", :left, 8, :gray30))
-        end
-    end
+    ## panel 1 — overview ---------------------------------------------------
+    sp = plt[1]
+    xl, yl = (2.44, 2.56), (0.0, 120.0)
+    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        title="Overview: S-curve with both folds", left_margin=11Plots.mm)
+    plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
+        color=C_SHORT, lw=2.5, label="short branch, stable", dotted_label="  continues → (budget)")
+    plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="long sheet, saddle")
+    plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
+        color=C_LL, lw=2.5, label="long-long, beyond fold 2")
+    vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5,
+        label="fold 1  v_ref*₁ = $(round(p1f, digits=4))")
+    vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5,
+        label="fold 2  v_ref*₂ = $(round(p2f, digits=4))")
+    scatter!(sp, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
+        markerstrokecolor=:white, label="")
+    vline!(sp, [TWO_P]; color=:black, ls=:dashdot, lw=1.0,
+        label="anchor  v_ref = $(round(TWO_P, digits=2))")
+    annotate!(sp, p1f + 0.004, 0.55 * yl[2], text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
+    annotate!(sp, p2f + 0.0008, 0.80 * yl[2], text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :left, 8, :gray30))
+    annotate!(sp, 2.505, 0.05 * yl[2], text("short branch →\n(budget past 2.55)", :left, 8, C_SHORT))
+    annotate!(sp, 2.4705, 0.95 * yl[2],
+        text("long-long continues ↑\n(past tf=$(round(TF_LL_DOT, digits=0)) s, budget)", :left, 8, C_LL))
+    annotate!(sp, 2.4835, 0.50 * yl[2], text("3 intersections\nfor v_ref = 2.48", :left, 8, :gray30))
+
+    ## panel 2 — fold 1 zoom (no long-long, no fold-2 markers) --------------
+    sp = plt[2]
+    xl, yl = (2.44, 2.56), (0.0, 30.0)
+    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        title="fold 1 zoom", left_margin=11Plots.mm)
+    plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
+        color=C_SHORT, lw=2.5)
+    plot_end!(sp, p[i2:i0], tf[i2:i0], :begin, (xl[1], yl[1], xl[2], TF_LONG_DOT);
+        color=C_LONG, lw=2.5)
+    vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="")
+    scatter!(sp, [p1f], [tf1f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
+    vline!(sp, [TWO_P]; color=:black, ls=:dashdot, lw=1.0, label="")
+    annotate!(sp, p1f + 0.004, 0.62 * yl[2], text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
+
+    ## panel 3 — fold 2 zoom -------------------------------------------------
+    sp = plt[3]
+    xl, yl = (2.4755, 2.4835), (40.0, 120.0)
+    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        title="fold 2 zoom", left_margin=11Plots.mm)
+    plot!(sp, p[i0:end], tf[i0:end]; color=C_SHORT, lw=2.5, label="")
+    plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="")
+    plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
+        color=C_LL, lw=2.5)
+    vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="")
+    scatter!(sp, [p2f], [tf2f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
+    vline!(sp, [TWO_P]; color=:black, ls=:dashdot, lw=1.0, label="")
+    annotate!(sp, p2f - 0.0002, tf2f, text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :right, 8, :gray30))
+
     return plt
 end
 
@@ -206,10 +212,11 @@ function fig_full_scale(M=M_FIG)
     p, tf, i0, i2 = branch_layout(M)
     p1f, tf1f = p[i0], tf[i0]
     p2f, tf2f = p[i2], tf[i2]
-    xl, yl = (0.0, 25.0), (0.05, 200.0)
+    xl, yl = (0.0, 25.0), (0.0, 120.0)
     plt = plot(size=(1050, 600), legend=:topright,
-        xlims=xl, ylims=yl, yscale=:log10,
-        xlabel="v_ref [m/s]", ylabel="period  tf [s] (Physical SI, log)", title="Full-scale limit-cycle branch  (v_ref in [0, 25])", titlelocation=:center,
+        xlims=xl, ylims=yl,
+        xlabel="v_ref (m/s)", ylabel="Period (s)",
+        title="Full-scale limit-cycle branch  (v_ref in [0, 25])", titlelocation=:center,
         left_margin=12Plots.mm, bottom_margin=7Plots.mm)
     plot_end!(plt, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_FULL, yl[2]);
         color=C_SHORT, lw=2.5, label="short branch, stable", dotted_label="  continues → (budget)")
@@ -221,7 +228,7 @@ function fig_full_scale(M=M_FIG)
     vline!(plt, [TWO_P]; color=:black, ls=:dashdot, lw=1.0, label="anchor")
     scatter!(plt, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
         markerstrokecolor=:white, label="")
-    annotate!(plt, 8.0, yfrac(yl, 0.80),
+    annotate!(plt, 8.0, 0.80 * yl[2],
         text("no prograde cycle\nfor v_ref below fold 1", :left, 9, :gray30))
     return plt
 end
@@ -229,7 +236,7 @@ end
 ## ===================================================================== ##
 ## Fig 2 — phase portraits: all 6 coordinate planes                        ##
 ## ===================================================================== ##
-const LABELS = ["α [rad]", "τ [rad]", "dα [rad/s]", "dτ [rad/s]"]
+const LABELS = ["α (rad)", "τ (rad)", "dα (rad/s)", "dτ (rad/s)"]
 const PAIRS = [(1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
 
 function fig_phase_planes()
@@ -259,7 +266,7 @@ function fig_timeseries()
         plot_title="Prograde BVP solutions vs physical time at v_ref = $TWO_P ($ncyc cycles)")
     for i in 1:4
         plot!(plt[i], tshort, Ushort[i, :];
-            xlabel="t [s]", ylabel=LABELS[i], title=LABELS[i],
+            xlabel="t (s)", ylabel=LABELS[i], title=LABELS[i],
             color=C_SHORT, lw=2, label="short  tf=$(round(short.tf, digits=1)) s",
             left_margin=6Plots.mm, bottom_margin=5Plots.mm)
         plot!(plt[i], tlong, Ulong[i, :];
