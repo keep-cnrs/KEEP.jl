@@ -179,3 +179,207 @@ damped-Armijo pre-solve Newton with step capping, warm-starting MS from the
 converged collocation orbit, and doing all diagnostics on *one* persistent
 parameter set (snapshot `scratch/_opt_result_tmp.jl`) so any discrepancy is
 methodological, not setup noise.
+
+---
+
+## 3. The two folds of the low-wind branch, the arc-count sweep, and coexisting cycles
+
+### 3.1 Arc-count sweep (multiple shooting)
+
+`scratch/_arcs_sweep_one_tmp.jl` (fresh collocation warm start per M, one
+bothside continuation, loose tol `1e-6`, `max_steps=400`):
+
+| M | passes fold | long-leg tfmax | steps | wall | peak RSS* |
+|---|---|---|---|---|---|
+| 5 | no (p_min=2.876) | 6.3 | 621 | 16.8 s | — |
+| 10 | yes | 39.7 | 802 (budget) | 28.7 s | — |
+| 20 | yes | 58.8 | 688 | 22.2 s | — |
+| 40 | yes | 71.8 | 691 | 16.2 s | — |
+| 80 | yes | 111.4 | 802 (budget) | 29.7 s | — |
+| 100 | yes, but stalls on `dsmin` | 59.1 | 655 | 59.8 s | 1412 MiB |
+
+\* cumulative process peak (Julia + BK + Plots). At full tolerance
+(`scratch/_branch_fulltol.jl`, `max_steps=400`) both M=40 and M=80 reach
+`tfmax ≈ 111.4` and are budget-limited, so the finer method does **not** extend
+the reach at equal budget; M=100 is worse (smaller reach, slower) because its
+corrector underflows `ds`. **Chosen base M = 40** (smallest clean pass, cheapest
+per step); the extra arcs buy conditioning, not reach, here.
+
+### 3.2 The two turns are genuine quadratic saddle–nodes of the prograde branch
+
+From `scratch/brS_shoot.jls` (`i0 = argmin p`, `p_f = 2.458474`, `tf_f = 14.296`):
+
+- `p` has an *interior* minimum — strictly decreasing on the long leg, strictly
+  increasing on the short leg. A homoclinic/SNIC would instead have
+  `tf → ∞` with `p` monotone and no turn.
+- Local log–log exponent `(p − p_min) ∝ |tf − tf_f|^α`: **α = 2.10** (long leg),
+  **α = 2.03** (short leg) — quadratic tangency.
+- Tightest window (long leg, tf∈[14,15], 5 pts): fold law `p = p_f + γ(tf−tf_f)²`
+  gives RMS **4.6e-7 m/s**; the homoclinic log-law **9.6e-5** (200× worse).
+
+So "no prograde cycles below `v_ref*`" is correct **for this branch**.
+
+**Second fold.** The long-period side does not run away monotonically: on the
+full-tol branches the branch turns a *second* time, at a `p` **maximum**
+(`i2 = argmax p[1:i0]`). Identical at M=40 and M=80, so it is genuine, not a
+discretization artifact:
+
+| fold | `tf` [s] | `v_ref` | type |
+|---|---|---|---|
+| 1 | 14.44 | 2.45848 | `p` min (low-wind saddle–node) |
+| 2 | 67.67 | 2.48168 | `p` max (long-sheet saddle–node) |
+
+The branch is therefore an **S-curve**: short leg (tf 0.07→14.44), long sheet
+(14.44→67.67, `p` rising), and a **long-long sheet** (67.67→111+, `p` falling,
+still budget-truncated at `tf≈111.4`). For every `v_ref ∈ (2.45848, 2.48168)` a
+horizontal cut meets it **three times**, i.e. three coexisting prograde periods
+(see §3.3).
+
+### 3.3 The Poincaré sampler reproduces the branch (a units trap), and three periods at the second fold
+
+The BVP boundary condition (line 167 of `BK_tests_0910.jl`) enforces
+`τ(tf) − τ(0) = +2π`, so a cycle "verifies the BVP" iff it is **prograde**
+(`dτ0 > 0`). A retrograde cycle (`Δτ = −2π`) is a genuine flow solution but
+**not** a BVP solution, so it is out of scope by construction.
+`KEEP.LimitCycle.all_limit_cycles` (`scratch/_bvp_cycles_poincare_tmp.jl`,
+`N=40`, `vmax=12`, `α∈[−π,π]`, filtered to `build_shooting(lc)[3] > 0`)
+**returns NORMALIZED units** (L=2 m, M=6 kg, time `T0 = l/v_ref = 2.0/v_ref` s,
+velocities physical×`T0`). Converting to the branch's PHYSICAL/SI convention,
+`tf_SI = T·T0`, `dα_SI = dα0/T0`, `dτ_SI = dτ0/T0`:
+
+| `v_ref` | cycles | `T` (norm.) | `tf = T·T0` (SI) | branch short `tf` (SI) | `α0` | `dα0`(SI) | `dτ0`(SI) | power [W] |
+|---|---|---|---|---|---|---|---|---|
+| 2.42 | **0** | — | — | (below fold) | — | — | — | — |
+| 2.45 | **0** | — | — | (below fold) | — | — | — | — |
+| 2.4585 | **0** | — | — | 14.12 (at fold) | — | — | — | — |
+| 2.46 | 1 | 15.6537 | 12.727 | 12.858 (@2.4597) | −0.219 | +0.041 | +0.655 | 42 |
+| 2.47 | 1 | 14.0367 | **11.366** | **11.3658** | −0.225 | +0.044 | +0.671 | 48 |
+| 2.50 | 1 | 12.6874 | 10.150 | 10.025 | −0.233 | +0.049 | +0.695 | 56 |
+| 2.60 | 1 | 11.0111 | 8.470 | 8.467 | −0.251 | +0.062 | +0.760 | 75 |
+| 2.80 | 1 | 9.4972 | 6.784 | 6.652 | −0.279 | +0.089 | +0.886 | 110 |
+| 3.00 | 1 | 8.5795 | 5.720 | 5.790 | −0.303 | +0.121 | +1.017 | 150 |
+| 3.50 | 1 | 7.1232 | 4.070 | 4.019 | −0.359 | +0.230 | +1.377 | 287 |
+| 4.00 | 1 | 6.1822 | 3.091 | 3.058 | −0.410 | +0.388 | +1.788 | 487 |
+| 5.00 | 1 | 4.9596 | 1.984 | 1.965 | −0.503 | +0.892 | +2.758 | 1140 |
+| 7.00 | 1 | 3.6018 | 1.029 | 1.016 | −0.659 | +2.843 | +5.261 | 3847 |
+| 9.00 | 1 | 2.8263 | 0.6281 | 0.6281 | −0.777 | +6.255 | +8.465 | 9055 |
+
+Data: `scratch/bvp_cycles_poincare.jls`; branch column from
+`scratch/brS_shoot_M40_fulltol.jls`. Consequences:
+
+- **The sampler finds the blue short branch, exactly.** At `v_ref = 2.47` the
+  converted sampler cycle `(α0,dα0,dτ0,tf) = (−0.225, +0.044, +0.671, 11.366)`
+  equals the branch's `(−0.22521, +0.04439, +0.67054, 11.36577)`; seeding the
+  *normalized* Poincaré flow from the branch state returns the sampler's cycle
+  to 5 digits. An earlier figure overlaid `T` (normalized) against the branch's
+  `tf` (SI) and concluded, wrongly, that the sampler traced a **separate family**
+  with ≥3 coexisting prograde cycles. There is no separate family — that was a
+  unit mismatch. `presentation_figs.jl` no longer overlays it.
+- **No prograde cycle below the fold**: the sampler finds none at
+  `v_ref = 2.42, 2.45, 2.4585`, exactly as the fold requires.
+- **The sampler is attractor-only.** Its callback terminates when successive
+  section crossings agree, so it only sees *attracting* cycles. It therefore
+  finds the stable short branch and **misses** the long / long-long saddle
+  sheets. Enumerating those needs deflation (§3.4).
+- **Three periods coexist** for `v_ref ∈ (2.45848, 2.48168)` (the two folds of
+  §3.2). A cut at `v_ref = 2.480` meets the S-curve three times — short
+  `10.83 s`, long `49.22 s`, long-long `96.35 s` (§3.5).
+- A retrograde attractor also exists below the fold (`T ≈ 8.5 s`; diagnostic
+  `scratch/attractor_family.jls`, probe `scratch/_attractor_probe_tmp.jl`). It is
+  a real limit cycle but fails the BVP boundary condition, so it is not counted.
+
+### 3.4 Deflation: recovering the non-attracting cycles
+
+The Poincaré sampler is attractor-only, so the saddle sheets are invisible to it.
+Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, penalising
+`‖u−u_i‖^{-2p}+α`) is what reaches them. `scratch/_deflate_cycles.jl`
+(M=20, physical/SI BVP) at the two anchors:
+
+| `v_ref` | # cycles | `tf` [s] | `α0` [rad] | max non-trivial \|μ\| | power [W] | cycle res |
+|---|---|---|---|---|---|---|
+| 2.47 | 2 | 11.3658 | −0.22521 | 2.94e−01 | 47.3 | 1.6e−16 |
+| 2.47 | | 28.8205 | −0.19298 | 3.47e+16 | 24.4 | 1.9e−12 |
+| 9.00 | 1 | 0.6281 | −0.77710 | 2.80e−03 | 8736.6 | 1.8e−15 |
+
+- **Deflation demonstration (v_ref = 2.47):** with the *short* cycle deflated, a
+  deflated Newton started from the long state converges back to the **long
+  saddle** (`tf = 28.8205 s`) — i.e. deflation does reach the non-attracting
+  sheet, which the sampler cannot. The archived short/long periods are
+  reproduced exactly (`11.3658` / `28.8205`), and the freshly regenerated short
+  from the sampler agrees (`tf = 11.36575`), so the archived orbits are not stale.
+- **No extra cycle found.** Searching beyond the seeds (perturbed states) is not
+  usable with this machinery: a divergent shooting guess makes the adaptive
+  integrator crawl and `with_timeout` cannot interrupt it, so the search was
+  abandoned. A complete enumeration must be seeded from continuation-derived
+  states (see §3.7).
+- **Reference wind `v_ref = 9`** (the optimization wind, `build_vbpara()` default)
+  has exactly **one** prograde BVP cycle — the operating cycle. So a deflated
+  Newton there returns nothing new to seed an optimization with.
+
+### 3.5 Three coexisting periods at the second fold
+
+Within `v_ref ∈ (2.45848, 2.48168)` the S-curve is cut three times. Crossings
+from the M=40 full-tol branch (`tf` interpolated at fixed `v_ref`):
+
+| `v_ref` | cycle 1 (short) | cycle 2 (long) | cycle 3 (long-long) |
+|---|---|---|---|
+| 2.470 | 11.376 | 28.821 | — (not reached in budget) |
+| 2.478 | 10.919 | 42.442 | — |
+| **2.480** | **10.833** | **49.216** | **96.348** |
+| 2.4810 | 10.790 | 55.085 | 84.181 |
+| 2.4816 | 10.764 | 62.887 | 72.702 |
+
+The three merge at the second fold (`tf = 67.67 s`) and cycle 1's value
+`10.833 s` matches the independent deflation/sampler result `10.8232 s`. The
+long-long sheet is **budget-truncated** at `tf ≈ 111.4 s` (it is still
+descending in `v_ref`), not closed by a fold, so a third fold or a homoclinic
+terminus beyond `tf = 111` is unresolved. Its stability was not measured (the
+state would have to come from a continuation); only the two 2.47 sheets were
+deflated.
+
+### 3.6 Two-cycle extraction at M=40 (and a silent non-convergence, fixed)
+
+`scratch/_regen_two_cycles_tmp.jl` (`MSTAR=40`, Newton tol `1e-10`) re-extracts
+the `v_ref = 2.47` pair at 40 arcs. First attempt gave short `tf = 11.36577 s`
+(reproduces the archive) but long `tf = 17.15 s`, not the archived `28.82 s`.
+The `17.15` orbit did **not** close — cycle residual `2.1e-3`
+(`|α(tf)−α(0)|` etc.) — i.e. the fixed-parameter Newton from a near-fold
+candidate failed to converge and the script reported it anyway. Diagnosis: at
+`v_ref = 2.47` the long branch crosses once, at `tf ≈ 29 s` (from the M=40
+full-tol branch: `p = 2.47014` at `tf = 28.998`), but `longs[1]` picked the
+smallest candidate above `1.3·tf_short` — a near-fold point whose refine did not
+close. The archive's `28.82 s` orbit closes to `5.7e-15`, so it was right and the
+M=40 run was a tolerance/candidate-selection failure, not a different solution.
+
+Fix: `_regen` now tries candidates ordered by proximity to `v_ref` and accepts
+only an orbit that closes (cycle residual < `1e-7`). Rerun at M=40:
+
+| cycle | tf [s] | max non-trivial \|μ\| |
+|---|---|---|
+| short | 11.36577 | 0.2943 |
+| long | 28.82052 | 3.47e16 |
+
+both closing to ~`1e-14` and matching the archived pair (Finding 9's long-sheet
+`|μ| ≈ 3.5e16`). So the documented pair is confirmed at M=40, and
+`two_cycles_shooting_M40.jls` / `two_cycles_M40_validated.jls` now hold it; the
+figures keep using `two_cycles_shooting.jls` (identical values).
+
+### 3.7 What's next
+
+- **Optimization seeding.** The optimization is warm-started from a single
+  operating orbit. If a deflated Newton at the reference wind (`v_ref = 9`)
+  returned a *distinct, stable, higher-power* cycle, it could seed a second
+  `optimize()` run to test for a better operating point. At present deflation
+  finds only the known operating cycle there, so there is nothing to seed with —
+  but the hook is cheap to add once a richer anchor (e.g. the 2.48 three-cycle
+  window) yields a stable alternative.
+- **Full deflation enumeration.** The perturbation search was abandoned because
+  divergent shooting guesses stall the integrator. A complete sweep should seed
+  from *continuation-derived* states on every sheet (short, long, long-long at
+  2.48) and deflate them jointly, then probe with continuation-adjacent guesses —
+  bounded per attempt (a cooperative cancellation hook, or a per-attempt thread
+  kill).
+- **Third fold / homoclinic.** The long-long sheet is budget-truncated at
+  `tf ≈ 111 s` and still descending in `v_ref`; a longer continuation would show
+  whether it folds a third time (a fourth coexisting period) or runs to a
+  homoclinic terminus.

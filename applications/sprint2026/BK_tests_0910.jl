@@ -82,9 +82,9 @@ function make_setup(; factor=5, opt=nothing)
 
     vbp = build_vbpara(CA(p0; params_opt...))
     solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
-    tf = solution_sim.t[end]     # normalized period [units of T0]
-    T0 = lmt(vbp)[3]             # characteristic time [s] of the OPTIMIZED set
-    tf_physical = tf * T0        # physical period [s] at the reference wind
+    tf = solution_sim.t[end]     # NORMALIZED period [units of T0]
+    T0 = lmt(vbp)[3]             # characteristic time [s] = l/v_ref (SI s per normalized unit)
+    tf_physical = tf * T0        # PHYSICAL period [s] at the reference wind
 
     nt_p0 = NamedTuple(p0)::PARA_NT
     u0 = SA[x_optimization_phys(solution_sim, T0, 0.0)..., tf_physical]
@@ -104,7 +104,16 @@ end
 ## ===================================================================== ##
 ## BVP model — physical time                                             ##
 ## ===================================================================== ##
-# State u = (α, τ, dα, dτ, tf), integration variable s ∈ [0, 1] spans one period:
+# UNITS. Two conventions meet here:
+#  - NORMALIZED (L=2 m, M=6 kg, time T0 = l/v_ref s): PM4.dynamics, the
+#    optimization, and KEEP.LimitCycle (Poincaré) all live here. Their times
+#    are `t_norm`, their velocities physical×T0.
+#  - PHYSICAL/SI: the BVP unknown below. dα, dτ in rad/s, ddα, ddτ in rad/s²,
+#    `tf` in seconds. Bridge: t_SI = t_norm * T0, dα_SI = dα_norm / T0, with
+#    T0 = lmt(p)[3] = l/v_ref.
+#
+# State u = (α, τ, dα, dτ, tf) [α,τ in rad; dα,dτ in rad/s; tf in s],
+# integration variable s ∈ [0, 1] spans one period:
 # du/ds = tf * [dα, dτ, ddα, ddτ, 0] with dα, dτ in rad/s and ddα, ddτ in rad/s².
 # Reference implementation: rebuilds a ComponentArray on EVERY call (~5 μs).
 # Kept only for validation of `F_fast`.
@@ -191,8 +200,12 @@ const ODE_ALG = let name = get(ENV, "BK_ODE_ALG", "Vern9")
 end
 
 "Selected discretizer. Uncomment the alternative line to switch method."
-build_disc() = BVP.Collocation(Ntst=30, m=5, meshadapt=true)  # ← collocation
-# build_disc() = BVP.Shooting(10, ODE_ALG, true)               # ← multiple shooting
+# Multiple shooting, 40 arcs (arc sweep, scratch/_arcs_sweep_one_tmp.jl): M=5 fails to
+# reach the fold; M=10/15/20 pass but stall earlier / are budget-limited; at full tol
+# M=40 and M=80 both reach tfmax≈111 s (budget), and M=100 is worse (corrector
+# underflows ds, smaller reach, slower). M=40 is the cheapest clean pass.
+build_disc() = BVP.Shooting(40, ODE_ALG, true)                # ← multiple shooting
+# build_disc() = BVP.Collocation(Ntst=30, m=5, meshadapt=true) # ← collocation (stalls above the fold)
 
 "RHS-function model for collocation; Shooting requires an ODEProblem model."
 make_model(::BVP.Collocation, setup) = BVP.BVPModel(F_fast, g; n=setup.state_size)

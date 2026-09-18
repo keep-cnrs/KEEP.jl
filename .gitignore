@@ -37,3 +37,9 @@ Manifest*.toml
 
 # Ignore program outputs
 out/
+
+# Figures / animations / serialized data — publish individual files with `git add -f`
+*.png
+*.jls
+*.mp4
+*.gif
