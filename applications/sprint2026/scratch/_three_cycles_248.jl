@@ -1,8 +1,8 @@
 # Three coexisting prograde limit cycles at v_ref = 2.48 (inside the window
 # between the two folds), for the comparison figures.
 #
-# The three cycles are three crossings of ONE continuation path (short sheet ->
-# fold 1 -> long sheet -> fold 2 -> long-long sheet), so a branch continuation
+# The three cycles are three crossings of ONE continuation path (short branch ->
+# fold 1 -> long branch -> fold 2 -> long-long branch), so a branch continuation
 # that KEEPS its solutions (`ContResult.sol`) yields all three orbits. This is
 # the only reliable way to get the long-long state: it is a saddle the Poincare
 # sampler never reaches and there is no intermediate archive to seed Newton.

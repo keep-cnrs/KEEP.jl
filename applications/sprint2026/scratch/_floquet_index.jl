@@ -1,7 +1,7 @@
 # Floquet stability index of the coexisting prograde cycles, from their shooting
 # orbits, by a reorthonormalised (QR) product of per-arc flow Jacobians.
 #
-# A raw product of the per-arc Jacobians is dominated by the unstable sheets'
+# A raw product of the per-arc Jacobians is dominated by the unstable branches'
 # growth (|mu| ~ 1e34 for long, 1e75 for long-long at v_ref=2.48), so the
 # tangent map Phi is re-QR'd after EVERY arc and log|diag(R)| accumulated over
 # `nper` periods -> Lyapunov exponents, whose signs give the number of stable

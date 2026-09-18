@@ -26,14 +26,14 @@
 #    `bothside=true`). `bothside=true` looks equivalent to running ds>0 and
 #    ds<0, but is not — see the continuation section below. Findings:
 #
-#    * Family topology (physical units): main sheet tf(v_ref) ≈ 0.63 s at
+#    * Family topology (physical units): main branch tf(v_ref) ≈ 0.63 s at
 #      v_ref = 9 m/s falling monotonically to ≈ 0.12 s at 20 m/s; below 9 m/s
 #      the period grows without bound (tf ≈ 47.7 s at v_ref = 2.4585, still
 #      growing at continuation budget — no true low-wind endpoint found); a
 #      fold tangle (detected folds at v_ref ≈ 9.31, 9.30, 9.46, 9.54, 9.72)
-#      crowds sheets just above 9 m/s.
+#      crowds branches just above 9 m/s.
 #    * Collocation and multiple shooting agree on the period to ~1e-6 s
-#      wherever both track the same sheet (checked at v_ref = 8, 9, 10 m/s).
+#      wherever both track the same branch (checked at v_ref = 8, 9, 10 m/s).
 
 using Pkg
 Pkg.activate("applications/sprint2026")
@@ -263,17 +263,17 @@ optc = ContinuationPar(
 #   family — this produced the "both branches go right from v_ref = 9" artifact.
 # * The merged branch gives each leg neither its own budget nor a direction
 #   label; near the fold tangle at v_ref ≈ 8.7–9.7 the corrector can land on a
-#   different sheet (observed: a single recorded step moved Δp = 0.27 with
+#   different branch (observed: a single recorded step moved Δp = 0.27 with
 #   dsmax = 0.1 — impossible for a true PALC step, whose tangent is a unit
-#   vector, so the Newton correction left the sheet) and then silently spend
-#   the whole budget on the wrong sheet.
+#   vector, so the Newton correction left the branch) and then silently spend
+#   the whole budget on the wrong branch.
 # Two separate runs give each direction its own budget and make the step-size
 # sanity check below meaningful (recorded points must satisfy |Δp| ≤ dsmax).
 continuation_side(ds) = continuation(prob, PALC(), @set optc.ds = ds;
     plot=false, verbosity=1, normC=norminf)
 
 "Recorded PALC points satisfy |Δp| ≤ dsmax; larger gaps flag corrector
-sheet-jumps (only possible where sheets crowd, i.e. near folds)."
+sheet-jumps (only possible where branches crowd, i.e. near folds)."
 function sheet_jumps(br; dsmax=0.1, factor=1.5)
     return [i for i in 2:length(br)
                   if abs(br.sol[i].p - br.sol[i-1].p) > factor * dsmax]

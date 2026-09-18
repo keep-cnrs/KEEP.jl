@@ -1,7 +1,7 @@
 # Deflated enumeration of coexisting prograde limit cycles of the physical-time
 # BVP at one wind. The Poincare sampler (all_limit_cycles) only finds ATTRACTING
 # cycles; deflation penalises a known root so a Newton step can land on a saddle
-# sheet (or on a disconnected cycle) instead.
+# branches (or on a disconnected cycle) instead.
 #
 # Two anchors:
 #   VREF=2.47  -> the archived short + long (saddle) pair is a valid solution;

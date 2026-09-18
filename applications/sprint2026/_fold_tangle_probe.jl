@@ -2,14 +2,14 @@
 #
 # QUESTION
 #   `BK_tests_0910.jl` / REPORT.md report a "fold tangle" near v_ref ≈ 9.2–9.8 m/s
-#   (several :fold special points crowding sheets, plus corrector sheet-jumps).
+#   (several :fold special points crowding branches, plus corrector sheet-jumps).
 #   Is anything genuinely new there — real saddle-nodes / extra periodic orbits —
 #   or is it a continuation artifact (BK's `detect_fold` firing on a nearly flat
 #   tf(v_ref) plus the corrector hopping between symmetry-related cycles)?
 #
 # TESTS (all independent of the BK continuation that produced the tangle)
 #   A. Ground-truth Floquet multipliers of the tracked stable cycle over
-#      [8.8, 10.2]. A genuine fold of THIS sheet requires a nontrivial |mu| → 1.
+#      [8.8, 10.2]. A genuine fold of THIS branch requires a nontrivial |mu| → 1.
 #   B. Orbit census by KEEP Poincaré sampling (`all_limit_cycles`) in the band:
 #      how many distinct cycles exist, and are they just the α ↔ −α mirror pair?
 #   C. The archived BK branch trace (`scratch/brA_ds002.jls`): does the recorded
@@ -68,8 +68,8 @@ function sweep(s0, vrefs)
 end
 
 ## ---------------------------------------------------------------- A ---------
-println("=== A. ground-truth |mu| of the tracked stable sheet, v_ref ∈ [8.8, 10.2] ===")
-println("     (a genuine fold of this sheet needs max nontrivial |mu| -> 1)")
+println("=== A. ground-truth |mu| of the tracked stable branch, v_ref ∈ [8.8, 10.2] ===")
+println("     (a genuine fold of this branch needs max nontrivial |mu| -> 1)")
 rows_up = sweep(S9, collect(9.0:0.02:10.2))
 rows_dn = sweep(S9, collect(9.0:-0.02:8.8))
 @printf("  v_ref     tf (s)     max|mu|!=1\n")
@@ -120,13 +120,13 @@ println("  p monotone across band ? ", all(Δp .>= -1e-9) || all(Δp .<= 1e-9))
 # ARTIFACT, not a physical saddle-node, and it hides no new orbits.
 #
 # Evidence (all at default params, the setting the tangle was reported for):
-#   A. Ground-truth Floquet multipliers of the tracked stable sheet are
+#   A. Ground-truth Floquet multipliers of the tracked stable branch are
 #      ≤ 4.8e-3 across v_ref ∈ [8.8, 10.2] (rising smoothly with v_ref) —
 #      nowhere near the +1 a genuine fold requires. tf(v_ref) is smooth and
 #      monotone decreasing (0.657 s @ 8.8 → 0.489 s @ 10.2): no turnaround.
 #   B. Independent Poincaré census finds exactly 2 cycles at every v_ref in
 #      [9.0, 10.0]: the known α ↔ −α mirror pair, both stable. No subharmonics,
-#      no extra sheets.
+#      no extra branches.
 #   C. The archived BK collocation trace in the band shows parameter reversals
 #      but NO step-size collapse (|ds| ∈ [0.005, 0.02]); the reversals sit at
 #      the `bothside` seam (p = 9.0, ds = ∓0.005) plus a mild wobble near 9.21.

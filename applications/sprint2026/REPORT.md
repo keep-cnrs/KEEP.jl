@@ -58,12 +58,12 @@ optimized cycle continues as the family below (`tf` = physical period):
 
 ![Branch topology](fig_branch.png)
 
-* **Main sheet** (top panel): `tf` falls monotonically from 0.628 s at 9 m/s to
+* **Main branch** (top panel): `tf` falls monotonically from 0.628 s at 9 m/s to
   ≈ 0.12 s at 20 m/s. Collocation, multiple shooting and the bothside runs all
   coincide on it.
 * **Fold tangle at v_ref ≈ 9.2–9.8 m/s** (shaded): several periodic-orbit
-  sheets crowd together (detected folds at 9.24, 9.30, 9.46, 9.54, 9.84 m/s).
-  Near it, Newton's corrector can land on a different sheet than the predictor —
+  branches crowd together (detected folds at 9.24, 9.30, 9.46, 9.54, 9.84 m/s).
+  Near it, Newton's corrector can land on a different branch than the predictor —
   the red ✕ markers flag recorded steps with |Δp| > 1.5·dsmax, impossible for a
   true PALC step and therefore the signature of a sheet-jump.
 * **Low-wind fold** (bottom): the period grows steeply as the wind decreases
@@ -73,9 +73,9 @@ optimized cycle continues as the family below (`tf` = physical period):
 
 ## 3. Collocation and multiple shooting agree
 
-Both discretizations trace the same sheets. On sheet-matched, smooth segments
-the relative period difference is **≤ 3.0e-5 on the main sheet** and **≤ 8.6e-4
-on the low-wind sheet** (where tf is large and sensitive).
+Both discretizations trace the same branches. On branch-matched, smooth segments
+the relative period difference is **≤ 3.0e-5 on the main branch** and **≤ 8.6e-4
+on the low-wind branch** (where tf is large and sensitive).
 
 ![MS vs collocation](fig_ms_vs_coll.png)
 
@@ -106,7 +106,7 @@ smaller") had two independent, non-physical causes, both fixed in
 3. **Explicit record** of the physical period (above).
 4. **Two explicit single-direction continuations** (`ds = ±0.01`) instead of
    `bothside=true`, each with its own budget, plus a `sheet_jumps()` sanity
-   check (|Δp| > 1.5·dsmax ⇒ Newton left the sheet near the fold tangle).
+   check (|Δp| > 1.5·dsmax ⇒ Newton left the branch near the fold tangle).
 5. Warm start: damped-Armijo pre-solve Newton (BK's plain `Newton` overshoots),
    multiple shooting warm-started from the converged collocation orbit.
    Integrator: **Tsit5** with abstol = reltol = 1e-10 (an order of magnitude
@@ -161,9 +161,9 @@ distinct discoveries, each forced by an observed symptom:
    Single-direction runs behave perfectly; the merged result does not.
 
 4. **Sheet jumps near v_ref ≈ 9.2–9.8.** Recorded steps with |Δp| > dsmax
-   (impossible for PALC) revealed Newton corrections landing on adjacent sheets
-   in the fold tangle, then riding the wrong sheet to the budget. Fresh-mesh
-   runs jump; runs with mesh history reached the low-wind sheet — the tangle
+   (impossible for PALC) revealed Newton corrections landing on adjacent branches
+   in the fold tangle, then riding the wrong branch to the budget. Fresh-mesh
+   runs jump; runs with mesh history reached the low-wind branch — the tangle
    makes the corrector basin history-dependent. This motivated the explicit
    `sheet_jumps()` check and replacing `bothside=true` with two explicit runs.
 
@@ -189,7 +189,7 @@ methodological, not setup noise.
 `scratch/_arcs_sweep_one_tmp.jl` (fresh collocation warm start per M, one
 bothside continuation, loose tol `1e-6`, `max_steps=400`):
 
-| M | passes fold | long-leg tfmax | steps | wall | peak RSS* |
+| M | passes fold | long-branch tfmax | steps | wall | peak RSS* |
 |---|---|---|---|---|---|
 | 5 | no (p_min=2.876) | 6.3 | 621 | 16.8 s | — |
 | 10 | yes | 39.7 | 802 (budget) | 28.7 s | — |
@@ -209,12 +209,12 @@ per step); the extra arcs buy conditioning, not reach, here.
 
 From `scratch/brS_shoot.jls` (`i0 = argmin p`, `p_f = 2.458474`, `tf_f = 14.296`):
 
-- `p` has an *interior* minimum — strictly decreasing on the long leg, strictly
-  increasing on the short leg. A homoclinic/SNIC would instead have
+- `p` has an *interior* minimum — strictly decreasing on the long-branch, strictly
+  increasing on the short-branch. A homoclinic/SNIC would instead have
   `tf → ∞` with `p` monotone and no turn.
-- Local log–log exponent `(p − p_min) ∝ |tf − tf_f|^α`: **α = 2.10** (long leg),
-  **α = 2.03** (short leg) — quadratic tangency.
-- Tightest window (long leg, tf∈[14,15], 5 pts): fold law `p = p_f + γ(tf−tf_f)²`
+- Local log–log exponent `(p − p_min) ∝ |tf − tf_f|^α`: **α = 2.10** (long-branch),
+  **α = 2.03** (short-branch) — quadratic tangency.
+- Tightest window (long-branch, tf∈[14,15], 5 pts): fold law `p = p_f + γ(tf−tf_f)²`
   gives RMS **4.6e-7 m/s**; the homoclinic log-law **9.6e-5** (200× worse).
 
 So "no prograde cycles below `v_ref*`" is correct **for this branch**.
@@ -232,12 +232,12 @@ discretization artifact:
 Both turns are saddle–nodes of the branch (a nontrivial Floquet multiplier passes
 through `+1`, quadratic tangency above). What differs is the *global* stability of
 the merging pair: at fold 1 the stable short cycle meets the unstable long cycle,
-while at fold 2 the long and long-long sheets — **both unstable** — merge, so the
+while at fold 2 the long and long-long branches — **both unstable** — merge, so the
 second fold annihilates two saddles and leaves only the stable short cycle for
 `v_ref > 2.48168`. Counts in §3.5.
 
-The branch is therefore an **S-curve**: short leg (tf 0.07→14.44), long sheet
-(14.44→67.67, `p` rising), and a **long-long sheet** (67.67→111+, `p` falling,
+The branch is therefore an **S-curve**: short-branch (tf 0.07→14.44), long branch
+(14.44→67.67, `p` rising), and a **long-long branch** (67.67→111+, `p` falling,
 still budget-truncated at `tf≈111.4`). A horizontal cut meets the *computed*
 branch **three times** for `v_ref ∈ (2.4785, 2.48168)` — i.e. three coexisting
 prograde periods; below that the third (long-long) crossing lies beyond the
@@ -288,7 +288,7 @@ Data: `scratch/bvp_cycles_poincare.jls`; branch column from
 - **The sampler is attractor-only.** Its callback terminates when successive
   section crossings agree, so it only sees *attracting* cycles. It therefore
   finds the stable short branch and **misses** the long / long-long saddle
-  sheets. Enumerating those needs deflation (§3.4).
+  branches. Enumerating those needs deflation (§3.4).
 - **Three periods coexist** for `v_ref ∈ (2.4785, 2.48168)` (the computed part of
   the two folds of §3.2; below `2.4785` the long-long crossing is budget-truncated).
   A cut at `v_ref = 2.480` meets the S-curve three times — short `10.83 s`, long
@@ -299,7 +299,7 @@ Data: `scratch/bvp_cycles_poincare.jls`; branch column from
 
 ### 3.4 Deflation: recovering the non-attracting cycles
 
-The Poincaré sampler is attractor-only, so the saddle sheets are invisible to it.
+The Poincaré sampler is attractor-only, so the saddle branches are invisible to it.
 Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, penalising
 `‖u−u_i‖^{-2p}+α`) is what reaches them. `scratch/_deflate_cycles.jl`
 (M=20, physical/SI BVP) at the two anchors:
@@ -313,7 +313,7 @@ Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, pena
 - **Deflation demonstration (v_ref = 2.47):** with the *short* cycle deflated, a
   deflated Newton started from the long state converges back to the **long
   saddle** (`tf = 28.8205 s`) — i.e. deflation does reach the non-attracting
-  sheet, which the sampler cannot. The archived short/long periods are
+  branch, which the sampler cannot. The archived short/long periods are
   reproduced exactly (`11.3658` / `28.8205`), and the freshly regenerated short
   from the sampler agrees (`tf = 11.36575`), so the archived orbits are not stale.
 - **No extra cycle found.** Searching beyond the seeds (perturbed states) is not
@@ -341,16 +341,16 @@ from the M=40 full-tol branch (`tf` interpolated at fixed `v_ref`):
 
 The three merge at the second fold (`tf = 67.67 s`) and cycle 1's value
 `10.833 s` matches the independent deflation/sampler result `10.8232 s`. The
-long-long sheet is **budget-truncated** at `tf ≈ 111.4 s` (it is still
+long-long branch is **budget-truncated** at `tf ≈ 111.4 s` (it is still
 descending in `v_ref`), not closed by a fold, so a third fold or a homoclinic
 terminus beyond `tf = 111` is unresolved.
 
 **Floquet stability of the three cycles** (`scratch/_floquet_index.jl`): the
 tangent map is assembled from per-arc flow Jacobians and QR-reorthonormalised
 over 25 periods, so the trivial direction converges to ≈0 and the strongly
-unstable sheets do not overflow:
+unstable branches do not overflow:
 
-| sheet | `tf` (s) | Floquet exponents (per period, M=40) | # stable dirs | # unstable dirs |
+| branch | `tf` (s) | Floquet exponents (per period, M=40) | # stable dirs | # unstable dirs |
 |---|---|---|---|---|
 | short | 10.82 | `+0.09*`, −1.48, −7.99, −35.70 | **3** | 0 |
 | long | 49.22 | **+78.84**, `−0.07*`, −2.01, −183.91 | **2** | 1 |
@@ -358,7 +358,7 @@ unstable sheets do not overflow:
 
 `*` marks the trivial (≈0) direction. Counts are discretization-independent:
 the 2.47 pair at M=20 and M=40 agree (short: 3 stable; long: 2 stable / 1
-unstable). So the short cycle is attracting, while the long and long-long sheets
+unstable). So the short cycle is attracting, while the long and long-long branches
 each carry **one strongly unstable direction** — both are saddles, which is why
 fold 2 annihilates an unstable pair. Caveat: a fold requires the merging pair to
 differ in index by one, but this finite-time spectrum does not cleanly separate
@@ -387,7 +387,7 @@ only an orbit that closes (cycle residual < `1e-7`). Rerun at M=40:
 | short | 11.36577 | 0.2943 |
 | long | 28.82052 | 3.47e16 |
 
-both closing to ~`1e-14` and matching the archived pair (Finding 9's long-sheet
+both closing to ~`1e-14` and matching the archived pair (Finding 9's long-branch
 `|μ| ≈ 3.5e16`). So the documented pair is confirmed at M=40, and
 `two_cycles_shooting_M40.jls` / `two_cycles_M40_validated.jls` now hold it; the
 figures keep using `two_cycles_shooting.jls` (identical values).
@@ -403,11 +403,11 @@ figures keep using `two_cycles_shooting.jls` (identical values).
   window) yields a stable alternative.
 - **Full deflation enumeration.** The perturbation search was abandoned because
   divergent shooting guesses stall the integrator. A complete sweep should seed
-  from *continuation-derived* states on every sheet (short, long, long-long at
+  from *continuation-derived* states on every branch (short, long, long-long at
   2.48) and deflate them jointly, then probe with continuation-adjacent guesses —
   bounded per attempt (a cooperative cancellation hook, or a per-attempt thread
   kill).
-- **Third fold / homoclinic.** The long-long sheet is budget-truncated at
+- **Third fold / homoclinic.** The long-long branch is budget-truncated at
   `tf ≈ 111 s` and still descending in `v_ref`; a longer continuation would show
   whether it folds a third time (a fourth coexisting period) or runs to a
   homoclinic terminus.

@@ -412,7 +412,7 @@ function damped_newton(prob, x0, params; tol=1e-8, max_iter=200, Δmax=1.0)
 end
 
 "Recorded PALC points satisfy |Δp| ≤ dsmax; larger gaps flag corrector
-sheet-jumps (only possible where sheets crowd, i.e. near folds). Uses the
+sheet-jumps (only possible where branches crowd, i.e. near folds). Uses the
 branch param column — `br.sol` is a single saved solution, not the path."
 function sheet_jumps(br; factor=1.5)
     dsmax = br.contparams.dsmax
@@ -702,7 +702,7 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     # dsmax=0.1 steps may skip VRT, so widen the window, then refine candidate
     # cycles at exactly VRT with a fixed-parameter damped Newton. The two-cycle
     # decision is made AFTER refinement: the raw tf spread over the window is
-    # merely the branch's tf(p) variation (points from both legs share one sheet
+    # merely the branch's tf(p) variation (points from both legs share one branch
     # when the fold was not passed), so only genuinely separated refined periods
     # count as two cycles.
     cand = [(i, s.p, raw_x(s.x)[5]) for (i, s) in enumerate(br.sol) if abs(s.p - VRT) < 0.12]
@@ -924,7 +924,7 @@ end
 #    save_sol_every_step = 1, so the single multiple-shooting continuation
 #    already stores BOTH crossings in br.sol; select those with
 #    |s.p - v_ref*| < tol, sort by raw_x(s.x)[5], take the candidates nearest
-#    v_ref on each sheet, then Newton-refine each at v_ref*. Collocation does
+#    v_ref on each branch, then Newton-refine each at v_ref*. Collocation does
 #    NOT pass the fold (it stalls at v_ref ≈ 2.4868, tf ≈ 10.56 s), so it
 #    yields only the short cycle — the "try both discretizations" check.
 #    MULTIPLIER CAVEAT: a naive single-shooting period-map FD CANNOT measure
@@ -934,7 +934,7 @@ end
 #    monodromy) — `monodromy`/`monodromy_max` above, applied to both crossings
 #    in the two-cycles block. The historical extraction/plotting scripts are
 #    archived under `scratch/` (`_two_cycles_bk.jl`, `_two_cycles_floquet.jl`).
-#    The long-cycle tf/|mu| quoted above is the archived run's; which long-sheet
+#    The long-cycle tf/|mu| quoted above is the archived run's; which long-branch
 #    point the in-script selection refines depends on the continuation budget.
 #
 # 10. SHOOTING JACOBIAN. BK's `AutoDiffDense` differentiates the whole residual
@@ -955,7 +955,7 @@ end
 # Continuation then sweeps v_ref. The stable "short" cycle runs tf ≈ 0.63 s @ 9 → 0.12 s @ 20 m/s.
 # Low wind: the family folds at v_ref* ≈ 2.458 m/s (tf ≈ 14.3 s), and the second, long-period branch beyond it is a strongly unstable saddle cycle. That fold is the "hard to pass" part numerically (collocation stalls just above it; multiple shooting gets through).
 # But that's not all that's in here — three secondary things:
-# 1. Fold tangle near 9.2–9.8 m/s: several folds crowd sheets, so the Newton corrector can jump sheets.
+# 1. Fold tangle near 9.2–9.8 m/s: several folds crowd branches, so the Newton corrector can jump branches.
 # 2. Coexisting mirror cycles (symmetry α,dτ → −α,−dτ), found by Poincaré sampling, not by a single continuation.
 # 3. Equilibria: 8 (4 mirror pairs), all unstable everywhere; no clean Hopf generates the cycle in the reachable range.
 # So: the headline phenomenon is the low-wind fold + unstable long branch; the tangle, the mirror pair, and the all-unstable equilibria are the side structure.

@@ -33,7 +33,7 @@ function branch_fulltol(M, setup)
     serialize(joinpath(@__DIR__, "brS_shoot_M$(M)_fulltol" *
         (MAXSTEPS == 400 ? "" : "_max$(MAXSTEPS)") * ".jls"),
         (; p=p, tf=tf, M=M, secs=time() - t0, res_pre=res_pre, maxsteps=MAXSTEPS))
-    @printf("M=%3d  n=%3d  pmin=%.8f (tf=%.3f)  long-leg tfmax=%.2f  short-leg tfmin=%.4f  %.1fs  rss=%.0fMiB  maxsteps=%d\n",
+    @printf("M=%3d  n=%3d  pmin=%.8f (tf=%.3f)  long-branch tfmax=%.2f  short-branch tfmin=%.4f  %.1fs  rss=%.0fMiB  maxsteps=%d\n",
         M, length(p), p[i0], tf[i0], maximum(tf[1:i0]), minimum(tf[i0:end]), time() - t0,
         Sys.maxrss() / 2^20, MAXSTEPS)
     flush(stdout)
