@@ -10,8 +10,8 @@ Pkg.activate(@__DIR__)
 using KEEP
 using KEEP.PointMassPara: build_para, build_vbpara
 using KEEP.PointMass4: integrate
-using KEEP.LimitCycle: compute_limit_cycle, build_shooting, unpack_shooting,
-    endpoint_residuals
+using KEEP.LimitCycle:
+    compute_limit_cycle, build_shooting, unpack_shooting, endpoint_residuals
 using StaticArrays, LinearAlgebra, Printf, Logging
 Logging.disable_logging(Logging.Warn)   # keep the ODE divergence warnings out of the log
 
@@ -21,7 +21,7 @@ vbp_at(vr) = build_vbpara(merge(NT_P0, (v_ref=vr,)))
 function R4(z)
     u0, T = unpack_shooting(SA[z[1], z[2], z[3], z[4]])
     sol = integrate(u0, T, vbp_at(z[5]); tol=1e-11)
-    return collect(endpoint_residuals(sol; sense=+))
+    return collect(endpoint_residuals(sol; sense=(+)))
 end
 
 function fd_jac!(J, f, x, fx; h=1e-7)
@@ -37,7 +37,8 @@ end
 
 "Right singular vector of the 4×5 Jacobian for the smallest singular value."
 function tangent(z, τprev)
-    z0 = copy(z); r0 = R4(z)
+    z0 = copy(z)
+    r0 = R4(z)
     J = Matrix{Float64}(undef, 4, 5)
     fd_jac!(J, R4, z0, r0; h=1e-7)
     τ = svd(J).V[:, end]
@@ -49,15 +50,20 @@ function multipliers(z)
     u0, T = unpack_shooting(SA[z[1], z[2], z[3], z[4]])
     vbp = vbp_at(z[5])
     v0 = collect(Array(u0)[1:4])
-    pm = v -> copy(Array(integrate(SA[v[1], v[2], v[3], v[4], 0.0], T, vbp; tol=1e-11).u[end])[1:4])
+    pm =
+        v -> copy(
+            Array(integrate(SA[v[1], v[2], v[3], v[4], 0.0], T, vbp; tol=1e-11).u[end])[1:4],
+        )
     J = fd_jac!(Matrix{Float64}(undef, 4, 4), pm, v0, pm(v0))
-    return sort(abs.(eigvals(J)), rev=true)
+    return sort(abs.(eigvals(J)); rev=true)
 end
 
 function main()
     s = [-0.7771, 1.3899, 1.8811, 2.82632]
     for vr in (6.0, 4.0, 3.0, 2.75, 2.6, 2.55, 2.52, 2.5)
-        s = build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tol=1e-11))
+        s = build_shooting(
+            compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tol=1e-11)
+        )
     end
     z = [s[1], s[2], s[3], s[4], 2.5]
     τ = tangent(z, ones(5))
@@ -72,9 +78,14 @@ function main()
         ok = false
         for _ in 1:25
             G = vcat(R4(zc), [dot(τ, zc - zpred)])
-            norm(G[1:4]) < 1e-10 && (ok = true; break)
-            JG = fd_jac!(Matrix{Float64}(undef, 5, 5), w -> vcat(R4(w), [dot(τ, w - zpred)]),
-                zc, G; h=1e-7)
+            norm(G[1:4]) < 1e-10 && (ok=true; break)
+            JG = fd_jac!(
+                Matrix{Float64}(undef, 5, 5),
+                w -> vcat(R4(w), [dot(τ, w - zpred)]),
+                zc,
+                G;
+                h=1e-7,
+            )
             dz = try
                 JG \ (-G)
             catch
@@ -85,9 +96,15 @@ function main()
         end
         res = norm(R4(zc))
         mu = multipliers(zc)
-        @printf("%8.4f  %9.5f  %8.4f  %s  %.1e%s\n", zc[5], zc[4],
-            zc[4] * (NT_P0.l / zc[5]), join([@sprintf("%.5f", m) for m in mu], "  "),
-            res, ok ? "" : "  <-- no conv")
+        @printf(
+            "%8.4f  %9.5f  %8.4f  %s  %.1e%s\n",
+            zc[5],
+            zc[4],
+            zc[4] * (NT_P0.l / zc[5]),
+            join([@sprintf("%.5f", m) for m in mu], "  "),
+            res,
+            ok ? "" : "  <-- no conv"
+        )
         flush(stdout)
         ok || break
         z = zc

@@ -30,14 +30,31 @@ using OptimalControl, NLPModelsIpopt
 # Parameters — plain NamedTuple (type-stable, fast)
 # =========================================================
 
-function kite_params(; larm=2.0, lcg=20.0, mass=5.0, inertia=(25.0, 0.5, 2.5),
-    inertiaarm=8.0, g=9.81, kgenerator=0.0, cgenerator=1.0, klines=0.0,
-    S=2.5, rho=1.225, delta=30.0 * pi / 180)
+function kite_params(;
+    larm=2.0,
+    lcg=20.0,
+    mass=5.0,
+    inertia=(25.0, 0.5, 2.5),
+    inertiaarm=8.0,
+    g=9.81,
+    kgenerator=0.0,
+    cgenerator=1.0,
+    klines=0.0,
+    S=2.5,
+    rho=1.225,
+    delta=30.0 * pi / 180,
+)
     panels = @SMatrix [0.1 0.1; 1.25 -1.25; 0.0 0.0]
     return (;
-        larm=larm, lcg=lcg, mass=mass, inertia=SA[inertia[1], inertia[2], inertia[3]],
+        larm=larm,
+        lcg=lcg,
+        mass=mass,
+        inertia=SA[inertia[1], inertia[2], inertia[3]],
         inertiaarm=inertiaarm,
-        g=g, kgenerator=kgenerator, cgenerator=cgenerator, klines=klines,
+        g=g,
+        kgenerator=kgenerator,
+        cgenerator=cgenerator,
+        klines=klines,
         aero=(S=S, rho=rho, panels=panels, delta=delta),
     )
 end
@@ -54,9 +71,7 @@ end
 
 @inline function pos_CG(q, p)          # kite centre of gravity
     return SVector(
-        p.lcg * sin(q[2]) * cos(q[3]),
-        p.lcg * sin(q[2]) * sin(q[3]),
-        p.lcg * cos(q[2]),
+        p.lcg * sin(q[2]) * cos(q[3]), p.lcg * sin(q[2]) * sin(q[3]), p.lcg * cos(q[2])
     ) + pos_OA(q, p)
 end
 
@@ -64,12 +79,16 @@ end
 @inline function body_axes(q)
     sq, cq = sin.(q), cos.(q)
     Ihat = SVector(sq[2] * cq[3], sq[2] * sq[3], cq[2])
-    Jhat = SVector(-cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
+    Jhat = SVector(
+        -cq[4] * sq[3] - sq[4] * cq[2] * cq[3],
         cq[4] * cq[3] - sq[4] * cq[2] * sq[3],
-        sq[4] * sq[2])
-    Khat = SVector(sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
+        sq[4] * sq[2],
+    )
+    Khat = SVector(
+        sq[4] * sq[3] - cq[4] * cq[2] * cq[3],
         -sq[4] * cq[3] - cq[4] * cq[2] * sq[3],
-        cq[4] * sq[2])
+        cq[4] * sq[2],
+    )
     return Ihat, Jhat, Khat
 end
 
@@ -166,7 +185,8 @@ end
 function lagrangian(q, dq, u, p)
     vCG = ForwardDiff.jacobian(x -> pos_CG(x, p), q) * dq
     ω = W(q) * dq
-    T = 0.5 * p.mass * sum(abs2, vCG) +
+    T =
+        0.5 * p.mass * sum(abs2, vCG) +
         0.5 * dot(p.inertia, ω .^ 2) +
         0.5 * p.inertiaarm * dq[1]^2
     V = p.mass * p.g * pos_CG(q, p)[3]
@@ -232,7 +252,7 @@ function eom(X, u, p)
     Q = generalized_forces(q, dq, u, p)
 
     b = Q + dLdq - cross
-    ddq = cholesky_solve(SMatrix{4, 4}(M + 1e-9 * I), b)
+    ddq = cholesky_solve(SMatrix{4,4}(M + 1e-9 * I), b)
 
     return SVector{8}(dq[1], dq[2], dq[3], dq[4], ddq[1], ddq[2], ddq[3], ddq[4])
 end
@@ -243,7 +263,7 @@ f(X, u) = eom(X, u, pars)
 # Sanity checks
 # =========================================================
 let X = SA[0.3, 0.5, 0.2, 0.6, 0.1, 0.2, 0.3, 0.4], u = SA[0.1, 0.0]
-    @assert f(X, u) isa SVector{8, Float64}
+    @assert f(X, u) isa SVector{8,Float64}
     # ForwardDiff through the full RHS (what OptimalControl's Jacobian needs)
     J = ForwardDiff.jacobian(x -> f(x, u), X)
     @assert size(J) == (8, 8)
@@ -296,9 +316,13 @@ end
 # backend=:default => pure ForwardDiff gradient+Jacobian+Hessian (SparseADHessian).
 # The default :optimized backend nests ReverseDiff inside ForwardDiff and throws
 # "Cannot determine ordering of Dual tags" on StaticArrays-heavy RHS.
-sol_ocp = solve(ocp; init=init, grid_size=20,
-    modeler=OptimalControl.ADNLP(backend=:default),
-    max_wall_time=120.0)
+sol_ocp = solve(
+    ocp;
+    init=init,
+    grid_size=20,
+    modeler=OptimalControl.ADNLP(; backend=:default),
+    max_wall_time=120.0,
+)
 println("OCP solve done: objective = ", objective(sol_ocp))
 
 # =========================================================

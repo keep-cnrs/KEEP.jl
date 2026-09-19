@@ -28,8 +28,8 @@ using Plots
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara: build_para
 
-export Geometry, eight_circle_geometry, draw_background!, add_state!, add_trail!,
-    kite_xy, eight_xy
+export Geometry,
+    eight_circle_geometry, draw_background!, add_state!, add_trail!, kite_xy, eight_xy
 
 struct Geometry
     mode::Symbol
@@ -45,8 +45,9 @@ struct Geometry
     eight_y::Vector{Float64}
 end
 
-function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
-        y8::Real=2.1, n::Int=400)
+function eight_circle_geometry(
+    vbp; mode::Symbol=:src, arm_scaling::Real=1.0, y8::Real=2.1, n::Int=400
+)
     mode in (:src, :rescaled) || error("mode must be :src or :rescaled")
     l, r = vbp.l, vbp.r
     θ0 = l + r
@@ -54,11 +55,11 @@ function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
     Δθv = vbp.Δθ * θ0
 
     ls = arm_scaling * (mode === :src ? l : 1.0)
-    αs = range(-π, π, length=n)
+    αs = range(-π, π; length=n)
     circle_x = ls .* sin.(αs)
     circle_y = ls .* cos.(αs)
 
-    τs = range(-π, π, length=n)
+    τs = range(-π, π; length=n)
     if mode === :src
         eight_x = Δφh .* sin.(τs)
         eight_y = θ0 .- Δθv .* sin.(2 .* τs)       # flipped vertical modulation
@@ -66,8 +67,19 @@ function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
         eight_x = sin.(τs)
         eight_y = y8 .- (Δθv / Δφh) .* sin.(2 .* τs)
     end
-    return Geometry(mode, Float64(arm_scaling), l, θ0, Δφh, Δθv, Float64(y8),
-        circle_x, circle_y, eight_x, eight_y)
+    return Geometry(
+        mode,
+        Float64(arm_scaling),
+        l,
+        θ0,
+        Δφh,
+        Δθv,
+        Float64(y8),
+        circle_x,
+        circle_y,
+        eight_x,
+        eight_y,
+    )
 end
 
 "Kite plot point (xdata, ydata) for arm angle α."
