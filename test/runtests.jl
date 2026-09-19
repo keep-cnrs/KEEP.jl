@@ -2,8 +2,8 @@ using Test
 using SafeTestsets
 using Underscores
 using Logging
-import Plots
-import Makie
+using Plots: Plots
+using Makie: Makie
 using ProgressMeter
 
 struct PlotSilencer <: AbstractDisplay end
@@ -24,8 +24,6 @@ function with_no_plots(f)
         popdisplay(silencer)
     end
 end
-
-
 
 const exclude = [
     "06c_phase_space_plot.jl",  # Uses Makie and is slow
@@ -82,10 +80,9 @@ function main()
         end
     end
     popdisplay(silencer)
-    nothing
+    return nothing
 end
 
 with_no_plots() do
-    main()
+    return main()
 end
-

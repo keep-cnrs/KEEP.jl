@@ -25,7 +25,7 @@ using Plots
 using Serialization
 using Printf
 using LinearAlgebra
-import BifurcationKit              # only to resolve RecursiveArrayTools on deserialize
+using BifurcationKit: BifurcationKit              # only to resolve RecursiveArrayTools on deserialize
 
 const HERE = @__DIR__
 const SCRATCH = joinpath(HERE, "scratch")
@@ -47,8 +47,8 @@ const C_LL = :darkorange
 "Run the two pipeline generators (each writes its scratch/*.jls)."
 function generate_caches()
     julia = Base.julia_cmd()
-    for (script, args) in (("_branch_fulltol.jl", ["$(M_FIG)"]),
-                           ("_three_cycles_248.jl", String[]))
+    for (script, args) in
+        (("_branch_fulltol.jl", ["$(M_FIG)"]), ("_three_cycles_248.jl", String[]))
         println("running scratch/", script, " ...")
         run(`$julia --project=$HERE $(joinpath(SCRATCH, script)) $args`)
     end
@@ -66,8 +66,14 @@ end
 
 "Three coexisting cycles at the anchor; falls back to the older 2.47 pair."
 function load_cycles()
-    f = joinpath(SCRATCH, isfile(joinpath(SCRATCH, "three_cycles_shooting.jls")) ?
-        "three_cycles_shooting.jls" : "two_cycles_shooting.jls")
+    f = joinpath(
+        SCRATCH,
+        if isfile(joinpath(SCRATCH, "three_cycles_shooting.jls"))
+            "three_cycles_shooting.jls"
+        else
+            "two_cycles_shooting.jls"
+        end,
+    )
     cyc = deserialize(f)
     vr = hasproperty(cyc, :v_ref) ? cyc.v_ref : 2.47
     ll = hasproperty(cyc, :longlong) ? cyc.longlong : nothing
@@ -128,9 +134,11 @@ function dot_end(x, y, where::Symbol, window::NTuple{4,Real})
         elseif k == 1                                      # nothing dotted
             return (collect(float.(x)), collect(float.(y)), Float64[], Float64[])
         end
-        C = boundary_point((x[k-1], y[k-1]), (x[k], y[k]), window)
-        sx = vcat(C[1], float.(x[k:n]));   sy = vcat(C[2], float.(y[k:n]))
-        dx = vcat(float.(x[1:k-1]), C[1]); dy = vcat(float.(y[1:k-1]), C[2])
+        C = boundary_point((x[k - 1], y[k - 1]), (x[k], y[k]), window)
+        sx = vcat(C[1], float.(x[k:n]))
+        sy = vcat(C[2], float.(y[k:n]))
+        dx = vcat(float.(x[1:(k - 1)]), C[1])
+        dy = vcat(float.(y[1:(k - 1)]), C[2])
         @assert dx[end] == sx[1] && dy[end] == sy[1]       # runs meet at C
     elseif where === :end
         k = findlast(inside)
@@ -139,9 +147,11 @@ function dot_end(x, y, where::Symbol, window::NTuple{4,Real})
         elseif k == n
             return (collect(float.(x)), collect(float.(y)), Float64[], Float64[])
         end
-        C = boundary_point((x[k], y[k]), (x[k+1], y[k+1]), window)
-        sx = vcat(float.(x[1:k]), C[1]);   sy = vcat(float.(y[1:k]), C[2])
-        dx = vcat(C[1], float.(x[k+1:n])); dy = vcat(C[2], float.(y[k+1:n]))
+        C = boundary_point((x[k], y[k]), (x[k + 1], y[k + 1]), window)
+        sx = vcat(float.(x[1:k]), C[1])
+        sy = vcat(float.(y[1:k]), C[2])
+        dx = vcat(C[1], float.(x[(k + 1):n]))
+        dy = vcat(C[2], float.(y[(k + 1):n]))
         @assert sx[end] == dx[1] && sy[end] == dy[1]
     else
         throw(ArgumentError("where must be :begin or :end, got $where"))
@@ -150,8 +160,17 @@ function dot_end(x, y, where::Symbol, window::NTuple{4,Real})
 end
 
 "Plot `(x,y)` as a solid interior with a dotted end selected by `where`/`window`."
-function plot_end!(sp, x, y, where::Symbol, window::NTuple{4,Real};
-        color, lw=2.5, label="", dotted_label="")
+function plot_end!(
+    sp,
+    x,
+    y,
+    where::Symbol,
+    window::NTuple{4,Real};
+    color,
+    lw=2.5,
+    label="",
+    dotted_label="",
+)
     sx, sy, dx, dy = dot_end(x, y, where, window)
     isempty(dx) || plot!(sp, dx, dy; color=color, lw=lw, ls=:dot, label=dotted_label)
     isempty(sx) || plot!(sp, sx, sy; color=color, lw=lw, label=label)
@@ -182,61 +201,163 @@ function fig_fold_zoom(M=M_FIG)
     p1f, tf1f = p[i0], tf[i0]
     p2f, tf2f = p[i2], tf[i2]
 
-    plt = plot(layout=(3, 1), size=(900, 1420), legend=:topright,
-        plot_title="Limit-cycle branch: two folds ⇒ three periods in (v_ref*₁, v_ref*₂)")
+    plt = plot(;
+        layout=(3, 1),
+        size=(900, 1420),
+        legend=:topright,
+        plot_title="Limit-cycle branch: two folds ⇒ three periods in (v_ref*₁, v_ref*₂)",
+    )
 
     ## panel 1 — overview ---------------------------------------------------
     sp = plt[1]
     xl, yl = (2.44, 2.54), (0.0, 120.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title="Overview: S-curve with both folds", left_margin=11Plots.mm)
-    plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
-        color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
+    plot!(
+        sp;
+        xlabel="v_ref (m/s)",
+        ylabel="Period (s)",
+        xlims=xl,
+        ylims=yl,
+        title="Overview: S-curve with both folds",
+        left_margin=11Plots.mm,
+    )
+    plot_end!(
+        sp,
+        p[i0:end],
+        tf[i0:end],
+        :end,
+        (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
+        color=C_SHORT,
+        lw=2.5,
+        label="short, stable",
+        dotted_label="continues",
+    )
     plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="long, saddle")
-    plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
-        color=C_LL, lw=2.5, label="long-long, saddle")
-    vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5,
-        label="fold 1  v_ref*₁ = $(round(p1f, digits=4))")
-    vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5,
-        label="fold 2  v_ref*₂ = $(round(p2f, digits=4))")
-    scatter!(sp, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
-        markerstrokecolor=:white, label="")
-    vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  v_ref = %.4f", TWO_P))
-    annotate!(sp, p1f + 0.0035, 0.40 * yl[2],
-        text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
-    annotate!(sp, p2f + 0.0010, 0.66 * yl[2],
-        text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :left, 8, :gray30))
+    plot_end!(
+        sp,
+        p[1:i2],
+        tf[1:i2],
+        :begin,
+        (xl[1], yl[1], xl[2], TF_LL_DOT);
+        color=C_LL,
+        lw=2.5,
+        label="long-long, saddle",
+    )
+    vline!(
+        sp,
+        [p1f];
+        color=C_SHORT,
+        ls=:dash,
+        lw=1.5,
+        label="fold 1  v_ref*₁ = $(round(p1f, digits=4))",
+    )
+    vline!(
+        sp,
+        [p2f];
+        color=C_LONG,
+        ls=:dash,
+        lw=1.5,
+        label="fold 2  v_ref*₂ = $(round(p2f, digits=4))",
+    )
+    scatter!(
+        sp,
+        [p1f, p2f],
+        [tf1f, tf2f];
+        color=:black,
+        ms=6,
+        msw=1.2,
+        markerstrokecolor=:white,
+        label="",
+    )
+    vline!(
+        sp,
+        [TWO_P];
+        color=:black,
+        ls=:solid,
+        lw=1.2,
+        label=@sprintf("anchor  v_ref = %.4f", TWO_P)
+    )
+    annotate!(
+        sp,
+        p1f + 0.0035,
+        0.40 * yl[2],
+        text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30),
+    )
+    annotate!(
+        sp,
+        p2f + 0.0010,
+        0.66 * yl[2],
+        text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :left, 8, :gray30),
+    )
     annotate!(sp, 2.492, 20.0, text("short, stable\n(continues →)", :left, 8, C_SHORT))
-    annotate!(sp, 2.4455, 0.93 * yl[2],
-        text("long-long continues ↑\n(past tf=$(round(TF_LL_DOT, digits=0)) s, budget)", :left, 8, C_LL))
+    annotate!(
+        sp,
+        2.4455,
+        0.93 * yl[2],
+        text(
+            "long-long continues ↑\n(past tf=$(round(TF_LL_DOT, digits=0)) s, budget)",
+            :left,
+            8,
+            C_LL,
+        ),
+    )
 
     ## panel 2 — fold 1 zoom -------------------------------------------------
     sp = plt[2]
     xl, yl = (2.44, 2.54), (0.0, 30.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+    plot!(
+        sp;
+        xlabel="v_ref (m/s)",
+        ylabel="Period (s)",
+        xlims=xl,
+        ylims=yl,
         title=@sprintf("fold 1 — stable + saddle  (v_ref = %.3f, tf = %.1f s)", p1f, tf1f),
-        left_margin=11Plots.mm)
-    plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
-        color=C_SHORT, lw=2.5)
-    plot_end!(sp, p[i2:i0], tf[i2:i0], :begin, (xl[1], yl[1], xl[2], TF_LONG_DOT);
-        color=C_LONG, lw=2.5)
+        left_margin=11Plots.mm,
+    )
+    plot_end!(
+        sp,
+        p[i0:end],
+        tf[i0:end],
+        :end,
+        (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
+        color=C_SHORT,
+        lw=2.5,
+    )
+    plot_end!(
+        sp,
+        p[i2:i0],
+        tf[i2:i0],
+        :begin,
+        (xl[1], yl[1], xl[2], TF_LONG_DOT);
+        color=C_LONG,
+        lw=2.5,
+    )
     vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="")
-    scatter!(sp, [p1f], [tf1f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
+    scatter!(
+        sp, [p1f], [tf1f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label=""
+    )
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2, label="")
 
     ## panel 3 — fold 2 zoom -------------------------------------------------
     sp = plt[3]
     xl, yl = (2.4755, 2.4835), (40.0, 120.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+    plot!(
+        sp;
+        xlabel="v_ref (m/s)",
+        ylabel="Period (s)",
+        xlims=xl,
+        ylims=yl,
         title=@sprintf("fold 2 — saddle + saddle  (v_ref = %.3f, tf = %.1f s)", p2f, tf2f),
-        left_margin=11Plots.mm)
+        left_margin=11Plots.mm,
+    )
     plot!(sp, p[i0:end], tf[i0:end]; color=C_SHORT, lw=2.5, label="")
     plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="")
-    plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
-        color=C_LL, lw=2.5)
+    plot_end!(
+        sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT); color=C_LL, lw=2.5
+    )
     vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="")
-    scatter!(sp, [p2f], [tf2f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
+    scatter!(
+        sp, [p2f], [tf2f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label=""
+    )
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2, label="")
 
     return plt
@@ -250,24 +371,66 @@ function fig_full_scale(M=M_FIG)
     p1f, tf1f = p[i0], tf[i0]
     p2f, tf2f = p[i2], tf[i2]
     xl, yl = (0.0, 25.0), (0.0, 120.0)
-    plt = plot(size=(1050, 600), legend=:topright,
-        xlims=xl, ylims=yl,
-        xlabel="v_ref (m/s)", ylabel="Period (s)",
-        title="Full-scale limit-cycle branch  (v_ref in [0, 25])", titlelocation=:center,
-        left_margin=12Plots.mm, bottom_margin=7Plots.mm)
-    plot_end!(plt, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_FULL, yl[2]);
-        color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
+    plt = plot(;
+        size=(1050, 600),
+        legend=:topright,
+        xlims=xl,
+        ylims=yl,
+        xlabel="v_ref (m/s)",
+        ylabel="Period (s)",
+        title="Full-scale limit-cycle branch  (v_ref in [0, 25])",
+        titlelocation=:center,
+        left_margin=12Plots.mm,
+        bottom_margin=7Plots.mm,
+    )
+    plot_end!(
+        plt,
+        p[i0:end],
+        tf[i0:end],
+        :end,
+        (xl[1], yl[1], X_SHORT_FULL, yl[2]);
+        color=C_SHORT,
+        lw=2.5,
+        label="short, stable",
+        dotted_label="continues",
+    )
     plot!(plt, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="long, saddle")
-    plot_end!(plt, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
-        color=C_LL, lw=2.5, label="long-long, saddle")
+    plot_end!(
+        plt,
+        p[1:i2],
+        tf[1:i2],
+        :begin,
+        (xl[1], yl[1], xl[2], TF_LL_DOT);
+        color=C_LL,
+        lw=2.5,
+        label="long-long, saddle",
+    )
     vline!(plt, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="fold 1")
     vline!(plt, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="fold 2")
-    vline!(plt, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  v_ref = %.4f", TWO_P))
-    scatter!(plt, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
-        markerstrokecolor=:white, label="")
-    annotate!(plt, 8.0, 0.80 * yl[2],
-        text("no prograde cycle\nfor v_ref below fold 1", :left, 9, :gray30))
+    vline!(
+        plt,
+        [TWO_P];
+        color=:black,
+        ls=:solid,
+        lw=1.2,
+        label=@sprintf("anchor  v_ref = %.4f", TWO_P)
+    )
+    scatter!(
+        plt,
+        [p1f, p2f],
+        [tf1f, tf2f];
+        color=:black,
+        ms=6,
+        msw=1.2,
+        markerstrokecolor=:white,
+        label="",
+    )
+    annotate!(
+        plt,
+        8.0,
+        0.80 * yl[2],
+        text("no prograde cycle\nfor v_ref below fold 1", :left, 9, :gray30),
+    )
     return plt
 end
 
@@ -279,18 +442,35 @@ const PAIRS = [(1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
 
 function fig_phase_planes()
     ncyc = longlong === nothing ? 2 : 3
-    plt = plot(layout=(2, 3), size=(1250, 760), legend=:topright,
-        plot_title="$(ncyc) prograde limit cycles at v_ref = $TWO_P — phase projections")
+    plt = plot(;
+        layout=(2, 3),
+        size=(1250, 760),
+        legend=:topright,
+        plot_title="$(ncyc) prograde limit cycles at v_ref = $TWO_P — phase projections",
+    )
     for (k, (i, j)) in enumerate(PAIRS)
-        plot!(plt[k], Ushort[i, :], Ushort[j, :];
-            xlabel=LABELS[i], ylabel=LABELS[j],
+        plot!(
+            plt[k],
+            Ushort[i, :],
+            Ushort[j, :];
+            xlabel=LABELS[i],
+            ylabel=LABELS[j],
             title="$(LABELS[j]) vs $(LABELS[i])",
-            color=C_SHORT, lw=2, label="short, stable",
-            left_margin=6Plots.mm, bottom_margin=5Plots.mm)
-        plot!(plt[k], Ulong[i, :], Ulong[j, :];
-            color=C_LONG, lw=2.2, label="long, saddle")
-        longlong === nothing || plot!(plt[k], Ulonglong[i, :], Ulonglong[j, :];
-            color=C_LL, lw=2.2, label="long-long, saddle")
+            color=C_SHORT,
+            lw=2,
+            label="short, stable",
+            left_margin=6Plots.mm,
+            bottom_margin=5Plots.mm,
+        )
+        plot!(plt[k], Ulong[i, :], Ulong[j, :]; color=C_LONG, lw=2.2, label="long, saddle")
+        longlong === nothing || plot!(
+            plt[k],
+            Ulonglong[i, :],
+            Ulonglong[j, :];
+            color=C_LL,
+            lw=2.2,
+            label="long-long, saddle",
+        )
     end
     return plt
 end
@@ -300,25 +480,52 @@ end
 ## ===================================================================== ##
 function fig_timeseries()
     ncyc = longlong === nothing ? 2 : 3
-    plt = plot(layout=(2, 2), size=(1150, 700), legend=:topright,
-        plot_title="Prograde BVP solutions vs physical time at v_ref = $TWO_P ($ncyc cycles)")
+    plt = plot(;
+        layout=(2, 2),
+        size=(1150, 700),
+        legend=:topright,
+        plot_title="Prograde BVP solutions vs physical time at v_ref = $TWO_P ($ncyc cycles)",
+    )
     for i in 1:4
-        plot!(plt[i], tshort, Ushort[i, :];
-            xlabel="t (s)", ylabel=LABELS[i], title=LABELS[i],
-            color=C_SHORT, lw=2, label="short, stable  (tf=$(round(short.tf, digits=1)) s)",
-            left_margin=6Plots.mm, bottom_margin=5Plots.mm)
-        plot!(plt[i], tlong, Ulong[i, :];
-            color=C_LONG, lw=2.2, label="long, saddle  (tf=$(round(long.tf, digits=1)) s)")
-        longlong === nothing || plot!(plt[i], tlonglong, Ulonglong[i, :];
-            color=C_LL, lw=2.2, label="long-long, saddle  (tf=$(round(longlong.tf, digits=1)) s)")
+        plot!(
+            plt[i],
+            tshort,
+            Ushort[i, :];
+            xlabel="t (s)",
+            ylabel=LABELS[i],
+            title=LABELS[i],
+            color=C_SHORT,
+            lw=2,
+            label="short, stable  (tf=$(round(short.tf, digits=1)) s)",
+            left_margin=6Plots.mm,
+            bottom_margin=5Plots.mm,
+        )
+        plot!(
+            plt[i],
+            tlong,
+            Ulong[i, :];
+            color=C_LONG,
+            lw=2.2,
+            label="long, saddle  (tf=$(round(long.tf, digits=1)) s)",
+        )
+        longlong === nothing || plot!(
+            plt[i],
+            tlonglong,
+            Ulonglong[i, :];
+            color=C_LL,
+            lw=2.2,
+            label="long-long, saddle  (tf=$(round(longlong.tf, digits=1)) s)",
+        )
     end
     return plt
 end
 
-for (f, fn) in (("fig_fold_zoom.png", fig_fold_zoom),
-                ("fig_full_scale.png", fig_full_scale),
-                ("fig_phase_planes.png", fig_phase_planes),
-                ("fig_timeseries.png", fig_timeseries))
+for (f, fn) in (
+    ("fig_fold_zoom.png", fig_fold_zoom),
+    ("fig_full_scale.png", fig_full_scale),
+    ("fig_phase_planes.png", fig_phase_planes),
+    ("fig_timeseries.png", fig_timeseries),
+)
     savefig(fn(), joinpath(HERE, f))
     println("saved ", f)
 end
