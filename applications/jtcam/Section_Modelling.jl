@@ -51,17 +51,28 @@ fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
 
 # set of possible arm-tip positions: circle of radius l in the xy-plane
 θc = range(0, 2π, length=200)
-plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); c=:blue, lw=3, label="arm-tip locus")
+arm_tip_pars = (; c=:blue, lw=3, label="Arm-tip locus")
+plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); arm_tip_pars..., label="")
 
 # example arm and kite at α = 0, β = 30°
-plot!(fig, [0, l], [0, 0], [0, 0]; c=:black, lw=3, label="arm")
-plot!(fig, [l, kite_pos[1]], [0, 0], [0, kite_pos[3]]; c=:red, lw=2, ls=:dash, label="kite line")
+arm_and_lines_pars = (; c=:black, lw=3, label="Arm and lines")
+plot!(fig, [0, l], [0, 0], [0, 0]; arm_and_lines_pars..., label="")
+plot!(fig, [l, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., label="")
 
 # COMMENT/UNCOMMENT to identify easily those lines
-plot!(fig, (l + r * cos(β0)) .* cos.(θc), (l + r * cos(β0)) .* sin.(θc), fill(r * sin(β0), length(θc)); c=:green, lw=2, label="kite latitude")
-plot!(fig, l .+ r .* cos.(θc), zero(θc), r .* sin.(θc); c=:orange, lw=2, label="kite longitude")
+longitude_pars = (; c=:orange, lw=2, label="Kite longitude")
+latitude_pars = (; c=:green, lw=2, label="Kite latitude")
+plot!(fig, l .+ r .* cos.(θc), zero(θc), r .* sin.(θc); longitude_pars..., label="")
+plot!(fig, (l + r * cos(β0)) .* cos.(θc), (l + r * cos(β0)) .* sin.(θc), fill(r * sin(β0), length(θc)); latitude_pars..., label="")
 
-scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; c=:red, ms=7, label="kite")
+kite_pars = (; c=:red, ms=7, label="Kite")
+scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")
 
-savefig(fig, joinpath(@__DIR__, "spindle_torus.png"))
+scatter!([]; kite_pars...)
+plot!([]; arm_and_lines_pars...)
+plot!([]; arm_tip_pars...)
+plot!([]; longitude_pars...)
+plot!([]; latitude_pars...)
+
+savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.png"))
 display(fig)

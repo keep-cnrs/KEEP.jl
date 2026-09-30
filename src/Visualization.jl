@@ -48,7 +48,7 @@ function build_t(tspan, points_per_second)
 end
 build_t(tspan::Number, points_per_second) = build_t((0, tspan), points_per_second)
 
-function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)
+function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS, kite_ls=:solid, new=true)
     p = sol.prob.p
     t, _ = build_t(tspan, points_per_second)
     q = sol.(t, idxs=1:5)
@@ -58,11 +58,11 @@ function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAUL
 
     arm_and_lines = [[0 * A, A, K1, NaN * A] for (A, K1) in zip(A, K1)]
 
-    plot()
+    new && plot()
     plot!(invert(flatten(arm_and_lines))..., c=:black, alpha=20 / length(t), lw=1, label="")
-    plot!(invert(A)..., label="A(α)", c=1)
-    plot!(invert(K1)..., label="K1(R, τ)", c=2)
-    plot!(invert(K2)..., label="K2(α, θ2, φ2)", c=3)
+    plot!(invert(A)..., label=new ? "A(α)" : "", c=1)
+    plot!(invert(K1)..., label=new ? "K1(R, τ)" : "", c=2, ls=kite_ls)
+    plot!(invert(K2)..., label=new ? "K2(α, θₗ, φₗ)" : "", c=3, ls=kite_ls)
 end
 
 function plot_trajectory_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)

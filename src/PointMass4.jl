@@ -12,7 +12,7 @@ using KEEP.TorqueFunction
 using KEEP.Integrate: _integrate
 import KEEP: DEFAULT_TOLERANCE, TAU0
 
-export dynamics, integrate, init_u
+export dynamics, integrate, build_u
 
 @doc raw"""
 Compute the jacobian of `f` at `x`.
@@ -179,12 +179,12 @@ function compute_line_tension(u, p; du=PM4.dynamics(u, p, 0))
     return -F_tension ⋅ rhat
 end
 
-function create_u(α, τ, dα, dτ, W)
+function build_u(α, τ, dα, dτ, W)
     return SA[α, τ, dα, dτ, W]
 end
 
-function init_u(α=0, dα=0, dτ=0; τ=TAU0, W=0.0)
-    return create_u(α, τ, dα, dτ, W)
+function build_u(; α=0, dα=0, dτ=0, τ=TAU0, W=0.0)
+    return build_u(α, τ, dα, dτ, W)
 end
 
 function integrate(u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)

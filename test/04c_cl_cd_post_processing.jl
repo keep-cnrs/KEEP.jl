@@ -22,7 +22,7 @@ dτ0 = 0.
 
 p_para = PMP.build_para()
 p_vb = PMP.build_vbpara(p_para)
-u0 = PM4.init_u(τ0, dα0, dτ0)
+u0 = PM4.build_u(dα=dα0, dτ=dτ0)
 tf = 20
 tol = 1e-7
 
@@ -58,7 +58,7 @@ function coeff_aero(u, p)
         Fgrav = SA[0, 0, -p.g*(p.m+m_l)]
 
         # Compute aerodynamical force
-        wind = SA[p.v_ref*abs(OK[3] / p.h_ref)^p.n_wind, 0, 0]
+        wind = SA[p.v_ref*abs(OK[3]/p.h_ref)^p.n_wind, 0, 0]
         kite_speed = D_OK * D_Rτ * dq
         app_wind = wind - kite_speed  # apparent wind, We
 
@@ -91,8 +91,8 @@ function coeff_aero(u, p)
 
         b = (
             p.m * acc_OK +
-            p.m * D_OK * acc_Rτ +
-            -b_tension - Fgrav - Faero
+                p.m * D_OK * acc_Rτ +
+                -b_tension - Fgrav - Faero
         )
         ddq = (D_OK' * A) \ (-D_OK' * b)
         Fcone = A * ddq + b

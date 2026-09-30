@@ -17,14 +17,16 @@ include("plots_default.jl")
 function main()
     outpath = mkpath("out/2026_07_ECC")
 
-    u0 = SA[0, TAU0, 0, 1, 0]
+    _u0 = SA[0, TAU0, 0, 1, 0]
+    u0 = PM4.build_u(dτ=1)
+    @assert u0 == _u0
     p = PM4.build_vbpara()
     tf = 25
     cb = LC.build_poincare_callback(eps(1.0))
     sol = PM4.integrate(-u0, tf, p; callback=cb, save_end=false, tol=1e-13)
 
     x_infty = sol.u[end]
-    errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:end-1]]
+    errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end-1)]]
     n = length(errors)
 
     i1, i2 = 2, 6
@@ -64,8 +66,8 @@ function main()
     # (+) trajectory
     # (-) trajectory
     # (-) trajectory with necessary symmetry (α, τ) -> (-α, -τ) to show that they are not the "inverse" of one another
-    lc_p = LC.compute_limit_cycle(p; sense=+, save_everystep=true)
-    lc_m = LC.compute_limit_cycle(p; sense=-, save_everystep=true)
+    lc_p = LC.compute_limit_cycle(p; sense=(+), save_everystep=true)
+    lc_m = LC.compute_limit_cycle(p; sense=(-), save_everystep=true)
 
 
     P_fig = plot(ylabel="P (kW)", xformatter=x -> "", yticks=0:10:20, ylim=(-3, 23))
