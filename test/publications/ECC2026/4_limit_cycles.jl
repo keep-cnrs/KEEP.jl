@@ -124,7 +124,7 @@ function main()
     # more accurate version: do not compute the limit cycle, just integrate for enough time
     # lc_sign(q, p) = first(LC.compute_limit_cycle(SA[q..., 0, 0, 0], p; tol=1e-3))[4] > 0 ? 1 : -1
 
-    lc_sign(q, p) = last(PM4.integrate(SA[q..., 0, 0, 0], 3, p; tol=1e-2))[4] > 0 ? 1 : -1
+    lc_sign(q, p) = last(PM4.integrate(SA[q..., 0, 0, 0], 3, p; tol=1e-2).u)[4] > 0 ? 1 : -1
 
     n = 10
     qs = [SA[α, τ] for α in range(-π, π, length=100) for τ in range(0, 2π, length=100)]
