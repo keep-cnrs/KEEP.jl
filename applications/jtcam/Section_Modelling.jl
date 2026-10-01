@@ -18,8 +18,8 @@ kite_pos = [l + r * cos(β0), 0, r * sin(β0)]
 
 # mesh as flat line segments (GR's wireframe chokes on matrix grids); a mesh
 # rather than a surface so the self-intersecting interior stays visible
-lg = range(0, 2π, length=120)  # points along each grid line
-lk = range(0, 2π, length=40)   # grid lines
+lg = range(0, 2π; length=120)  # points along each grid line
+lk = range(0, 2π; length=40)   # grid lines
 xs = Float64[];
 ys = Float64[];
 zs = Float64[]
@@ -44,13 +44,26 @@ for αj in lk
     push!(zs, NaN)
 end
 
-fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
-    xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=:topright,
-    title="Spindle torus, not to scale", label="",
-    size=(800, 800), margin=1Plots.mm)
+fig = plot(
+    xs,
+    ys,
+    zs;
+    c=:black,
+    alpha=0.4,
+    lw=0.5,
+    aspect_ratio=:equal,
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+    legend=:topright,
+    title="Spindle torus, not to scale",
+    label="",
+    size=(800, 800),
+    margin=1Plots.mm,
+)
 
 # set of possible arm-tip positions: circle of radius l in the xy-plane
-θc = range(0, 2π, length=200)
+θc = range(0, 2π; length=200)
 arm_tip_pars = (; c=:blue, lw=3, label="Arm-tip locus")
 plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); arm_tip_pars..., label="")
 
@@ -63,7 +76,14 @@ plot!(fig, [l, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., la
 longitude_pars = (; c=:orange, lw=2, label="Kite longitude")
 latitude_pars = (; c=:green, lw=2, label="Kite latitude")
 plot!(fig, l .+ r .* cos.(θc), zero(θc), r .* sin.(θc); longitude_pars..., label="")
-plot!(fig, (l + r * cos(β0)) .* cos.(θc), (l + r * cos(β0)) .* sin.(θc), fill(r * sin(β0), length(θc)); latitude_pars..., label="")
+plot!(
+    fig,
+    (l + r * cos(β0)) .* cos.(θc),
+    (l + r * cos(β0)) .* sin.(θc),
+    fill(r * sin(β0), length(θc));
+    latitude_pars...,
+    label="",
+)
 
 kite_pars = (; c=:red, ms=7, label="Kite")
 scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")

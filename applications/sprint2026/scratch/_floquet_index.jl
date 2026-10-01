@@ -11,7 +11,7 @@
 # Run: julia --project=applications/sprint2026 scratch/_floquet_index.jl
 using LinearAlgebra, StaticArrays, Serialization, Printf
 import OrdinaryDiffEqTsit5 as ODE
-import KEEP
+using KEEP: KEEP
 using KEEP.PointMass4: dynamics
 using KEEP.PointMassPara: build_vbpara, build_para
 
@@ -19,7 +19,8 @@ const NT_P0 = NamedTuple(build_para(build_vbpara()))
 const CACHE = Ref{Union{Nothing,Tuple{Float64,Any}}}(nothing)
 function fp(p)
     c = CACHE[]
-    (c === nothing || c[1] != p.v_ref) && (c = (p.v_ref, NamedTuple(build_vbpara(p))); CACHE[] = c)
+    (c === nothing || c[1] != p.v_ref) &&
+        (c=(p.v_ref, NamedTuple(build_vbpara(p))); CACHE[]=c)
     return c[2]
 end
 
@@ -27,8 +28,8 @@ end
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
     T = params.l / params.v_ref
-    _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T*dα, T*dτ, 0.0], fp(params))
-    out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0.0]
+    _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T * dα, T * dτ, 0.0], fp(params))
+    out = tf .* SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2, 0.0]
     return u isa SVector ? out : Vector(out)
 end
 
@@ -36,7 +37,8 @@ function fd_jac(f, x; h=1e-7)
     n = length(x)
     J = Matrix{Float64}(undef, n, n)
     for i in 1:n
-        e = zeros(n); e[i] = h
+        e = zeros(n)
+        e[i] = h
         J[:, i] = (f(x .+ e) .- f(x .- e)) ./ (2h)
     end
     return J
@@ -45,7 +47,7 @@ end
 "Flow of the 4 mechanical states over a normalised arc `ds` (physical dt = tf·ds)."
 function flowseg(v, tf, ds, p)
     pr = ODE.ODEProblem((uu, pp, t) -> F_fast(uu, pp, t), vcat(v, tf), (0.0, ds), p)
-    return copy(Array(ODE.solve(pr, ODE.Tsit5(), abstol=1e-13, reltol=1e-13).u[end])[1:4])
+    return copy(Array(ODE.solve(pr, ODE.Tsit5(); abstol=1e-13, reltol=1e-13).u[end])[1:4])
 end
 
 "Per-arc flow Jacobians along the saved orbit `d` (t is PHYSICAL seconds)."
@@ -53,7 +55,7 @@ function arc_jacobians(d, pp)
     tf = d.tf
     Js = Matrix{Float64}[]
     for k in 1:(size(d.u, 2) - 1)
-        ds = (d.t[k+1] - d.t[k]) / tf
+        ds = (d.t[k + 1] - d.t[k]) / tf
         ds <= 0 && continue
         push!(Js, fd_jac(x -> flowseg(x, tf, ds, pp), collect(d.u[1:4, k]); h=1e-7))
     end
@@ -77,7 +79,7 @@ end
 const HERE = @__DIR__
 
 function report_file(f, mstar)
-    isfile(joinpath(HERE, f)) || return
+    isfile(joinpath(HERE, f)) || return nothing
     cy = deserialize(joinpath(HERE, f))
     m = hasproperty(cy, :M) ? cy.M : mstar
     for tag in (:short, :long, :longlong)
@@ -85,13 +87,23 @@ function report_file(f, mstar)
         d = getfield(cy, tag)
         pp = merge(NT_P0, (v_ref=d.p, tf=d.tf))
         e, narcs = floquet_exponents(d, pp)
-        e = sort(e, rev=true)
+        e = sort(e; rev=true)
         triv = e[argmin(abs.(e))]                  # trivial (≈0) direction
         # dead-zone separates the converged trivial from the genuine exponents
         stable = count(x -> x < -0.5, e)
         unstable = count(x -> x > 0.5, e)
-        @printf("%-32s %-9s M=%-3s tf=%8.3f arcs=%-4d  #stable=%d #unstable=%d  trivial=%+.3f  max|mu|=%.3g\n",
-            f, tag, m, d.tf, narcs, stable, unstable, triv, maximum(abs, exp.(e)))
+        @printf(
+            "%-32s %-9s M=%-3s tf=%8.3f arcs=%-4d  #stable=%d #unstable=%d  trivial=%+.3f  max|mu|=%.3g\n",
+            f,
+            tag,
+            m,
+            d.tf,
+            narcs,
+            stable,
+            unstable,
+            triv,
+            maximum(abs, exp.(e))
+        )
         @printf("    exponents=[%s]\n", join([@sprintf("%+7.3f", x) for x in e], ", "))
         flush(stdout)
     end

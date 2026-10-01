@@ -24,12 +24,13 @@
 Copy of expression `e` with all `LineNumberNode`s removed (they carry file/line
 positions, which must not affect the fingerprint).
 """
-__fp_expr(e::Expr) = Expr(e.head,
-    Any[__fp_expr(a) for a in e.args if !(a isa LineNumberNode)]...)
+function __fp_expr(e::Expr)
+    return Expr(e.head, Any[__fp_expr(a) for a in e.args if !(a isa LineNumberNode)]...)
+end
 __fp_expr(x) = x
 
 # evaluate a generated in-place function `(r, ...) -> nothing` and return `r`
-__fp_call(f, rlen, args...) = (r = zeros(rlen); f(r, args...); r)
+__fp_call(f, rlen, args...) = (r=zeros(rlen); f(r, args...); r)
 
 """
     problem_fingerprint(ocp)::UInt64
@@ -47,10 +48,14 @@ function problem_fingerprint(ocp)::UInt64
     nx = OptimalControl.state_dimension(ocp)
     nu = OptimalControl.control_dimension(ocp)
     nv = OptimalControl.variable_dimension(ocp)
-    samples = [(t = 0.37 + 0.11 * k,
-        x = [0.1 + 0.05 * i + 0.01 * k for i in 1:nx],
-        u = [0.2 - 0.03 * i + 0.01 * k for i in 1:nu],
-        v = [0.7 + 0.01 * i for i in 1:nv]) for k in 1:3]
+    samples = [
+        (
+            t=0.37 + 0.11 * k,
+            x=[0.1 + 0.05 * i + 0.01 * k for i in 1:nx],
+            u=[0.2 - 0.03 * i + 0.01 * k for i in 1:nu],
+            v=[0.7 + 0.01 * i for i in 1:nv],
+        ) for k in 1:3
+    ]
 
     fdyn = OptimalControl.dynamics(ocp)
     for a in samples
@@ -84,9 +89,11 @@ function problem_fingerprint(ocp)::UInt64
         end
     end
 
-    for getf in (OptimalControl.state_constraints_box,
+    for getf in (
+        OptimalControl.state_constraints_box,
         OptimalControl.control_constraints_box,
-        OptimalControl.variable_constraints_box)
+        OptimalControl.variable_constraints_box,
+    )
         try
             h = hash(getf(ocp)[1:3], h)   # (lb, indices, ub); labels are parser-generated
         catch
@@ -108,8 +115,12 @@ function init_fingerprint(init)::UInt64
     init === nothing && return hash(:no_init)
     h = hash(init.variable)
     var = init.variable
-    tf_guess = (var isa AbstractVector && length(var) >= 1 && var[1] isa Real && var[1] > 0) ?
-               Float64(var[1]) : 1.0
+    tf_guess =
+        if (var isa AbstractVector && length(var) >= 1 && var[1] isa Real && var[1] > 0)
+            Float64(var[1])
+        else
+            1.0
+        end
     for i in 0:8
         t = tf_guess * i / 8
         h = hash(init.state(t), h)
@@ -123,10 +134,18 @@ end
 
 Cache path prefix (no extension) of one fingerprint-matched cache entry.
 """
-function cache_filepath(cache_dir::String, prefix::String, grid_size::Int,
-    problem_hash::UInt64, init_hash::UInt64)
-    return joinpath(cache_dir, "$(prefix)_grid_$(grid_size)" *
-                               "_p$(string(problem_hash; base=16))_i$(string(init_hash; base=16))")
+function cache_filepath(
+    cache_dir::String,
+    prefix::String,
+    grid_size::Int,
+    problem_hash::UInt64,
+    init_hash::UInt64,
+)
+    return joinpath(
+        cache_dir,
+        "$(prefix)_grid_$(grid_size)" *
+        "_p$(string(problem_hash; base=16))_i$(string(init_hash; base=16))",
+    )
 end
 
 # Highest-grid cached file with the same problem fingerprint and any init
@@ -168,11 +187,15 @@ previous grid of the same run — and stored.
    highest-grid cached solution of the same *problem* with any init (opt-in:
    it may converge to a different solution than a fresh start from `init`).
 """
-function run_grid_homotopy(ocp, grid_schedule; init,
+function run_grid_homotopy(
+    ocp,
+    grid_schedule;
+    init,
     cache::Symbol=:auto,
     cache_dir::String="applications/controlled/solutions",
     prefix::String="ocp_half",
-    solve_options...)
+    solve_options...,
+)
     cache in (:auto, :exact, :no, :warm) ||
         throw(ArgumentError("cache must be :auto, :exact, :no or :warm (got :$cache)"))
     mkpath(cache_dir)
@@ -186,7 +209,7 @@ function run_grid_homotopy(ocp, grid_schedule; init,
         fpath = cache_filepath(cache_dir, prefix, N, pf, ih)
         if cache != :no && isfile(fpath * ".jld2")
             sol = import_ocp_solution(ocp; filename=fpath)
-            println("✓ Grid $N loaded — Objective: ", round(objective(sol), digits=4))
+            println("✓ Grid $N loaded — Objective: ", round(objective(sol); digits=4))
         else
             cache == :exact &&
                 error("cache=:exact: missing cached solution for grid $N ($(fpath).jld2)")
@@ -195,12 +218,14 @@ function run_grid_homotopy(ocp, grid_schedule; init,
                 wf = _warmstart_file(cache_dir, prefix, pf)
                 if wf !== nothing
                     warm = import_ocp_solution(ocp; filename=wf)
-                    println("… Grid $N warm-started from $(basename(wf)) (same problem, other init)")
+                    println(
+                        "… Grid $N warm-started from $(basename(wf)) (same problem, other init)",
+                    )
                 end
             end
             sol = solve(ocp; init=warm, grid_size=N, solve_options...)
             export_ocp_solution(sol; filename=fpath)
-            println("✓ Grid $N solved — Objective: ", round(objective(sol), digits=4))
+            println("✓ Grid $N solved — Objective: ", round(objective(sol); digits=4))
         end
     end
     return sol
