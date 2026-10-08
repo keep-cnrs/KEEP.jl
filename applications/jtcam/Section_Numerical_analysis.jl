@@ -7,6 +7,7 @@ using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
 using KEEP: SteadyState
 using KEEP: Visualization as VIZ
+using KEEP.TorqueFunction: torque_function
 
 using Plots
 using LinearAlgebra: norm, eigvals
@@ -47,12 +48,29 @@ function tau_wrap(ts, τm)
     return t_main, y_main, t_jump, y_jump
 end
 
+"""
+Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W.
+"""
+function plot_avg_power_kW(sol)
+    t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
+    p = sol.prob.p
+    L, M, T = PMP.lmt(p)
+    dα = sol.(t, idxs=3)
+    power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
+    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
+    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
+        label="Average power = $(round(avg_power; digits=2)) kW")
+    plot!(legend=(0.1, -0.2), xlabel="t (s)",
+        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
+end
+
 t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
 p_wts = plot(ts, q_ts[:, [1, 3, 4]]; label=["α" "dα" "dτ"],
-    ylabel="q (rad), qd (rad/s)", legend=:topleft)
+    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
 plot!(t_main, y_main; c=4, lw=2, label="τ mod 2π")
 plot!(t_jump, y_jump; c=4, ls=:dash, label=false)
-pw = VIZ.plot_avg_power_4D(sol)
+pw = plot_avg_power_kW(sol)
 sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.65h}; b]), size=(800, 700))
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "simulation_4D.png"))
 display(sim_4D_fig)
