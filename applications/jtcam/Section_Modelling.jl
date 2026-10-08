@@ -76,3 +76,6 @@ plot!([]; latitude_pars...)
 
 savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.png"))
 display(fig)
+
+## Parametrisation in tau
+# TODO [use the plot from test/publications/ECC2026]

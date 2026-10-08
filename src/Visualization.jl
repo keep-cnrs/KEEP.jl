@@ -35,7 +35,7 @@ const DEFAULT_PPS = 30
 
 # For plotting phase space etc...
 const TICKS_PI = (-2π:π:2π, [L"-2π", L"-π", L"0", L"π", L"2π"])
-const TICKS_HALF_PI = (-2π:π/2:2π, [L"-2π", L"-3π/2", L"-π", L"-π/2", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"])
+const TICKS_HALF_PI = (-2π:(π/2):2π, [L"-2π", L"-3π/2", L"-π", L"-π/2", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"])
 # const TICKS_HALF_PI = (-2π:π/2:2π, [L"-2π", L"-\frac{3π}{2}", L"-π", L"-\frac{π}{2}", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"])
 
 """
@@ -60,9 +60,9 @@ function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAUL
 
     new && plot()
     plot!(invert(flatten(arm_and_lines))..., c=:black, alpha=20 / length(t), lw=1, label="")
-    plot!(invert(A)..., label=new ? "A(α)" : "", c=1)
-    plot!(invert(K1)..., label=new ? "K1(R, τ)" : "", c=2, ls=kite_ls)
-    plot!(invert(K2)..., label=new ? "K2(α, θₗ, φₗ)" : "", c=3, ls=kite_ls)
+    plot!(invert(K1)..., label=new ? L"K1(R, \tau)" : "", c=2, ls=kite_ls)
+    plot!(invert(K2)..., label=new ? L"K2(\alpha, \theta_\ell, \phi_\ell)" : "", c=3, ls=kite_ls)
+    plot!(invert(A)..., label=new ? L"A(\alpha)" : "", c=1)
 end
 
 function plot_trajectory_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)
@@ -76,8 +76,8 @@ function plot_trajectory_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT
 
     plot()
     plot!(invert(flatten(arm_and_lines))..., c=:black, alpha=20 / length(t), lw=1, label="")
-    plot!(invert(A)..., label="A(α)", c=1)
-    plot!(invert(K)..., label="K(α, τ)", c=2)
+    plot!(invert(K)..., label=L"K(\alpha, \tau)", c=2)
+    plot!(invert(A)..., label=L"A(\alpha)", c=1)
 end
 
 function _plot_avg_power(t0, tf, t, power, avg_power)
@@ -116,7 +116,7 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
 
     @show length(t)
     @time anim = @animate for t_ in t
-        t_trail = [max(0, t_ - trail_length):trail_step:t_; t_]
+        t_trail = [max(0, t_-trail_length):trail_step:t_; t_]
         q = sol(t_trail, idxs=1:2)
         α = first(q[end])
         A = vbp.l * PM4.compute_αhat(α)
@@ -170,7 +170,7 @@ function init_plot_eight_circle(vbp)
 
     x_lbl = @. x_axes + u_axes / 2 - v_axes / 4
     y_lbl = @. y_axes + v_axes / 2 - u_axes / 4
-    labels = text.(["y", "x", "φ", "θ"], :black, :center, 10)
+    labels = text.(["y", "x", L"\phi", L"\theta"], :black, :center, 10)
     annotate!(x_lbl, y_lbl, labels)
     plot!([-1, -2vbp.l], alpha=0, label="")  # Else "y" is not shown
 
@@ -224,7 +224,7 @@ function plot_phase_space(qs; links=[[]])
 
     ticks = TICKS_PI
 
-    plot(xlabel="α", ylabel="τ", title="Equilibriums linked to their symmetries", legend=:outerright, xticks=ticks, yticks=ticks)
+    plot(xlabel=L"\alpha", ylabel=L"\tau", title="Equilibriums linked to their symmetries", legend=:outerright, xticks=ticks, yticks=ticks)
 
     alpha_col = 0.1
     alpha_pattern = 0.1

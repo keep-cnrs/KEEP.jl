@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using KEEP: PointMass10 as PM10
 using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
@@ -12,6 +15,9 @@ using Logging
 
 using LinearAlgebra: norm
 
+include("jtcam_theme.jl")
+
+## Setup
 p = PMP.build_para()
 τ0, dτ0 = 1e-10, 10
 u0_10 = PM10.init_u(τ0, dτ0, p)
@@ -19,55 +25,57 @@ u0_4 = PM4.build_u(α=0, dα=0, dτ=dτ0; τ=τ0)
 vbp = PMP.build_vbpara(p)
 
 # Projection callback: its tolerance is independent of the integrator tolerance.
-callback = PM10.build_manifold_projection(u0_10; save=true, tol=1e-12)
+callback = PM10.build_manifold_projection(u0_10; save=true, tol=1e-10)
 
 # Physical plots at loose tolerance, to exaggerate the drift of the raw 10D model.
-tf, tol = 80, 1e-3
+tf_short, tf, tol = 20, 100, 1e-3
 sol10 = PM10.integrate(u0_10, tf, p; save_everystep=true, tol)
 sol10_cb = PM10.integrate(u0_10, tf, p; save_everystep=false, tol, callback)
 
-# 10D, Tsit5, tol=1e-3, tf = 20 vs 80 s
-p20 = VIZ.plot_trajectory_10D(sol10; tspan=(0, 20))
-p80 = VIZ.plot_trajectory_10D(sol10; tspan=(0, 80))
-plot!(p20; title="10D, tf=20s, Tsit5, tol=1e-3", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=:topleft)
-plot!(p80; title="10D, tf=80s, Tsit5, tol=1e-3", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false)
-tf_fig = plot(p20, p80, layout=(1, 2), size=(1200, 600))
-savefig(tf_fig, joinpath(@__DIR__, "figs", "trajectory_10D_tf.png"))
+## 10D, Tsit5, tol=1e-3, tf = 20 vs 100 s vs callback
+fig_traj_short = VIZ.plot_trajectory_10D(sol10; tspan=(0, tf_short))
+fig_traj = VIZ.plot_trajectory_10D(sol10)
+fig_traj_cb = VIZ.plot_trajectory_10D(sol10_cb)
+params = (; xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false)
+plot!(fig_traj_short; title="10D, tf=20s, Tsit5, tol=1e-3", params..., legend=:topleft)
+plot!(fig_traj; title="10D, tf=*100s*, Tsit5, tol=1e-3", params...)
+plot!(fig_traj_cb; title="10D + *callback*, tf=100s, Tsit5, tol=1e-3", params...)
+tf_fig = plot(fig_traj_short, fig_traj, fig_traj_cb, layout=(1, 3), size=SIZE_FULL)
+savefig(tf_fig, joinpath(@__DIR__, "figs", "trajectory_10D_short_long_cb.png"))
 display(tf_fig)
 
-# 10D, Tsit5, tol=1e-3, tf = 80 s, no callback vs. callback
-p10 = VIZ.plot_trajectory_10D(sol10)
-p10_cb = VIZ.plot_trajectory_10D(sol10_cb)
-plot!(p10; title="10D, tf=80s, Tsit5, tol=1e-3", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)")
-plot!(p10_cb; title="10D + callback, tf=80s, Tsit5, tol=1e-3", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)")
-plot!(p10; legend=:topleft)
-plot!(p10_cb; legend=false)
-fig = plot(p10, p10_cb, layout=(1, 2), size=(1200, 600))
-savefig(fig, joinpath(@__DIR__, "figs", "trajectory_10D_callback.png"))
-display(fig)
 
-# Single-figure alternative: kite trajectory solid until 20s then dotted, arm/lines always solid.
-# Both segments share t=20 exactly, so the transition is seamless and 0-20s is never plotted twice.
-p_nc = VIZ.plot_trajectory_10D(sol10; tspan=(0, 20))
-VIZ.plot_trajectory_10D(sol10; tspan=(20, 80), kite_ls=:dot, new=false)
-plot!(p_nc; title="10D: solid 0-20s, dotted 20-80s", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=:topleft)
-p_cb = VIZ.plot_trajectory_10D(sol10_cb)
-plot!(p_cb; title="10D + callback, tf=80s, Tsit5, tol=1e-3", xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false)
-split_fig = plot(p_nc, p_cb, layout=(1, 2), size=(1200, 600))
-savefig(split_fig, joinpath(@__DIR__, "figs", "trajectory_10D_tf_callback.png"))
-display(split_fig)
+## Residuals
+# plot(title="Configuration residuals without vs. with callback")
+# plot!(sol10.t, [norm(PM10.manifold_residuals!(similar(u0_10, 6), u, p)) for u in sol10.u], label="No callback")
+# plot!(sol10_cb.t, [norm(PM10.manifold_residuals!(similar(u0_10, 6), u, p)) for u in sol10_cb.u], label="Callback")
+# hline!([tol], label="Tolerance", c=:black)
+# res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", yscale=:log, yticks=exp10.(-15:3:3), legend=:right)
+# savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D.png"))
+# display(res_fig)
 
-plot(title="Configuration residuals without vs. with callback")
-plot!(sol10.t, [norm(PM10.manifold_residuals!(similar(u0_10, 6), u, p)) for u in sol10.u], label="No callback")
-plot!(sol10_cb.t, [norm(PM10.manifold_residuals!(similar(u0_10, 6), u, p)) for u in sol10_cb.u], label="Callback")
-hline!([tol], label="Tolerance", c=:black)
-res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", yscale=:log, yticks=exp10.(-15:3:3), legend=:right)
-savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D.png"))
+t0_res = 1
+ind0 = findfirst(sol10.t .> t0_res)
+ind0_cb = findfirst(sol10_cb.t .> t0_res)
+ts = sol10.t[ind0:(end-1)]
+ts_cb = sol10_cb.t[ind0_cb:(end-1)]
+res = [PM10.manifold_residuals!(similar(u0_10, 6), u, p) for u in sol10.u[ind0:(end-1)]]
+res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), u, p) for u in sol10_cb.u[ind0_cb:(end-1)]]
+plot(title="Residuals without vs. with callback")
+plot!(ts, norm.(getindex.(res, Ref(1:3))), label="Position")
+plot!(ts, norm.(getindex.(res, Ref(4:6))), label="Speed")
+plot!(ts_cb, norm.(getindex.(res_cb, Ref(1:3))) .+ 1e-15, label="Position (callback)", c=PALETTE[1], ls=:dash, alpha=0.5)
+plot!(ts_cb, norm.(getindex.(res_cb, Ref(4:6))) .+ 1e-15, label="Speed (callback", c=PALETTE[2], ls=:dash, alpha=0.5)
+hline!([tol], label="Tolerance (remove it? only for 1 step)", c=:black)
+plot!(xscale=:log10, xticks=exp10.(-15:0.5:15), yscale=:log10, yticks=exp10.(-15:3:15))
+res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:right)
+# savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D.png"))
 display(res_fig)
 
-# --- Model equivalence at maximum accuracy (Alg = Vern9, abstol = reltol = 1e-10) ---
+
+## --- Model equivalence at maximum accuracy (Alg = Vern9, abstol = reltol = 1e-10) ---
 # Short window: the raw 10D model's constraint drift grows with time, keep it small.
-tf_cmp = 3.0
+tf_cmp = 100.0
 tc = range(0, tf_cmp, length=1000)
 pos10(ss) = [PM10.compute_pos1(q, p) for q in ss.(tc, idxs=1:5)]
 pos4(ss) = [PM4.compute_OK(PM4.compute_Rτ(q, vbp), vbp) for q in ss.(tc, idxs=1:2)]
@@ -105,9 +113,9 @@ cmp = plot(v1, v3, layout=(1, 2), size=(1100, 500))
 savefig(cmp, joinpath(@__DIR__, "figs", "_comparison.png"))
 display(cmp)
 
-# --- Error vs integration tolerance, against a very tight 4D reference ---
-tols = [1e-3, 1e-6, 1e-9, 1e-12]
-ref = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-13, save_everystep=true)
+## --- Error vs integration tolerance, against a very tight 4D reference ---
+tols = exp10.(-2:-1:-12)
+ref = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-14, save_everystep=true)
 pref = pos4(ref)
 
 err10 = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=t, save_everystep=true)), pref)) for t in tols]
@@ -115,18 +123,20 @@ err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=t, s
 err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=t, save_everystep=true)), pref)) for t in tols]
 
 conv = plot(title="Kite-position error vs integration tolerance",
-    xlabel="Tolerance (abstol = reltol)", ylabel="Max kite-position error (m)",
-    xscale=:log, yscale=:log, legend=:bottomright)
+    xlabel="Tolerance (abstol = reltol, reversed)", ylabel="Max kite-position error (m)", legend=:bottomright)
 plot!(conv, tols, err10, marker=:circle, label="10D")
 plot!(conv, tols, err10cb, marker=:square, label="10D + callback")
 plot!(conv, tols, err4, marker=:diamond, label="4D")
+plot!(conv, xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15))
+plot!(conv, xflip=true, ymirror=true, legend=:topright)
 savefig(conv, joinpath(@__DIR__, "figs", "convergence.png"))
 display(conv)
+@error "Note: The horizontal axis is reversed so that tighter integration tolerances progress to the right."
 
-# --- Timing at the production tolerance -----------------------------------------
-btime4 = @belapsed PM4.integrate(u0_4, tf, vbp; save_everystep=true, tol) seconds = 0.1
-btime = @belapsed PM10.integrate(u0_10, tf, p; save_everystep=true, tol) seconds=0.1
-btime_cb = @belapsed PM10.integrate(u0_10, tf, p; save_everystep=true, tol, callback) seconds=0.1
+## --- Timing at the production tolerance -----------------------------------------
+btime4 = @belapsed PM4.integrate(u0_4, tf, vbp; save_everystep=true, tol) seconds = 1
+btime = @belapsed PM10.integrate(u0_10, tf, p; save_everystep=true, tol) seconds = 1
+btime_cb = @belapsed PM10.integrate(u0_10, tf, p; save_everystep=true, tol, callback) seconds = 1
 
 ratio_cb = btime_cb / btime
 speedup = btime / btime4
