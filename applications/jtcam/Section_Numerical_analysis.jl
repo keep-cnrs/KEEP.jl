@@ -7,73 +7,16 @@ using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
 using KEEP: SteadyState
 using KEEP: Visualization as VIZ
+using KEEP: LimitCycle as LC
 using KEEP.TorqueFunction: torque_function
 
 using Plots
 using LinearAlgebra: norm, eigvals
+using SplitApplyCombine: invert
+
+include(joinpath(@__DIR__, "jtcam_theme.jl"))
 
 vbp = PMP.build_vbpara()
-
-## ---------------------------------------------------------------------------
-# One simulation: start near the aligned state q = (0, 0) with a prograde
-# kick dq = (0, 1); the trajectory leaves the transient and settles on the
-# pumping limit cycle within ~5 s (a few cycle periods).
-u0 = PM4.build_u(; dτ=1)
-sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
-
-N = 500
-ts = range(0, sol.t[end], N)
-q_ts = reduce(hcat, sol.(ts))'  # interpolated states on the grid
-τm = mod.(q_ts[:, 2], 2π) .- π
-@assert all(-π .<= τm .< π)
-@assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
-
-"""
-Wrapped-τ series: main polyline on the grid with a NaN sample at each 2π
-crossing, plus the crossings as NaN-separated vertical segments (crossing
-time twice, values π and -π) to be drawn dashed.
-"""
-function tau_wrap(ts, τm)
-    Δt = step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
-    t_jump, y_jump = Float64[], Float64[]
-    for tc in tcross
-        append!(t_jump, (tc, tc, NaN))
-        append!(y_jump, (π, -π, NaN))
-    end
-    perm = sortperm(vcat(ts, tcross))
-    t_main = vcat(ts, tcross)[perm]
-    y_main = vcat(τm, fill(NaN, length(tcross)))[perm]
-    return t_main, y_main, t_jump, y_jump
-end
-
-"""
-Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W.
-"""
-function plot_avg_power_kW(sol)
-    t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
-    p = sol.prob.p
-    L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
-    power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
-        label="Average power = $(round(avg_power; digits=2)) kW")
-    plot!(legend=(0.1, -0.2), xlabel="t (s)",
-        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
-end
-
-t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-p_wts = plot(ts, q_ts[:, [1, 3, 4]]; label=["α" "dα" "dτ"],
-    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
-plot!(t_main, y_main; c=4, lw=2, label="τ mod 2π")
-plot!(t_jump, y_jump; c=4, ls=:dash, label=false)
-pw = plot_avg_power_kW(sol)
-sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.65h}; b]), size=(800, 700))
-savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "simulation_4D.png"))
-display(sim_4D_fig)
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -212,14 +155,115 @@ plot!([NaN], [NaN]; c=:magenta, label="ddα = 0")
 ss = SteadyState.all_steady_states(vbp)
 scatter!(first.(ss), last.(ss); c=:black, ms=5, label="Equilibrium")
 
-savefig(joinpath(@__DIR__, "figs", "equilibria.png"))
+savefig(joinpath(@__DIR__, "figs", "equilibria.pdf"))
 savefig(joinpath(@__DIR__, "figs", "equilibria.pdf"))
 display(current())
 @error "Chance to use Poincaré-Miranda theorem?"
 
 # Sanity: the nullclines pass through the equilibria (|ddq| ≈ 0 there).
 @assert maximum(norm(f(q)) for q in ss) < 1e-6
-@assert 0 < last(sol.u)[5] / last(sol.t)  # positive average power over the simulation
+
+
+## ---------------------------------------------------------------------------
+# One simulation: start near the aligned state q = (0, 0) with a prograde
+# kick dq = (0, 1); the trajectory leaves the transient and settles on the
+# pumping limit cycle within ~5 s (a few cycle periods).
+u0 = PM4.build_u(; dτ=1)
+sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
+
+N = 500
+ts = range(0, sol.t[end], N)
+q_ts = reduce(hcat, sol.(ts))'  # interpolated states on the grid
+τm = mod.(q_ts[:, 2], 2π) .- π
+@assert all(-π .<= τm .< π)
+@assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
+
+"""
+Wrapped-τ series: main polyline on the grid with a NaN sample at each 2π
+crossing, plus the crossings as NaN-separated vertical segments (crossing
+time twice, values π and -π) to be drawn dashed.
+"""
+function tau_wrap(ts, τm)
+    Δt = step(ts)
+    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
+              for i in findall(diff(τm) .< -π)]
+    t_jump, y_jump = Float64[], Float64[]
+    for tc in tcross
+        append!(t_jump, (tc, tc, NaN))
+        append!(y_jump, (π, -π, NaN))
+    end
+    perm = sortperm(vcat(ts, tcross))
+    t_main = vcat(ts, tcross)[perm]
+    y_main = vcat(τm, fill(NaN, length(tcross)))[perm]
+    return t_main, y_main, t_jump, y_jump
+end
+
+"""
+Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W.
+"""
+function plot_avg_power_kW(sol)
+    t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
+    p = sol.prob.p
+    L, M, T = PMP.lmt(p)
+    dα = sol.(t, idxs=3)
+    power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
+    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
+    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
+        label="Average power = $(round(avg_power; digits=2)) kW")
+    plot!(legend=(0.1, -0.2), xlabel="t (s)",
+        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
+end
+
+t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
+p_wts = plot(ts, q_ts[:, [1, 3, 4]]; label=["α" "dα" "dτ"],
+    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
+plot!(t_main, y_main; c=4, lw=2, label="τ mod 2π")
+plot!(t_jump, y_jump; c=4, ls=:dash, label=false)
+pw = plot_avg_power_kW(sol)
+sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.65h}; b]), size=(800, 700))
+savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "simulation_4D.pdf"))
+display(sim_4D_fig)
+
+
+## Eight-trajectory in YZ plane
+# r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
+# include("../../test/publications/ECC2026/state_funcs.jl")
+lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
+lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
+
+function yz_split(sol, n_splits)
+    t = range(sol.prob.tspan..., 300)
+    yz = [r_vec(t, sol)[2:3] for t in t]
+    Δt = (t[end] - t[1]) / (n_splits + 1)
+    for i in 1:n_splits
+        t_split = (i - 0.2) * Δt
+        ind = searchsortedfirst(t, t_split)
+        insert!(yz, ind + i - 1, [NaN, NaN])
+    end
+    return yz
+end
+
+n_splits = 4
+# arrows = [permutedims(repeat([true], n_splits - 1)) false]
+plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-20:5:20, ytick=5:2.5:10, size=plot_size(500, aspect_ratio=1.8))
+plot!(invert(yz_split(lc_p, n_splits))..., arrows=true, label="\$\\dot{\\tau} > 0\$")
+plot!(invert(yz_split(lc_m, n_splits))..., arrows=true, label="\$\\dot{\\tau} < 0\$")
+plot!([0], [13])
+lens!([-11, -10], [8, 9], inset=(1, bbox(0.3, 0, 0.3, 0.4)))
+l = plot!().inset_subplots[1]
+xticks!(l, -11:0.5:-10)
+yticks!(l, 8:0.5:9)
+plot!(l, tickfontsize=TICKFONTSIZE - 1)
+
+display(plot!())
+
+savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
+
+#=
+Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
+Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
+=#
 
 ## Limit Cycles
 # TODO

@@ -98,15 +98,14 @@ function main()
     end
 
     n_splits = 4
-    arrows = [permutedims(repeat([true], n_splits - 1)) false]
-    plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-20:5:20, ytick=5:2.5:10, size=plot_size(1.8))
+    plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-40:10:40, ytick=10:5:20, size=plot_size(1.8))
     plot!(invert(yz_split(lc_p, n_splits))..., arrows=true, label="\$\\dot{\\tau} > 0\$")
     plot!(invert(yz_split(lc_m, n_splits))..., arrows=true, label="\$\\dot{\\tau} < 0\$")
-    plot!([0], [13])
-    lens!([-11, -10], [8, 9], inset=(1, bbox(0.3, 0, 0.3, 0.4)))
+    plot!([0], [26])
+    lens!([-20.5, -19.5], [15.5, 16.5], inset=(1, bbox(0.3, 0, 0.3, 0.4)))
     l = plot!().inset_subplots[1]
-    xticks!(l, -11:0.5:-10)
-    yticks!(l, 8:0.5:9)
+    xticks!(l, -21:1:-19)
+    yticks!(l, 15:1:17)
     plot!(l, tickfontsize=TICKFONTSIZE - 1)
 
     display(plot!())

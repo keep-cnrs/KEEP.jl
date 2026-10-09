@@ -27,14 +27,14 @@ function main()
     # using code in @Visualization.jl , write a function here that will plot the trajectory in XY, XZ and YZ planes, aswell as from the current angle
 
     t = range(tf - 5, tf, step=0.01)
-    plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-20:5:20, ytick=5:2.5:10, size=plot_size(1.8))
+    plot(aspect_ratio=:equal, xlabel="\$y\$ (m)", ylabel="\$z\$ (m)", xtick=-40:10:40, ytick=10:5:20, size=plot_size(1.8))
     plot!(invert(r_vec.(t, Ref(sol_plus)))[2:3]..., label="\$\\dot{\\tau} > 0\$")
     plot!(invert(r_vec.(t, Ref(sol_minus)))[2:3]..., label="\$\\dot{\\tau} < 0\$")
-    lens!([-11, -10], [8, 9], inset=(1, bbox(0.25, 0, 0.3, 0.3)))
+    lens!([-21, -19], [15, 17], inset=(1, bbox(0.25, 0, 0.3, 0.3)))
     l = plot!().inset_subplots[1]
-    xticks!(l, -11:0.5:-10)
-    yticks!(l, 8:0.5:9)
-    plot!([0], [13])
+    xticks!(l, -21:1:-19)
+    yticks!(l, 15:1:17)
+    plot!([0], [26])
     display(plot!())
 
     plot(title="Two different limit cycles", aspect_ratio=:equal, axis=false, xlabel=L"\alpha", ylabel=L"\tau")

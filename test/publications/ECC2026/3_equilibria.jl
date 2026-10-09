@@ -80,7 +80,7 @@ function main()
     display(fig)
 
     # cm.save("test/publications/ECC2026/figs/equilibria.png", fig, px_per_unit=PT_PER_INCH)
-    cm.save("test/publications/ECC2026/figs/equilibria.pdf", fig, px_per_unit=PT_PER_INCH * PT)
+    cm.save(joinpath(outpath, "equilibria.pdf"), fig, px_per_unit=PT_PER_INCH * PT)
 
     #=
     We plot in grey the stream lines of the $\ddq(\vq)$, in purple and green the null-clines of the $\ddot{α}(\vq)$ and $\ddot{τ}(\vq)$ respectively, and mark the equilibria at their intersections with a color based on the maximum eigenvalue of the jacobian of $\vb x -> f(x) = \dot{\vb x}$ \alter{vérifier f(x)}. Background is green when the arm points downwind and red when the arm points upwind, which is to be avoided for ease of access to the device by a technician.

@@ -74,7 +74,7 @@ plot!([]; arm_tip_pars...)
 plot!([]; longitude_pars...)
 plot!([]; latitude_pars...)
 
-savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.png"))
+savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
 display(fig)
 
 ## Parametrisation in tau

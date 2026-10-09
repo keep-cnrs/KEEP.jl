@@ -24,7 +24,7 @@ r = (t, sol) -> begin
     r_hat_ = r_hat(t, sol)
     a_hat_ = a_vec(t, sol)
     dotprod = r_hat_' * a_hat_
-    l = sol.prob.p.r
+    l = sol.prob.p.r * sol.prob.p.l   # p.r is arm-normalized (build_vbpara): physical tether = p.r * p.l
     a = sol.prob.p.l
     dotprod + sqrt(dotprod^2 + l^2 - a^2)
 end
