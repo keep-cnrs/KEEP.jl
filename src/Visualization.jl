@@ -35,7 +35,10 @@ const DEFAULT_PPS = 30
 
 # For plotting phase space etc...
 const TICKS_PI = (-2π:π:2π, [L"-2π", L"-π", L"0", L"π", L"2π"])
-const TICKS_HALF_PI = (-2π:(π/2):2π, [L"-2π", L"-3π/2", L"-π", L"-π/2", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"])
+const TICKS_HALF_PI = (
+    -2π:(π / 2):2π,
+    [L"-2π", L"-3π/2", L"-π", L"-π/2", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"],
+)
 # const TICKS_HALF_PI = (-2π:π/2:2π, [L"-2π", L"-\frac{3π}{2}", L"-π", L"-\frac{π}{2}", L"0", L"\frac{π}{2}", L"π", L"\frac{3π}{2}", L"2π"])
 
 """
@@ -48,10 +51,12 @@ function build_t(tspan, points_per_second)
 end
 build_t(tspan::Number, points_per_second) = build_t((0, tspan), points_per_second)
 
-function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS, kite_ls=:solid, new=true)
+function plot_trajectory_10D(
+    sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS, kite_ls=:solid, new=true
+)
     p = sol.prob.p
     t, _ = build_t(tspan, points_per_second)
-    q = sol.(t, idxs=1:5)
+    q = sol.(t; idxs=1:5)
     A = [PM10.compute_posA(q, p) for q in q]  # *A* like tip of the *A*rm
     K1 = [PM10.compute_pos1(q, p) for q in q]  # *K* like tip of the *K*ite, computed from R and τ
     K2 = [PM10.compute_pos2(q, p) for q in q]  # *K* like tip of the *K*ite, computed from α, θ2 and φ2
@@ -59,41 +64,52 @@ function plot_trajectory_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAUL
     arm_and_lines = [[0 * A, A, K1, NaN * A] for (A, K1) in zip(A, K1)]
 
     new && plot()
-    plot!(invert(flatten(arm_and_lines))..., c=:black, alpha=20 / length(t), lw=1, label="")
-    plot!(invert(K1)..., label=new ? L"K1(R, \tau)" : "", c=2, ls=kite_ls)
-    plot!(invert(K2)..., label=new ? L"K2(\alpha, \theta_\ell, \phi_\ell)" : "", c=3, ls=kite_ls)
-    plot!(invert(A)..., label=new ? L"A(\alpha)" : "", c=1)
+    plot!(invert(flatten(arm_and_lines))...; c=:black, alpha=20 / length(t), lw=1, label="")
+    plot!(invert(K1)...; label=new ? L"K1(R, \tau)" : "", c=2, ls=kite_ls)
+    plot!(
+        invert(K2)...;
+        label=new ? L"K2(\alpha, \theta_\ell, \phi_\ell)" : "",
+        c=3,
+        ls=kite_ls,
+    )
+    return plot!(invert(A)...; label=new ? L"A(\alpha)" : "", c=1)
 end
 
 function plot_trajectory_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)
     vbp = sol.prob.p
     t, _ = build_t(tspan, points_per_second)
-    q = sol.(t, idxs=1:2)
+    q = sol.(t; idxs=1:2)
     A = [vbp.l * PM4.compute_αhat(q[1]) for q in q]
     K = [PM4.compute_OK(PM4.compute_Rτ(q[1:2], vbp), vbp) for q in q]
 
     arm_and_lines = [[0 * A, A, K, NaN * A] for (A, K) in zip(A, K)]
 
     plot()
-    plot!(invert(flatten(arm_and_lines))..., c=:black, alpha=20 / length(t), lw=1, label="")
-    plot!(invert(K)..., label=L"K(\alpha, \tau)", c=2)
-    plot!(invert(A)..., label=L"A(\alpha)", c=1)
+    plot!(invert(flatten(arm_and_lines))...; c=:black, alpha=20 / length(t), lw=1, label="")
+    plot!(invert(K)...; label=L"K(\alpha, \tau)", c=2)
+    return plot!(invert(A)...; label=L"A(\alpha)", c=1)
 end
 
 function _plot_avg_power(t0, tf, t, power, avg_power)
-    plot(t, power, c=:black, lw=2, label="")
-    plot!([t0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = \%.0f(avg_power) W")
-    plot!(legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
+    plot(t, power; c=:black, lw=2, label="")
+    plot!(
+        [t0, tf],
+        avg_power .* [1, 1];
+        c=:red,
+        lw=2,
+        label=f"Average power = \%.0f(avg_power) W",
+    )
+    return plot!(; legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 end
 
 function plot_avg_power_10D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)
     dα_ind, P_ind = 8, 11
     t, (t0, tf) = build_t(tspan, points_per_second)
     p = sol.prob.p
-    dα = sol.(t, idxs=dα_ind)
+    dα = sol.(t; idxs=dα_ind)
     power = [dα * torque_function(dα, p) for dα in dα]
-    avg_power = sol(tf, idxs=P_ind) / (tf - t0)
-    _plot_avg_power(t0, tf, t, power, avg_power)
+    avg_power = sol(tf; idxs=P_ind) / (tf - t0)
+    return _plot_avg_power(t0, tf, t, power, avg_power)
 end
 
 function plot_avg_power_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_PPS)
@@ -101,22 +117,31 @@ function plot_avg_power_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT_
     t, (t0, tf) = build_t(tspan, points_per_second)
     p = sol.prob.p
     L, M, T = lmt(p)
-    dα = sol.(t, idxs=dα_ind)
+    dα = sol.(t; idxs=dα_ind)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2)
-    avg_power = sol(tf, idxs=P_ind) / (tf - t0)
-    _plot_avg_power(t0, tf, t, power, avg_power)
+    avg_power = sol(tf; idxs=P_ind) / (tf - t0)
+    return _plot_avg_power(t0, tf, t, power, avg_power)
 end
 
-function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail_length=1, trail_step=1 / 5fps, start_camera=(30, 30), end_camera=(40, 30), figsize=(800, 800))
+function animate_trajectory_4D(
+    sol;
+    tspan=extrema(sol.t),
+    fps=DEFAULT_PPS,
+    trail_length=1,
+    trail_step=1 / 5fps,
+    start_camera=(30, 30),
+    end_camera=(40, 30),
+    figsize=(800, 800),
+)
     vbp = sol.prob.p
     t, (t0, tf) = build_t(tspan, fps)
-    global K = [PM4.compute_OK(PM4.compute_Rτ(q, vbp), vbp) for q in sol(t, idxs=1:2)]
+    global K = [PM4.compute_OK(PM4.compute_Rτ(q, vbp), vbp) for q in sol(t; idxs=1:2)]
     xmax, ymax, zmax = 1.1 * maximum.(invert(K))
     @show xmax, ymax, zmax
 
     @show length(t)
     @time anim = @animate for t_ in t
-        t_trail = [max(0, t_-trail_length):trail_step:t_; t_]
+        t_trail = [max(0, t_ - trail_length):trail_step:t_; t_]
         q = sol(t_trail, idxs=1:2)
         α = first(q[end])
         A = vbp.l * PM4.compute_αhat(α)
@@ -130,11 +155,17 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
         plot(invert(segment)..., lw=1, c=:black, label="")
         plot!(invert(trail_K)..., msw=0, lw=4 * width, alpha=width, label="")
         scatter!(invert([A])..., msw=0, ms=4, label="")
-        plot!(xlims=(0, xmax), ylims=(-ymax, ymax), zlims=(0, zmax),
-            xlabel="x", ylabel="y", zlabel="z",
+        plot!(
+            xlims=(0, xmax),
+            ylims=(-ymax, ymax),
+            zlims=(0, zmax),
+            xlabel="x",
+            ylabel="y",
+            zlabel="z",
             camera=camera,
-            titlefont="monospace", title=f"t = \%.2f(t_) s / \%.2f(tf) s",
-            size=figsize
+            titlefont="monospace",
+            title=f"t = \%.2f(t_) s / \%.2f(tf) s",
+            size=figsize,
         )
     end fps = fps
     return anim
@@ -145,13 +176,13 @@ function init_plot_eight_circle(vbp)
     θ0 = vbp.l + vbp.r
     Δφ = θ0 * vbp.Δφ
     Δθ = vbp.Δθ * Δφ / vbp.Δφ
-    plot_vbp = build_para(θ0=θ0, Δθ=Δθ, φ0=0, Δφ=Δφ)
-    τ = range(-π, π, length=100)
+    plot_vbp = build_para(; θ0=θ0, Δθ=Δθ, φ0=0, Δφ=Δφ)
+    τ = range(-π, π; length=100)
     θ, φ = invert(PM4.τ_to_θφ.(τ, Ref(plot_vbp)))
-    plot(φ, θ, aspect_ratio=:equal, color=:black, grid=false, axis=false, label="")
+    plot(φ, θ; aspect_ratio=:equal, color=:black, grid=false, axis=false, label="")
 
     # Circle
-    α = range(-π, π, length=100)
+    α = range(-π, π; length=100)
     x, y = vbp.l .* invert(sincos.(α))
     plot!(y, x; color=:black, label="")
 
@@ -159,20 +190,24 @@ function init_plot_eight_circle(vbp)
     offset = l / 4
 
     # order: y, x, φ, θ
-    x_axes = [-l, -l - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset]
-    y_axes = [-l - offset, -l, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ]
+    x_axes = [
+        -l, -l - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset
+    ]
+    y_axes = [
+        -l - offset, -l, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ
+    ]
 
     u_axes = [2l, 0, 2l, 0]
     v_axes = [0, 2l, 0, 2l]
     xy_axes = hcat(x_axes, y_axes)
     uv_axes = hcat(u_axes, v_axes)
-    quiver!(eachcol(xy_axes)..., quiver=Tuple(eachcol(uv_axes)), c=:black)
+    quiver!(eachcol(xy_axes)...; quiver=Tuple(eachcol(uv_axes)), c=:black)
 
     x_lbl = @. x_axes + u_axes / 2 - v_axes / 4
     y_lbl = @. y_axes + v_axes / 2 - u_axes / 4
     labels = text.(["y", "x", L"\phi", L"\theta"], :black, :center, 10)
     annotate!(x_lbl, y_lbl, labels)
-    plot!([-1, -2vbp.l], alpha=0, label="")  # Else "y" is not shown
+    plot!([-1, -2vbp.l]; alpha=0, label="")  # Else "y" is not shown
 
     return (plot!(), plot_vbp)
 end
@@ -193,9 +228,7 @@ TODO:
 
 function plot_eight_circle(qs, vbp; plot_kwargs=())
     plot_kwargs_arr = ifelse(
-        isa(plot_kwargs, AbstractVector),
-        plot_kwargs,
-        fill(plot_kwargs, length(qs))
+        isa(plot_kwargs, AbstractVector), plot_kwargs, fill(plot_kwargs, length(qs))
     )
 
     fig, plot_vbp = init_plot_eight_circle(vbp)
@@ -205,7 +238,6 @@ function plot_eight_circle(qs, vbp; plot_kwargs=())
 
     return fig
 end
-
 
 """
 Make the links given by q1s and q2s
@@ -224,7 +256,14 @@ function plot_phase_space(qs; links=[[]])
 
     ticks = TICKS_PI
 
-    plot(xlabel=L"\alpha", ylabel=L"\tau", title="Equilibriums linked to their symmetries", legend=:outerright, xticks=ticks, yticks=ticks)
+    plot(;
+        xlabel=L"\alpha",
+        ylabel=L"\tau",
+        title="Equilibriums linked to their symmetries",
+        legend=:outerright,
+        xticks=ticks,
+        yticks=ticks,
+    )
 
     alpha_col = 0.1
     alpha_pattern = 0.1
@@ -232,15 +271,27 @@ function plot_phase_space(qs; links=[[]])
     fill_down = nothing
     alpha_up = isnothing(fill_up) ? 0 : alpha_pattern
     alpha_down = isnothing(fill_down) ? 0 : alpha_pattern
-    plot!(rect(-0.5, 0.5, -1, 1), c=:green, alpha=alpha_col, label="Arm towards the wind")
-    plot!(rect(-1, -0.5, -1, 1), c=:red, alpha=alpha_col, label="Arm against the wind")
-    plot!(rect(0.5, 1, -1, 1), c=:red, alpha=alpha_col, label="")
+    plot!(rect(-0.5, 0.5, -1, 1); c=:green, alpha=alpha_col, label="Arm towards the wind")
+    plot!(rect(-1, -0.5, -1, 1); c=:red, alpha=alpha_col, label="Arm against the wind")
+    plot!(rect(0.5, 1, -1, 1); c=:red, alpha=alpha_col, label="")
 
-    scatter!(invert(qs)..., c=:black, label="Equlibrium")
-    plot!(rect(-1, 1, -1, -0.5), c=:black, alpha=alpha_up, fillstyle=fill_up, label="Kite above center of 8")
-    plot!(rect(-1, 1, -0.5, 0), c=:black, alpha=alpha_down, fillstyle=fill_down, label="Kite below center of 8")
-    plot!(rect(-1, 1, 0, 0.5), c=:black, alpha=alpha_up, fillstyle=fill_up, label="")
-    plot!(rect(-1, 1, 0.5, 1), c=:black, alpha=alpha_down, fillstyle=fill_down, label="")
+    scatter!(invert(qs)...; c=:black, label="Equlibrium")
+    plot!(
+        rect(-1, 1, -1, -0.5);
+        c=:black,
+        alpha=alpha_up,
+        fillstyle=fill_up,
+        label="Kite above center of 8",
+    )
+    plot!(
+        rect(-1, 1, -0.5, 0);
+        c=:black,
+        alpha=alpha_down,
+        fillstyle=fill_down,
+        label="Kite below center of 8",
+    )
+    plot!(rect(-1, 1, 0, 0.5); c=:black, alpha=alpha_up, fillstyle=fill_up, label="")
+    plot!(rect(-1, 1, 0.5, 1); c=:black, alpha=alpha_down, fillstyle=fill_down, label="")
 
     ## We could use vspan/hspan but there is padding between the plot area and its axis which is ugly
     # vspan!(π * [-.5, .5], c=:green, alpha=alpha_col, label="Arm towards the wind")
@@ -249,7 +300,7 @@ function plot_phase_space(qs; links=[[]])
     # hspan!(π * [-1, -.5, 0, .5], c=:black, alpha=alpha_up, fillstyle=fill_up, label="Kite above center of 8")
     # hspan!(π * [-.5, 0, .5, 1], c=:black, alpha=alpha_down, fillstyle=fill_down, label="Kite below center of 8")
 
-    return plot!(invert(links)..., c=:black, alpha=0.1, lw=5, label="")
+    return plot!(invert(links)...; c=:black, alpha=0.1, lw=5, label="")
 end
 
 end  # module
