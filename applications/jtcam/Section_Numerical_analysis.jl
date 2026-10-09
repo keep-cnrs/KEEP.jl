@@ -35,8 +35,9 @@ time twice, values π and -π) to be drawn dashed.
 """
 function tau_wrap(ts, τm)
     Δt = step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
+    tcross = [
+        ts[i] + Δt * (π - τm[i]) / (τm[i + 1] + 2π - τm[i]) for i in findall(diff(τm) .< -π)
+    ]
     t_jump, y_jump = Float64[], Float64[]
     for tc in tcross
         append!(t_jump, (tc, tc, NaN))
@@ -55,19 +56,32 @@ function plot_avg_power_kW(sol)
     t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
+    dα = sol.(t; idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    avg_power = sol(tf; idxs=5) / (tf - t0) / 1000
     plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
-        label="Average power = $(round(avg_power; digits=2)) kW")
-    plot!(legend=(0.1, -0.2), xlabel="t (s)",
-        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
+    plot!(
+        [t0, tf],
+        [avg_power, avg_power];
+        c=:red,
+        lw=2,
+        label="Average power = $(round(avg_power; digits=2)) kW",
+    )
+    return plot!(;
+        legend=(0.1, -0.2), xlabel="t (s)", left_margin=2Plots.mm, bottom_margin=3Plots.mm
+    )
 end
 
 t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-p_wts = plot(ts, q_ts[:, [1, 3, 4]]; label=["α" "dα" "dτ"],
-    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
+p_wts = plot(
+    ts,
+    q_ts[:, [1, 3, 4]];
+    label=["α" "dα" "dτ"],
+    ylabel="q (rad), qd (rad/s)",
+    legend=:bottomleft,
+    xlabel="",
+    xformatter=x->"",
+)
 plot!(t_main, y_main; c=4, lw=2, label="τ mod 2π")
 plot!(t_jump, y_jump; c=4, ls=:dash, label=false)
 pw = plot_avg_power_kW(sol)
@@ -83,9 +97,17 @@ display(sim_4D_fig)
 f = q -> SteadyState.ddq_partial(q .+ 1e-100, vbp)
 
 # Background: green when the arm points downwind (|α| < π/2), red upwind.
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+plot(;
+    xlims=(-π - 0.2, π + 0.2),
+    ylims=(-π - 0.2, π + 0.2),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 vspan!([-π, -π / 2]; c=:red, alpha=0.1, label="Arm upwind")
 vspan!([-π / 2, π / 2]; c=:green, alpha=0.1, label="Arm downwind")
 vspan!([π / 2, π]; c=:red, alpha=0.1, label="")
@@ -107,7 +129,9 @@ equilibria.
 Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
 and seed positions / unit field directions for the arrows.
 """
-function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+function streamlines(
+    f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0
+)
     gx, gy = gridsize
     xmin, xmax = xlims
     ymin, ymax = ylims
@@ -133,8 +157,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
         k3 === nothing && return nothing
         k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
         k4 === nothing && return nothing
-        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
-            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+        return (
+            x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]),
+        )
     end
     line_x, line_y = Float32[], Float32[]
     ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
@@ -167,7 +193,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
                 x = step_rk4(x, d, stepsize)
                 x === nothing && break
                 (xmin ≤ x[1] ≤ xmax && ymin ≤ x[2] ≤ ymax) || break
-                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                idx = (
+                    clamp(searchsortedlast(rx, x[1]), 1, gx),
+                    clamp(searchsortedlast(ry, x[2]), 1, gy),
+                )
                 if idx != ccur
                     mask[idx...] || break
                     mask[idx...] = false
@@ -190,10 +219,13 @@ plot!(line_x, line_y; c=:grey, alpha=0.5, lw=0.5, label="")
 # shaft + fixed-size head (gr_polyline + GR.drawarrow), so marker-only heads
 # are rendered as triangles, one series for all seeds.
 L, W = 0.045, 0.016  # head length / half-width, data units
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),          # tip
-    (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
-    (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
-         for (s, u, v) in zip(zip(ax, ay), au, av)]
+heads = [
+    Shape([
+        (s[1] + L / 2 * u, s[2] + L / 2 * v),          # tip
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u),
+    ]) for (s, u, v) in zip(zip(ax, ay), au, av)
+]
 plot!(heads; c=:grey, alpha=0.6, label="")
 
 # Nullclines ddτ = 0 (green) and ddα = 0 (magenta); matrices are built with

@@ -17,12 +17,16 @@
 #
 # Run: julia --project=applications/sprint2026 scratch/_dense_frames.jl
 using Serialization, Printf, LinearAlgebra, StaticArrays
-import BifurcationKit
+using BifurcationKit: BifurcationKit
 include(joinpath(@__DIR__, "..", "BK_tests_0910.jl"))
 
 const OPT = (
-    params_opt=(r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744),
-    shooting=[-1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815],
+    params_opt=(
+        r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744
+    ),
+    shooting=[
+        -1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815
+    ],
 )
 const SNAPS = 300
 
@@ -41,29 +45,39 @@ function dense_frames(c, bvp, sh, p)
         F[2, i] = q[2]
     end
     # x closes under the rebuilt BVP (validates it is the periodic orbit)
-    xend = ens.u[M](sh.ds[M]); xs = um[:, 1]
-    res = maximum(abs.((xend[1] - xs[1], xend[2] - xs[2] - 2π, xend[3] - xs[3], xend[4] - xs[4])))
+    xend = ens.u[M](sh.ds[M])
+    xs = um[:, 1]
+    res = maximum(
+        abs.((xend[1] - xs[1], xend[2] - xs[2] - 2π, xend[3] - xs[3], xend[4] - xs[4]))
+    )
     # dense frames agree with the archived mesh (Hermite, same phase)
     mesh = BVP.get_solution_bvp(bvp, c.x[1:(N * M)], p)
-    U = Array(mesh.u); sn = collect(mesh.t)
+    U = Array(mesh.u)
+    sn = collect(mesh.t)
     err = 0.0
     for i in (1, 75, 150, 225, 299)
         s = (i - 1) / SNAPS
         j = clamp(searchsortedlast(sn, s), 1, length(sn) - 1)
-        w = (s - sn[j]) / (sn[j + 1] - sn[j]); h = (sn[j + 1] - sn[j]) * c.tf
-        h00 = 2w^3 - 3w^2 + 1; h10 = w^3 - 2w^2 + w; h01 = -2w^3 + 3w^2; h11 = w^3 - w^2
-        her = h00 .* U[1:2, j] .+ h10 .* h .* U[3:4, j] .+ h01 .* U[1:2, j + 1] .+ h11 .* h .* U[3:4, j + 1]
+        w = (s - sn[j]) / (sn[j + 1] - sn[j])
+        h = (sn[j + 1] - sn[j]) * c.tf
+        h00 = 2w^3 - 3w^2 + 1
+        h10 = w^3 - 2w^2 + w
+        h01 = -2w^3 + 3w^2
+        h11 = w^3 - w^2
+        her =
+            h00 .* U[1:2, j] .+ h10 .* h .* U[3:4, j] .+ h01 .* U[1:2, j + 1] .+
+            h11 .* h .* U[3:4, j + 1]
         err = max(err, norm(F[:, i] .- her))
     end
     @printf("closure res=%.2e   |frames-mesh|=%.2e\n", res, err)
     @assert res < 1e-6 "x does not close: res=$res"
     @assert err < 1e-5 "dense frames inconsistent with the mesh: err=$err"
-    (; frames=F, trail=[(U[1, k], U[2, k]) for k in 1:2:size(U, 2)], tf=c.tf)
+    return (; frames=F, trail=[(U[1, k], U[2, k]) for k in 1:2:size(U, 2)], tf=c.tf)
 end
 
 function main()
     cy = deserialize(joinpath(@__DIR__, "three_cycles_shooting.jls"))
-    setup = make_setup(opt=OPT)
+    setup = make_setup(; opt=OPT)
     method = BVP.Shooting(cy.M, ODE_ALG, true)
     bvp = make_bvp(make_model(method, setup), method)
     sh = bvp.cache
@@ -73,9 +87,17 @@ function main()
         @printf("  %-8s ", name)
         out[name] = dense_frames(c, bvp, sh, p)
     end
-    serialize(joinpath(@__DIR__, "three_cycles_frames.jls"),
-        (; short=out[:short], long=out[:long], longlong=out[:longlong],
-            v_ref=cy.v_ref, SNAPS=SNAPS, M=cy.M))
+    serialize(
+        joinpath(@__DIR__, "three_cycles_frames.jls"),
+        (;
+            short=out[:short],
+            long=out[:long],
+            longlong=out[:longlong],
+            v_ref=cy.v_ref,
+            SNAPS=SNAPS,
+            M=cy.M,
+        ),
+    )
     @printf("saved three_cycles_frames.jls (SNAPS=%d, M=%d)\n", SNAPS, cy.M)
 end
 
