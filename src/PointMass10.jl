@@ -3,7 +3,7 @@ module PointMass10
 import LinearAlgebra: norm, normalize, ⋅, ×
 using StaticArrays
 import NaNMath as nm
-import OrdinaryDiffEqTsit5: Tsit5
+import OrdinaryDiffEqVerner: Vern9
 import ForwardDiff
 using DiffResults
 using Logging: @warn
@@ -308,7 +308,7 @@ function manifold_residuals!(res, u, p)
     res
 end
 
-function integrate(u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
+function integrate(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
     return _integrate(dynamics!, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
 end
 

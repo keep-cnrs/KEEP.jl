@@ -22,7 +22,7 @@ What should go in there :
 =#
 
 using DiffEqCallbacks: ContinuousCallback
-using OrdinaryDiffEqTsit5: terminate!
+using OrdinaryDiffEqVerner: terminate!
 using StrFormat
 using StaticArrays
 using Clustering: dbscan
@@ -70,7 +70,7 @@ tol = Inf: Stop after the first pass
 
 Starting on the Poincarré section will not save the state trough the callback.
 
-In practice with Tsit5 it is not needed, but you shouldn't rely on this happy behavior.
+In practice with Vern9 it is not needed, but you shouldn't rely on this happy behavior.
 Also, tol should be greater than 1e-12 because of numerical errors accumulating during one cycle.
 
 Let tol_int be the tolerance used for integration. Then tol > max(10 * tol_int, 1e-12)."""

@@ -3,7 +3,7 @@ module PointMass4
 import LinearAlgebra: norm, normalize, ⋅, ×
 using StaticArrays
 import NaNMath as nm
-import OrdinaryDiffEqTsit5: Tsit5
+import OrdinaryDiffEqVerner: Vern9
 import ForwardDiff
 
 import KEEP.PointMass4 as PM4
@@ -97,7 +97,7 @@ du = (dα, dτ, ddα, ddτ)
 """
 function dynamics(u, p, t=0)
     L, M, T = lmt(p)
-    α, _ = q = u[SA[1, 2]]
+    α, _ = q = u[SA[1, 2]] .+ 1e-100  # Avoid singularity
     dα, _ = dq = u[SA[3, 4]]
 
     # Compute values and derivatives
@@ -187,7 +187,7 @@ function build_u(; α=0, dα=0, dτ=0, τ=TAU0, W=0.0)
     return build_u(α, τ, dα, dτ, W)
 end
 
-function integrate(u0, tf, p, alg=Tsit5(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
+function integrate(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
     return _integrate(dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
 end
 

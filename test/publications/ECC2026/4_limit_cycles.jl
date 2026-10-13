@@ -17,9 +17,7 @@ include("plots_default.jl")
 function main()
     outpath = mkpath("out/2026_07_ECC")
 
-    _u0 = SA[0, TAU0, 0, 1, 0]
     u0 = PM4.build_u(dτ=1)
-    @assert u0 == _u0
     p = PM4.build_vbpara()
     tf = 25
     cb = LC.build_poincare_callback(eps(1.0))

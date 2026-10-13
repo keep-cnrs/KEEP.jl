@@ -7,6 +7,7 @@ using KEEP: PointMassPara as PMP
 using KEEP: Visualization as VIZ
 
 using OrdinaryDiffEqVerner: Vern9
+using OrdinaryDiffEqTsit5: Tsit5
 
 using BenchmarkTools
 using Plots
@@ -27,11 +28,12 @@ vbp = PMP.build_vbpara(p)
 # Projection callback: its tolerance is independent of the integrator tolerance.
 cb_tol = 1e-10
 callback = PM10.build_manifold_projection(u0_10; save=true, tol=cb_tol)
+callback_no_save = PM10.build_manifold_projection(u0_10; save=false, tol=cb_tol)
 
 # Physical plots at loose tolerance, to exaggerate the drift of the raw 10D model.
 tf_short, tf, tol = 20, 100, 1e-3
-sol10 = PM10.integrate(u0_10, tf, p; save_everystep=true, tol)
-sol10_cb = PM10.integrate(u0_10, tf, p; save_everystep=false, tol, callback)
+sol10 = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol)
+sol10_cb = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol, callback=callback_no_save)
 
 ## 10D, Tsit5, tol=1e-3, tf = 20 vs 100 s vs callback
 fig_traj_short = VIZ.plot_trajectory_10D(sol10; tspan=(0, tf_short))
@@ -55,22 +57,44 @@ display(tf_fig)
 # savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D.pdf"))
 # display(res_fig)
 
+tf_long = 1000
+sol10 = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6)
+sol10_cb_f = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=false, tol=1e-6, callback=callback)
+sol10_cb_t = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6, callback=callback_no_save)
+
+## Only callback-saved states
 t0_res = 1
 ind0 = findfirst(sol10.t .> t0_res)
-ind0_cb = findfirst(sol10_cb.t .> t0_res)
+ind0_cb = findfirst(sol10_cb_f.t .> t0_res)
 ts = sol10.t[ind0:(end-1)]
-ts_cb = sol10_cb.t[ind0_cb:(end-1)]
+ts_cb = sol10_cb_f.t[ind0_cb:(end-1)]
 res = [PM10.manifold_residuals!(similar(u0_10, 6), u, p) for u in sol10.u[ind0:(end-1)]]
-res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), u, p) for u in sol10_cb.u[ind0_cb:(end-1)]]
+res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), u, p) for u in sol10_cb_f.u[ind0_cb:(end-1)]]
 plot(title="Residuals without vs. with callback")
 plot!(ts, norm.(getindex.(res, Ref(1:3))), label="Position")
 plot!(ts, norm.(getindex.(res, Ref(4:6))), label="Speed")
-plot!(ts_cb, norm.(getindex.(res_cb, Ref(1:3))) .+ 1e-15, label="Position (callback)", c=PALETTE[1], ls=:dash, alpha=0.5)
-plot!(ts_cb, norm.(getindex.(res_cb, Ref(4:6))) .+ 1e-15, label="Speed (callback", c=PALETTE[2], ls=:dash, alpha=0.5)
-hline!([tol], label="Tolerance (remove it? only for 1 step)", c=:black)
+plot!(ts_cb, norm.(getindex.(res_cb, Ref(1:3))) .+ 1e-15, label="Position (callback)", c=1, ls=:dash, lw=1)
+plot!(ts_cb, norm.(getindex.(res_cb, Ref(4:6))) .+ 1e-15, label="Speed (callback", c=2, ls=:dash, lw=1)
+# hline!([tol], label="Tolerance (remove it? only for 1 step)", c=:black)
 plot!(xscale=:log10, xticks=exp10.(-15:0.5:15), yscale=:log10, yticks=exp10.(-15:3:15))
-res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:right)
-# savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D.pdf"))
+res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:topleft)
+savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D_cb.pdf"))
+display(res_fig)
+
+## Interpolated
+ts = range(t0_res, sol10.prob.tspan[2], 1001)
+res = [PM10.manifold_residuals!(similar(u0_10, 6), sol10(t), p) for t in ts]
+res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), sol10_cb_t(t), p) for t in ts]
+
+plot(title="Residuals without vs. with callback")
+plot!(ts, norm.(getindex.(res, Ref(1:3))), label="Position")
+plot!(ts, norm.(getindex.(res, Ref(4:6))), label="Speed")
+plot!(ts, norm.(getindex.(res_cb, Ref(1:3))) .+ 1e-15, label="Position (callback)", c=1, ls=:dash, lw=1)
+plot!(ts, norm.(getindex.(res_cb, Ref(4:6))) .+ 1e-15, label="Speed (callback", c=2, ls=:dash, lw=1)
+# hline!([tol], label="Tolerance (remove it? only for 1 step)", c=:black)
+plot!(xscale=:log10, xticks=exp10.(-15:0.5:15), yscale=:log10, yticks=exp10.(-16:1:15))
+res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:topleft)
+savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D_interp.pdf"))
 display(res_fig)
 
 
@@ -114,57 +138,35 @@ cmp = plot(v1, v3, layout=(1, 2), size=(1100, 500))
 savefig(cmp, joinpath(@__DIR__, "figs", "_comparison.pdf"))
 display(cmp)
 
-## --- Error vs integration tolerance, against a very tight 4D reference ---
-tols = exp10.(-2:-1:-12)
-ref = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-14, save_everystep=true)
-pref = pos4(ref)
-
-err10 = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=t, save_everystep=true)), pref)) for t in tols]
-err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=t, save_everystep=true, callback)), pref)) for t in tols]
-err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=t, save_everystep=true)), pref)) for t in tols]
-
-conv = plot(title="Kite-position error vs integration tolerance",
-    xlabel="Tolerance (abstol = reltol, reversed)", ylabel="kite-position error (m)", legend=:bottomright)
-plot!(conv, tols, err10, marker=:circle, label="10D")
-plot!(conv, tols, err10cb, marker=:square, label="10D + callback")
-plot!(conv, tols, err4, marker=:diamond, label="4D")
-plot!(conv, xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15))
-plot!(conv, xflip=true, ymirror=true, legend=:topright)
-savefig(conv, joinpath(@__DIR__, "figs", "convergence.pdf"))
-display(conv)
-
-#=
-Max(OK_i(t) - OK_ref(t)), t in [0, t_f]
-TODO: add same with kite speed
-=#
-
-@error "Note: The horizontal axis is reversed so that tighter integration tolerances progress to the right."
-
 ## Remake
 pos10(sol) = [PM10.compute_pos1(u[1:5], sol.prob.p) for u in sol.u]
 pos4(sol) = [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
 
-tf_comp = 10
-saveat = range(0, tf_comp, 1001)  # sample times
+saveat = range(0, tf_short, 1001)  # sample times
 tols = exp10.(-2:-1:-12)
-ref = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-14, saveat)
-pref = pos4(ref, t_test)
-callback_no_save = PM10.build_manifold_projection(u0_10; save=false, tol=cb_tol)
+ref = PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol=1e-14, saveat)
+pref = pos4(ref)
 
-err10 = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol, saveat)), pref)) for tol in tols]
-err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol, saveat, callback=callback_no_save)), pref)) for tol in tols]
-err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol, saveat)), pref)) for tol in tols]
+err10 = [maximum(dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, saveat)), pref)) for tol in tols]
+err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, saveat, callback=callback_no_save)), pref)) for tol in tols]
+err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol, saveat)), pref)) for tol in tols]
 
-plot(title="Kite-position error vs integration tolerance",
-    xlabel="Tolerance (abstol = reltol, reversed)", ylabel="kite-position error (m)", legend=:bottomright)
+plot(xlabel="Tolerance (relative and absolute)", ylabel="Norm of error (m)", legend=:bottomright)
 plot!(tols, err10, marker=:circle, label="10D")
 plot!(tols, err10cb, marker=:square, label="10D + callback")
 plot!(tols, err4, marker=:diamond, label="4D")
 plot!(xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15))
 fig = plot!(xflip=true, ymirror=true, legend=:topright)
-savefig(fig, joinpath(@__DIR__, "figs", "convergence_remake.pdf"))
+savefig(fig, joinpath(@__DIR__, "figs", "three_models_convergence.pdf"))
 display(fig)
 
+#=
+Max(OK_i(t) - OK_ref(t)), t in [0, t_f]
+
+We compare the error of all three implementations (10D, 10D + callback, and 4D) across a range of tolerances (10^-2 to 10^-12) against a reference run (4D, tolerance at 10^-14). As the tolerance gets tighter, all runs converge to the reference trajectory, showing they are all equivalent.
+
+Note: The horizontal axis is reversed so that tighter integration tolerances progress to the right.
+=#
 ## --- Timing at the production tolerance -----------------------------------------
 btime4 = @belapsed PM4.integrate(u0_4, tf, vbp; save_everystep=true, tol) seconds = 1
 btime = @belapsed PM10.integrate(u0_10, tf, p; save_everystep=true, tol) seconds = 1

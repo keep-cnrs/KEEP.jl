@@ -8,7 +8,7 @@ A function `make_bounds` which, given a `p` (not VBPara), a vector `symbols` and
 module Optimization
 
 using StaticArrays: SA
-# using OrdinaryDiffEqTsit5
+# using OrdinaryDiffEqVerner
 using ADNLPModels, NLPModelsIpopt
 using Setfield: @set
 using Logging
@@ -56,7 +56,7 @@ function compute_dims(p, choosen_syms)
     vbp0 = build_vbpara(p)
     L, M, T = lmt(vbp0)
     p_adim = build_para(normalize_vbpara(vbp0))
-    para_dims = collect((p./p_adim)[choosen_syms])
+    para_dims = collect((p ./ p_adim)[choosen_syms])
     state_dims = [1, 1, 1 / T, 1 / T, M * L^2 * T^-2]
     power_dim = state_dims[5] / T
     iterate_dims = [state_dims[[1, 3, 4]]..., T, power_dim, para_dims...]
@@ -116,7 +116,7 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 The optimization is performed in a normalized (dimensionless) space to improve solver conditioning.
 The `optim_para_lower`, `optim_para_upper`, and `initial_guess` inputs are expected in physical units and are converted to normalized units internally. While the raw `stats.solution` remains in normalized units, the returned `solution` ComponentArray is automatically scaled back to physical units.
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=+, tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", initial_guess=(;))
+function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", initial_guess=(;))
     @info "To remove logging, use a Logging level below Info"
 
     function integrate(optim_vars::CA, vbp::VBPara)
