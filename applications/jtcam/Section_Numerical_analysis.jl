@@ -20,6 +20,7 @@ using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
 using PyFormattedStrings: @f_str
 using Roots
+using ForwardDiff
 
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
 
@@ -217,6 +218,162 @@ display(current())
 # TODO
 # https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221o94HCRuzmwEVdA-7pjgq-58mf6-UFtfb%22%5D,%22action%22:%22open%22,%22userId%22:%22107583648323041548472%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
 
+## 1
+using Plots, LinearAlgebra
+
+# Setup same background, layout, and faded nullclines
+theme = my_theme
+f = q -> SteadyState.ddq_partial(q, vbp)
+
+plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+
+# Keep vspans very faint (alpha=0.1)
+vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
+vspan!([π / 2, π]; theme.upwind...)
+vspan!([-π / 2, π / 2]; theme.downwind..., label="Arm downwind")
+
+# Background faint nullclines (using alpha or light gray)
+N = 25
+αs = range(-π, π, N + 1)
+τs = range(-π, π, 2N + 1)
+dd = [f((α, τ)) for τ in τs, α in αs]
+contour!(αs, τs, last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+contour!(αs, τs, first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+
+# Re-fetch equilibria
+ss = SteadyState.all_steady_states(vbp)
+ss_down = filter(q -> cos(first(q)) > 0, ss)
+ss_up = filter(q -> cos(first(q)) ≤ 0, ss)
+
+scatter!(first.(ss_down), last.(ss_down); theme.eq_down..., label="Equilibrium (down)")
+scatter!(first.(ss_up), last.(ss_up); theme.eq_up..., label="Equilibrium (up)")
+
+# Add Eigenspaces: Draw arrows & annotate eigenvalues directly at each equilibrium
+# Loop through all 8 equilibria, compute Jacobian J = df/dq, then its eigenvalues & vectors
+for q in ss
+    # Estimate Jacobian J = [df1/dα df1/dτ; df2/dα df2/dτ]
+    # In practice: J = fd_jacobian(f, q)
+    J = ForwardDiff.jacobian(f, q)
+    # Use dummy eigenvalues for illustration if needed, otherwise:
+    evals, evecs = eigen(J)
+
+    # Systematic annotation placement: every label offset by the same amount
+    # toward the plot center, so labels of boundary equilibria (|α|, |τ| ≈ π)
+    # always move inward instead of exiting the frame. The two labels of one
+    # equilibrium are split symmetrically along the perpendicular of ctr_dir.
+    ann_offset = 0.35
+    ann_sep = 0.12
+    ctr_dir = -q ./ (norm(q) + 1e-12)  # unit vector from q toward (0, 0)
+    ctr_perp = [-ctr_dir[2], ctr_dir[1]]
+
+    # Check if real to avoid complex issues (assume mostly real)
+    for i in 1:2
+        λ = real(evals[i])
+        v = real(evecs[:, i])
+        v = v / norm(v) # normalized direction
+
+        # Scale arrow by magnitude of λ, capping for visual comfort
+        arrow_len = clamp(0.08 * abs(λ), 0.1, 0.4)
+
+        # Arrow points outward for positive, inward for negative eigenvalues
+        dir = λ > 0 ? 1 : -1
+        p_start = q .- (dir < 0 ? dir * arrow_len * v : 0.0 * v)
+        p_end = q .+ (dir > 0 ? dir * arrow_len * v : 0.0 * v)
+
+        # Plot arrow (blue for incoming/stable, red/orange for outgoing/unstable)
+        arrow_color = λ < 0 ? :blue : :red
+        arrow_label = f"{λ:.1f}"
+
+        # Draw Arrow
+        plot!([p_start[1], p_end[1]], [p_start[2], p_end[2]],
+            arrow=arrow(:closed, :head, 0.4, 0.3), color=arrow_color, lw=2, label="")
+
+        # Text positioned toward the center (same system for all annotations)
+        ann_pos = q .+ ann_offset * ctr_dir .+ (i == 1 ? ann_sep : -ann_sep) .* ctr_perp
+        annotate!(ann_pos[1], ann_pos[2], text(arrow_label, 8, arrow_color, :center))
+    end
+end
+
+display(plot!())
+savefig(joinpath(@__DIR__, "figs", "equilibria_eigenvalues.pdf"))
+
+# 2
+# Use the same base setup as above, with faded vspans and nullclines
+plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false, framestyle=:semi, legend=:outerright)
+
+# ... (Insert faded background and scatter points from Option 1 here) ...
+
+# Compact Text Badge and Orientation Ticks
+for q in ss
+    J = ForwardDiff.jacobian(f, q)
+    evals, evecs = eigen(J)
+    λ1, λ2 = real(evals[1]), real(evals[2])
+    v1, v2 = real(evecs[:, 1]), real(evecs[:, 2])
+    v1, v2 = v1/norm(v1), v2/norm(v2)
+
+    # 1. Tiny orientation markers at the equilibrium (showing directions)
+    # Plus/minus color coding: blue is negative (stable), red is positive (unstable)
+    # Length scaled by the eigenvalue: log(1 + |λ|) gives a minimum length for
+    # |λ| → 0 and log-compresses the large |λ| ≈ 14; clamps keep it on-plot.
+    l1 = clamp(0.12 * log(1 + abs(λ1)), 0.05, 0.4)
+    l2 = clamp(0.12 * log(1 + abs(λ2)), 0.05, 0.4)
+    plot!([q[1]-l1*v1[1], q[1]+l1*v1[1]], [q[2]-l1*v1[2], q[2]+l1*v1[2]],
+        color=(λ1 < 0 ? :blue : :red), lw=2, label="")
+    plot!([q[1]-l2*v2[1], q[1]+l2*v2[1]], [q[2]-l2*v2[2], q[2]+l2*v2[2]],
+        color=(λ2 < 0 ? :blue : :red), lw=2, label="")
+
+    # 2. Add inline text box with numeric values (e.g., "-5.2, +2.1")
+    # Same systematic placement as ## 1: offset toward the plot center
+    shift_dir = -q ./ (norm(q) + 1e-12)
+    pos = q .+ 0.35 * shift_dir
+
+    badge_text = f"({λ1:.1f}, {λ2:.1f})"
+    # Anchor the text so it grows inward (away from the nearest α frame edge)
+    annotate!(pos[1], pos[2], text(badge_text, 7, :black, q[1] < 0 ? :left : :right))
+end
+
+# Dummy plots to insert clean legend items
+plot!([NaN], [NaN], color=:blue, lw=2, label="Stable (λ < 0)")
+plot!([NaN], [NaN], color=:red, lw=2, label="Unstable (λ > 0)")
+
+display(plot!())
+savefig(joinpath(@__DIR__, "figs", "equilibria_compact.pdf"))
+
+## 3
+# Density of the reduced flow around each equilibrium: N_eq trajectories seeded
+# equally on a circle of radius r_eq, integrated for t_eq in the same 2D field
+# f (dq = 0 convention as the streamplot), drawn in translucent black.
+using OrdinaryDiffEqTsit5: ODEProblem, solve, Tsit5
+
+plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+
+vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
+vspan!([π / 2, π]; theme.upwind...)
+vspan!([-π / 2, π / 2]; theme.downwind..., label="Arm downwind")
+
+contour!(αs, τs, last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+contour!(αs, τs, first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+
+scatter!(first.(ss_down), last.(ss_down); theme.eq_down..., label="Equilibrium (down)")
+scatter!(first.(ss_up), last.(ss_up); theme.eq_up..., label="Equilibrium (up)")
+
+N_eq, r_eq, t_eq = 10, π / 5, 0.5
+for q in ss
+    for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
+        q0 = q .+ r_eq .* [cos(θ), sin(θ)]
+        local sol = solve(ODEProblem((x, _, _) -> f(x), q0, (0.0, t_eq)), Tsit5();
+            reltol=1e-8, abstol=1e-8)
+        plot!(first.(sol.u), last.(sol.u); c=:black, alpha=0.2, lw=1, label="")
+    end
+end
+
+savefig(joinpath(@__DIR__, "figs", "equilibria_trajectories.pdf"))
 
 ## circle eight plot
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
@@ -304,11 +461,6 @@ savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 display(sim_4D_fig)
 
 ## Convergence rate toward limit cycle
-N = 10
-u0s = [PM4.build_u(; α, τ, dτ=1) for α in range(-π, π, N) for τ in range(-π, π, N)]
-sols = [PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13)]
-
-##
 # 1. Reference limit cycle calculation
 u0 = PM4.build_u(dτ=1)
 p = PM4.build_vbpara()
