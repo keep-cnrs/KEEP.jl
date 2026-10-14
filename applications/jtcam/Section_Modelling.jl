@@ -5,6 +5,8 @@
 #
 # The line of length r points anywhere in the radial-vertical plane. Revolving
 # the sphere of radius r about the arm axis gives a torus; r > l => spindle.
+using Pkg
+Pkg.activate(@__DIR__)
 
 using Plots
 using LinearAlgebra: norm

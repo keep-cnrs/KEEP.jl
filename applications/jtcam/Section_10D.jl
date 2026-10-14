@@ -81,21 +81,25 @@ res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:topl
 savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D_cb.pdf"))
 display(res_fig)
 
-## Interpolated
-ts = range(t0_res, sol10.prob.tspan[2], 1001)
+## Interpolated residuals
+ts = logrange(t0_res, sol10.prob.tspan[2], 501)
 res = [PM10.manifold_residuals!(similar(u0_10, 6), sol10(t), p) for t in ts]
 res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), sol10_cb_t(t), p) for t in ts]
+ylim = exp10.((-9.5, 0.5))
+xticks_ = exp10.(-18:1:10)
+yticks_ = exp10.(-18:3:10)
 
-plot(title="Residuals without vs. with callback")
-plot!(ts, norm.(getindex.(res, Ref(1:3))), label="Position")
-plot!(ts, norm.(getindex.(res, Ref(4:6))), label="Speed")
-plot!(ts, norm.(getindex.(res_cb, Ref(1:3))) .+ 1e-15, label="Position (callback)", c=1, ls=:dash, lw=1)
-plot!(ts, norm.(getindex.(res_cb, Ref(4:6))) .+ 1e-15, label="Speed (callback", c=2, ls=:dash, lw=1)
-# hline!([tol], label="Tolerance (remove it? only for 1 step)", c=:black)
-plot!(xscale=:log10, xticks=exp10.(-15:0.5:15), yscale=:log10, yticks=exp10.(-16:1:15))
-res_fig = plot!(xlabel="Time (s)", ylabel="Residual norm (m, m/s)", legend=:topleft)
-savefig(res_fig, joinpath(@__DIR__, "figs", "residuals_10D_interp.pdf"))
-display(res_fig)
+plot(; xscale=:log10, xticks=xticks_, xformatter=x->"", ylim, yscale=:log10, yticks=yticks_, ylabel="Residual on position (m)", legend=:topleft)
+plot!(ts, norm.(getindex.(res, Ref(1:3))), label="With callback")
+fig_pos = plot!(ts, norm.(getindex.(res_cb, Ref(1:3))), label="Without callback")
+
+plot(; xscale=:log10, xticks=xticks_, xlabel="Time (s)", ylim, yscale=:log10, yticks=yticks_, ylabel="Residual on speed (m/s)")
+plot!(ts, norm.(getindex.(res, Ref(4:6))))
+fig_speed = plot!(ts, norm.(getindex.(res_cb, Ref(4:6))))
+plot(fig_pos, fig_speed, layout=(2, 1))
+
+display(plot!())
+savefig(plot!(), joinpath(@__DIR__, "figs", "residuals_10D_interp.pdf"))
 
 
 ## --- Model equivalence at maximum accuracy (Alg = Vern9, abstol = reltol = 1e-10) ---

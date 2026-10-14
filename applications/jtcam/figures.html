@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Results</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      color: #222;
+      background: #fafafa;
+      margin: 0;
+      padding: 24px 16px;
+    }
+
+    /* Central 800px column */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Full-width single figures */
+    object {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    /* Flex row: evenly divides width for multiple items side-by-side */
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 1rem;
+    }
+
+    .row>object {
+      flex: 1;
+      min-width: 0;
+      height: 340px;
+      /* Proportionally shorter for side-by-side figures */
+      margin-bottom: 0;
+    }
+
+    /* Formatted code / Julia timing block */
+    pre {
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+      overflow-x: auto;
+    }
+
+    h1 {
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.3em;
+      margin-top: 2em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>10D model</h1>
+
+    <object data="figs/residuals_10D_interp.pdf" type="application/pdf"></object>
+
+    <p>Dense output evaluated on a logarithmically regular grid. Without callback: O(t) residual on speed, integrated to O(t^2) residual on position. The callback removes the trend, making the residuals O(1) for both, it does not correct for phase error.</p>
+
+    <!-- Full-width figure -->
+    <object data="figs/trajectory_10D_short_long_cb.pdf" type="application/pdf"></object>
+
+    <p>No callback is ok for short integrations, but error accumulates (here exagerated by loose tolerance and an order 5 scheme instead of 9 used otherwise), callback fixes that, at some cost</p>
+
+    <pre>
+      ┌ Info: Timing
+      │ reference (10D, no callback) = 44 ms
+      │ reference + callback = 54 ms
+      │ proposed model (4D) = 5.9 ms
+      │
+      │ reference to reference+callback = 1.25x slowdown
+      │ reference to proposed model = 7.44x speedup
+      └ reference+callback to proposed model = 9.29x speedup</pre>
+
+
+    <object data="figs/three_models_convergence.pdf" type="application/pdf"></object>
+    <p>As we reduce the integration tolerance and for each mof the three models, the sequence of trajectories converge toward the same reference, tight-tolerance trajectory (max_{t in range(0, t_f, N=1001) norm(x_i(t) - x_ref(t))}, where norm is the Euclidean norm on R^3, x_i is the trajectory of interest and x_ref is the reference trajectory). Therefore, we confirm that the model presented in the main section of this paper is equivalent to the original 10D model.</p>
+
+    <h1>Modelling</h1>
+
+    <object data="figs/spindle_torus.pdf" type="application/pdf"></object>
+
+    <h1>Numerical analysis of the dynamical system</h1>
+
+    <object data="figs/equilibria.pdf" type="application/pdf"></object>
+    <p>ddq(q, dq=(0,0)), where nullclines cross, there is an equilibrium. Red background = upwind arm</p>
+    <object data="figs/equilibria_eight_circle.pdf" type="application/pdf"></object>
+    <p>Configuration for each equilibria, not a physical representation -- lines and arm are aligned in a vertical plane for all equilibria</p>
+    <object data="figs/time_series_4D.pdf" type="application/pdf"></object>
+    <p>Trajectory seems to converge rapidly toward a limit cycle</p>
+    <object data="figs/yz_limit_cycles.pdf" type="application/pdf"></object>
+    <p>Depending on init, we have two different limit cycles: prograde(dτ > 0) and retrograde (dτ < 0). They follow different path in 3D space.</p>
+    <object data="figs/limit_cycle_convergence.pdf" type="application/pdf"></object>
+    <p>start with q=(0,0), dα = 0 and dτ = 1, integrate of record distance on surface of section</p>
+
+    <h1>Bifurcation Kit (not for JTCAM)</h1>
+    <img src="../sprint2026/fig_fold_zoom.png">
+
+    <img src="../sprint2026/fig_timeseries.png">
+    <img src="../sprint2026/fig_phase_planes.png">
+
+
+  </div>
+
+</body>
+
+</html>

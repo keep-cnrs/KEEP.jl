@@ -35,7 +35,7 @@ struct Geometry
     mode::Symbol
     arm_scaling::Float64
     l::Float64
-    θ0::Float64          # = l + r : eight vertical centre and radial scale
+    θ0::Float64          # = l + r_phys = l·(1 + vbp.r) : eight vertical centre and radial scale
     Δφh::Float64         # cross-range half-amplitude
     Δθv::Float64         # vertical half-amplitude
     y8::Float64          # vertical placement of the (:rescaled) eight
@@ -49,7 +49,7 @@ function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
         y8::Real=2.1, n::Int=400)
     mode in (:src, :rescaled) || error("mode must be :src or :rescaled")
     l, r = vbp.l, vbp.r
-    θ0 = l + r
+    θ0 = l * (1 + r)  # vbp.r is normalized by the arm length: l + r is the physical sum
     Δφh = θ0 * vbp.Δφ
     Δθv = vbp.Δθ * θ0
 

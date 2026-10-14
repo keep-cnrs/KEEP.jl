@@ -140,48 +140,63 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
     return anim
 end
 
-function init_plot_eight_circle(vbp)
-    # Eight
-    θ0 = vbp.l + vbp.r
-    Δφ = θ0 * vbp.Δφ
-    Δθ = vbp.Δθ * Δφ / vbp.Δφ
-    plot_vbp = build_para(θ0=θ0, Δθ=Δθ, φ0=0, Δφ=Δφ)
-    τ = range(-π, π, length=100)
-    θ, φ = invert(PM4.τ_to_θφ.(τ, Ref(plot_vbp)))
-    plot(φ, θ, aspect_ratio=:equal, color=:black, grid=false, axis=false, label="")
+function init_plot_eight_circle(vbp; project_eight=false)
+    l = vbp.l
+    R = l * (1 + vbp.r)  # Altitude of the eight center: arm + physical line (vbp.r is normalized by l), in meters
 
-    # Circle
+    # Circle (top view of the arm)
     α = range(-π, π, length=100)
-    x, y = vbp.l .* invert(sincos.(α))
-    plot!(y, x; color=:black, label="")
+    x, y = l .* invert(sincos.(α))
+    plot(y, x; aspect_ratio=:equal, color=:black, grid=false, axis=false, label="")
 
-    l = plot_vbp.l
-    offset = l / 4
+    if project_eight
+        # True eight on the sphere of radius R about the origin, projected on the xy plane
+        τ = range(-π, π, length=100)
+        K = R .* PM4.compute_τhat.(τ, Ref(vbp))  # Uses the true θ0, Δθ, φ0, Δφ of the model
+        plot!(getindex.(K, 2), getindex.(K, 1); color=:black, label="")
+        geom = (; l, R, vbp, project_eight)
+    else
+        # Developed ("fake") eight: center at distance R, half-widths = arc lengths R·Δφ, R·Δθ
+        plot_vbp = build_para(l=l, θ0=R, Δθ=R * vbp.Δθ, φ0=0, Δφ=R * vbp.Δφ)
+        τ = range(-π, π, length=100)
+        θ, φ = invert(PM4.τ_to_θφ.(τ, Ref(plot_vbp)))
+        plot!(φ, θ; color=:black, label="")
 
-    # order: y, x, φ, θ
-    x_axes = [-l, -l - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset]
-    y_axes = [-l - offset, -l, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ]
+        offset = l / 4
 
-    u_axes = [2l, 0, 2l, 0]
-    v_axes = [0, 2l, 0, 2l]
-    xy_axes = hcat(x_axes, y_axes)
-    uv_axes = hcat(u_axes, v_axes)
-    quiver!(eachcol(xy_axes)..., quiver=Tuple(eachcol(uv_axes)), c=:black)
+        # order: y, x, φ, θ
+        x_axes = [-l, -l - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset]
+        y_axes = [-l - offset, -l, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ]
 
-    x_lbl = @. x_axes + u_axes / 2 - v_axes / 4
-    y_lbl = @. y_axes + v_axes / 2 - u_axes / 4
-    labels = text.(["y", "x", L"\phi", L"\theta"], :black, :center, 10)
-    annotate!(x_lbl, y_lbl, labels)
-    plot!([-1, -2vbp.l], alpha=0, label="")  # Else "y" is not shown
+        u_axes = [2l, 0, 2l, 0]
+        v_axes = [0, 2l, 0, 2l]
+        xy_axes = hcat(x_axes, y_axes)
+        uv_axes = hcat(u_axes, v_axes)
+        quiver!(eachcol(xy_axes)..., quiver=Tuple(eachcol(uv_axes)), c=:black)
 
-    return (plot!(), plot_vbp)
+        x_lbl = @. x_axes + u_axes / 2 - v_axes / 4
+        y_lbl = @. y_axes + v_axes / 2 - u_axes / 4
+        labels = text.(["y", "x", L"\phi", L"\theta"], :black, :center, 10)
+        annotate!(x_lbl, y_lbl, labels)
+        plot!([-1, -2l], alpha=0, label="")  # Else "y" is not shown
+
+        geom = (; l, R, vbp, plot_vbp, project_eight)
+    end
+
+    return (plot!(), geom)
 end
 
-function add_point_plot_eight_circle!(q, plot_vbp, plot_args...; plot_kwargs...)
+function add_point_plot_eight_circle!(q, geom, plot_args...; plot_kwargs...)
     α, τ = q
-    θ, φ = PM4.τ_to_θφ(τ, plot_vbp)
-    x, y, _ = plot_vbp.l * PM4.compute_αhat(α)
-    return plot!([0, y, φ], [0, x, θ]; plot_args..., plot_kwargs...)
+    arm = geom.l .* PM4.compute_αhat(α)
+    if geom.project_eight
+        K = geom.R .* PM4.compute_τhat(τ, geom.vbp)
+        tip = (K[2], K[1])  # (y, x) like the circle
+    else
+        θ, φ = PM4.τ_to_θφ(τ, geom.plot_vbp)
+        tip = (φ, θ)
+    end
+    return plot!([0, arm[2], tip[1]], [0, arm[1], tip[2]]; plot_args..., plot_kwargs...)
 end
 
 #=
@@ -191,16 +206,16 @@ TODO:
  - draw eight_circle
 =#
 
-function plot_eight_circle(qs, vbp; plot_kwargs=())
+function plot_eight_circle(qs, vbp; project_eight=false, plot_kwargs=())
     plot_kwargs_arr = ifelse(
         isa(plot_kwargs, AbstractVector),
         plot_kwargs,
         fill(plot_kwargs, length(qs))
     )
 
-    fig, plot_vbp = init_plot_eight_circle(vbp)
+    fig, geom = init_plot_eight_circle(vbp; project_eight)
     for (q, plot_kwargs) in zip(qs, plot_kwargs_arr)
-        add_point_plot_eight_circle!(q, plot_vbp; plot_kwargs...)
+        add_point_plot_eight_circle!(q, geom; plot_kwargs...)
     end
 
     return fig

@@ -4,6 +4,8 @@
 # with Makie) using Plots.jl only, and heatmaps of the basins of attraction of
 # the two limit cycles (N_ε over two 2D slices of initial conditions, three
 # visualizations each).
+using Pkg
+Pkg.activate(@__DIR__)
 
 using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
@@ -17,10 +19,24 @@ using LinearAlgebra: norm, eigvals
 using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
 using PyFormattedStrings: @f_str
+using Roots
 
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
 
+
+## Determine optimal parameters using kinetic model
 vbp = PMP.build_vbpara()
+_, _, T_dim = PMP.lmt(vbp)
+@info f"b = torque_slope init : {vbp.torque_slope:.2f}"
+for i in 1:2
+    period = LC.compute_limit_cycle(vbp; sense=(+), tol=1e-3).t[end] / T_dim
+    ω = 2π/period
+
+    # b/Iω = 1  =>  b = Iω
+    b_pto = vbp.I_eq * ω
+    vbp.torque_slope = b_pto
+    @info f"b = torque_slope ({i}) : {vbp.torque_slope:.10f}"
+end
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -120,45 +136,76 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
     return (line_x, line_y, ax, ay, au, av)
 end
 
+#! format: off
+old_theme = (;
+    upwind=(; c=:red, alpha=0.1),
+    downwind=(; c=:green, alpha=0.1),
+    streamlines=(; c=:grey, alpha=0.5, lw=0.5),
+    heads=(; c=:grey, alpha=0.6, lw=0),
+    nullcline_tau=(; c=:green, lw=2, ls=:solid),
+    nullcline_alpha=(; c=:magenta, lw=2, ls=:solid),
+    eq_down=(; c=:green, shape=:circle, ms=7, markerstrokewidth=2, markerstrokecolor=:white),
+    eq_up=(; c=:darkred, shape=:circle, ms=7, markerstrokewidth=2, markerstrokecolor=:white),
+    eq_legend=(; c=:black, shape=:circle, ms=6),
+)
 
-f = q -> SteadyState.ddq_partial(q .+ 1e-100, vbp)
-# Background: green when the arm points downwind (|α| < π/2), red upwind.
+my_theme = (;
+    downwind        = (; c=:grey, alpha=0.08),
+    upwind          = (; c=:red, alpha=0.08),
+    streamlines     = (; c=:black, alpha=0.7, lw=0.5),
+    heads           = (; c=:black, alpha=0.5, lw=0),
+    nullcline_tau   = (; c=1, lw=2, ls=:solid),
+    nullcline_alpha = (; c=2, lw=2, ls=:solid),
+    eq_down         = (; c=:white, shape=:circle, ms=7, markerstrokewidth=2, markerstrokecolor=:black),
+    eq_up           = (; c=:black, shape=:diamond, ms=9, markerstrokewidth=3, markerstrokecolor=:white),
+    eq_legend       = (; c=:black, shape=:circle, ms=7),
+)
+#! format: on
+
+theme = my_theme
+
+f = q -> SteadyState.ddq_partial(q, vbp)
+
+# Canvas & Layout
 plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
     xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
     grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
-vspan!([-π, -π / 2]; c=:red, alpha=0.1, label="Arm upwind")
-vspan!([-π / 2, π / 2]; c=:green, alpha=0.1, label="Arm downwind")
-vspan!([π / 2, π]; c=:red, alpha=0.1, label="")
 
+# Background wind spans
+vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
+vspan!([π / 2, π]; theme.upwind...)
+vspan!([-π / 2, π / 2]; theme.downwind...) #, label="Arm downwind")
+
+# Streamlines & Arrowheads
 line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
-plot!(line_x, line_y; c=:grey, alpha=0.5, lw=0.5, label="")
+plot!(line_x, line_y; theme.streamlines...)
 
-# Arrowhead at each streamline seed (Makie-style). GR's quiver always draws
-# shaft + fixed-size head (gr_polyline + GR.drawarrow), so marker-only heads
-# are rendered as triangles, one series for all seeds.
-L, W = 0.2, 0.06  # head length / half-width, data units
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),          # tip
+L, W = 0.2, 0.06
+heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
     (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
     (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
          for (s, u, v) in zip(zip(ax, ay), au, av)]
-plot!(heads; c=:grey, alpha=0.6, label="", lw=0)
+plot!(heads; theme.heads...)
 
-# Nullclines ddτ = 0 (green) and ddα = 0 (magenta); matrices are built with
-# rows = τ, cols = α to match Plots' contour orientation (rows = y).
+# Nullclines (splatting reuses line properties for both contour and the GR legend fix)
 N = 20
 αs = range(-π, π, N + 1)
 τs = range(-π, π, 2N + 1)
 dd = [f((α, τ)) for τ in τs, α in αs]
-contour!(αs, τs, last.(dd); levels=[0], c=:green, lw=2)
-contour!(αs, τs, first.(dd); levels=[0], c=:magenta, lw=2)
-# Contour legend entries are unreliable on GR; add them explicitly.
-plot!([NaN], [NaN]; c=:magenta, label="D²(α) = 0")
-plot!([NaN], [NaN]; c=:green, label="D²(τ) = 0")
 
-# Equilibria at the nullcline intersections.
+contour!(αs, τs, last.(dd); levels=[0], theme.nullcline_tau...)
+contour!(αs, τs, first.(dd); levels=[0], theme.nullcline_alpha...)
+plot!([NaN], [NaN]; theme.nullcline_tau..., label="D²(τ) = 0")
+plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
+
+# Equilibria
 ss = SteadyState.all_steady_states(vbp)
-scatter!(first.(ss), last.(ss); c=ifelse.(cos.(first.(ss)) .> 0, :green, :darkred), ms=7, markerstrokewidth=2, markerstrokecolor=:white)
-scatter!([NaN], [NaN]; c=:black, ms=6, label="Equilibrium")
+ss_down = filter(q -> cos(first(q)) > 0, ss)
+ss_up = filter(q -> cos(first(q)) ≤ 0, ss)
+
+scatter!(first.(ss_down), last.(ss_down); theme.eq_down...)
+scatter!(first.(ss_up), last.(ss_up); theme.eq_up...)
+scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 
 savefig(joinpath(@__DIR__, "figs", "equilibria.pdf"))
 display(current())
@@ -174,9 +221,9 @@ display(current())
 ## circle eight plot
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
 ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
-p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:green))
+p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:green), project_eight=true)
 plot!(title="Downwind arm")
-p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:red))
+p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:red), project_eight=true)
 plot!(title="Upwind arm")
 
 plot(p_downwind, p_upwind; layout=(1, 2), size=4 .* plot_size(aspect_ratio=3))
@@ -190,7 +237,7 @@ all_aligned = true
 for (α, τ) in ss
     αx, αy, _ = PM4.compute_αhat(α)
     τx, τy, _ = PM4.compute_τhat(τ, vbp)
-    all_aligned &= (αx * τy ≈ αy * τx)
+    global all_aligned &= (αx * τy ≈ αy * τx)
 end
 @info "Alignment: $all_aligned\nDo all equilibria have the lines and arm aligned in the xy plane?"
 
@@ -250,34 +297,13 @@ p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="",
     ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
 plot!(t_main, y_main; c=2, lw=2, label="")
 plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
-plot!(t_jump, y_jump; c=2, ls=:dash, label=false)
+plot!(t_jump, y_jump; c=2, ls=:dot, label=false, lw=2)
 pw = plot_avg_power_kW(sol)
 sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.65h}; b]), size=(800, 700))
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 display(sim_4D_fig)
 
 ## Convergence rate toward limit cycle
-u0 = PM4.build_u(dτ=1)
-p = PM4.build_vbpara()
-tf = 100
-cb = LC.build_poincare_callback(eps(1.0))
-sol = PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13)
-x_infty = sol.u[end]
-
-errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end-1)]][1:10]
-n = length(errors)
-
-i1, i2 = 1, 6
-convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
-
-plot(yscale=:log10, xlim=(0, n + 1), xticks=0:2:100, ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), xlabel="Lemniscate revolutions", ylabel="Distance to limit")
-plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black, ls=:dash)
-annotate!((3.9, 1e-8, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
-scatter!(errors .+ 1e-16, label="\$|| x_i - x_\\infty  ||\$", color=1, markersize=7)
-display(plot!())
-savefig(plot!(), joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
-
-## Multiple trajectories
 N = 10
 u0s = [PM4.build_u(; α, τ, dτ=1) for α in range(-π, π, N) for τ in range(-π, π, N)]
 sols = [PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13)]
@@ -319,36 +345,57 @@ u0s = [PM4.build_u(; α, τ, dτ=1) for (α, τ) in eachcol(sample(10, Float64[-
 # Notice the loop comprehension `for u0 in u0s`
 sols = [PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13) for u0 in u0s]
 
+perturbed_params = (;
+    ls=:dot,
+    lw=2,
+    alpha=0.4,
+    c=:gray,
+    label="Perturbed trajectories"
+)
+
 # 3. Overlay each trajectory connected by dashed lines
 for (idx, s) in enumerate(sols)
     # Distances to the limit cycle on the Poincaré section
     traj_errors = [LC.distance_on_section(u, x_infty) for u in s.u]
     x_vals = 1:length(traj_errors)
 
-    # Only label the first curve in the legend to avoid cluttering
-    lbl = (idx == 1) ? "Perturbed trajectories" : ""
-
-    plot!(
-        x_vals, traj_errors .+ 1e-16;
-        ls=:dash,
-        lw=1,
-        alpha=0.4,
-        c=:gray,
-        label=lbl
-    )
+    plot!(x_vals, traj_errors .+ 1e-16; perturbed_params..., label="")
 end
 
 # 4. Highlight the reference points on top
 plot!(errors .+ 1e-16, label="\$|| x_i - x_\\infty  ||\$", color=1, ls=:dash, marker=:circle, linealpha=0.5, markersize=7)
+plot!([NaN], [NaN]; perturbed_params...)
 
 display(p_conv)
-savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence_multiple.pdf"))
+savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
 ## Eight-trajectory in YZ plane
 r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
 # include("../../test/publications/ECC2026/state_funcs.jl")
 lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
 lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
+
+"""
+Lens geometry for the YZ-plane zoom: locate each limit cycle at phase τ
+(mod 2π), take the midpoint of the two points as lens center `c`, and set
+δ = δ_factor × the YZ distance between the two cycles at that phase.
+"""
+function compute_lens(lc_p, lc_m, τ, δ_factor; idxs=2:3)
+    # τ(t) is monotone along a cycle and spans TAU0 ± 2π: find the time where
+    # the τ state hits τ mod 2π, mapped into the cycle's τ range.
+    function phase_time(sol, τ)
+        t0, t1 = sol.prob.tspan
+        lo, hi = minmax(sol(t0)[2], sol(t1)[2])
+        τ_target = clamp(τ + 2π * ceil((lo - τ) / 2π), lo, hi)
+        return find_zero(t -> sol(t)[2] - τ_target, (t0, t1))
+    end
+    yz(sol, t) = r_vec(t, sol)[idxs]
+    r_p = yz(lc_p, phase_time(lc_p, τ))
+    r_m = yz(lc_m, phase_time(lc_m, τ))
+    c = (r_p + r_m) / 2
+    δ = δ_factor * norm(r_p - r_m)
+    return c, δ
+end
 
 function yz_split(sol, n_splits)
     t = range(sol.prob.tspan..., 300)
@@ -365,18 +412,31 @@ end
 n_splits = 4
 # arrows = [permutedims(repeat([true], n_splits - 1)) false]
 plot(aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20, size=plot_size(500, aspect_ratio=1.8))
-plot!(invert(yz_split(lc_p, n_splits))..., arrows=true, label="D(τ) > 0")
-plot!(invert(yz_split(lc_m, n_splits))..., arrows=true, label="D(τ) < 0")
+plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
+plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
+plot!([NaN], [NaN], c=1, label="D(τ) > 0")
+plot!([NaN], [NaN], c=2, label="D(τ) < 0")
 plot!([0], [26])
-lens!([-20.7, -19.3], [15.3, 16.7], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
+c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ, set by hand
+c, δ = [12, 16.5], 0.5
+lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
 l = plot!().inset_subplots[1]
-xticks!(l, -21:0.5:-19)
-yticks!(l, 15:0.5:17)
+xticks_ = (c[1]-δ):δ:(c[1]+δ)
+yticks_ = (c[2]-δ):δ:(c[2]+δ)
+xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
+yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
 plot!(l, tickfontsize=TICKFONTSIZE - 1)
+plot!(leftmargin=1Plots.mm, bottommargin=2Plots.mm)
 
 display(plot!())
-
 savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
+
+# argmax_τ, max_δ = -1., -1.
+# argmax(τ -> compute_lens(lc_p, lc_m, τ, 3)[2], range(0, 2π, 100))
+# for τ in range(0, 2π, 100)
+#     c, δ = compute_lens(lc_p, lc_m, τ, 3) 
+#     @show τ, δ
+# end
 
 #=
 Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
