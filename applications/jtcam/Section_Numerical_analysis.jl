@@ -161,6 +161,13 @@ my_theme = (;
     eq_up           = (; c=:black, shape=:diamond, ms=9, markerstrokewidth=3, markerstrokecolor=:white),
     eq_legend       = (; c=:black, shape=:circle, ms=7),
 )
+
+ss_theme = [
+    (; c=:white, markerstrokecolor=:black, shape=:circle, ms=7, markerstrokewidth=2),
+    (; c=:black, markerstrokecolor=:white, shape=:circle, ms=7, markerstrokewidth=2),
+    (; c=:white, markerstrokecolor=:black, shape=:diamond, ms=9, markerstrokewidth=3),
+    (; c=:black, markerstrokecolor=:white, shape=:diamond, ms=9, markerstrokewidth=3),
+]
 #! format: on
 
 theme = my_theme
@@ -217,6 +224,19 @@ display(current())
 =#
 # TODO
 # https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221o94HCRuzmwEVdA-7pjgq-58mf6-UFtfb%22%5D,%22action%22:%22open%22,%22userId%22:%22107583648323041548472%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
+
+## All eigen values
+dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
+
+ss_ = [q for q in ss if q[2] > 0]
+evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
+hline([0], c=:black)
+# hspan!([-100, 0]; c=:green, alpha=.1, label="Stable")
+# hspan!([0, 100]; c=:red, alpha=.1, label="Unstable")
+scatter!(invert(real.(evs)), c=[ifelse(cos(q[1]) > 0, :green, :red) for q in ss_])
+annotate!([2.5, 2.5], [7.5, -1.5], ["Unstable", "Stable"])
+plot!(xlabel="Equilibrium index", ylabel="Re(λ)", ylim=(-3, 15))
+
 
 ## 1
 using Plots, LinearAlgebra
@@ -344,11 +364,10 @@ display(plot!())
 savefig(joinpath(@__DIR__, "figs", "equilibria_compact.pdf"))
 
 ## 3
-# Density of the reduced flow around each equilibrium: N_eq trajectories seeded
-# equally on a circle of radius r_eq, integrated for t_eq in the same 2D field
-# f (dq = 0 convention as the streamplot), drawn in translucent black.
-using OrdinaryDiffEqTsit5: ODEProblem, solve, Tsit5
-
+# Density of the physical flow around each equilibrium: N_eq trajectories seeded
+# equally on a circle of radius r_eq at rest (dq = 0, as the ddq = 0 convention
+# of the streamplot), integrated for t_eq with the full 4D dynamics and drawn in
+# translucent black in the (α, τ) plane.
 plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
     xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
     grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
@@ -363,17 +382,18 @@ contour!(αs, τs, first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2
 scatter!(first.(ss_down), last.(ss_down); theme.eq_down..., label="Equilibrium (down)")
 scatter!(first.(ss_up), last.(ss_up); theme.eq_up..., label="Equilibrium (up)")
 
-N_eq, r_eq, t_eq = 10, π / 5, 0.5
-for q in ss
+N_eq, r_eq, t_eq = 100, π / 10, 1
+@time for q in ss
     for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
         q0 = q .+ r_eq .* [cos(θ), sin(θ)]
-        local sol = solve(ODEProblem((x, _, _) -> f(x), q0, (0.0, t_eq)), Tsit5();
-            reltol=1e-8, abstol=1e-8)
-        plot!(first.(sol.u), last.(sol.u); c=:black, alpha=0.2, lw=1, label="")
+        local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
+        qs = [sol(t)[1:2] for t in range(0, sol.t[end], 1000)]  # interpolated (α, τ) on a grid
+        plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
     end
 end
 
 savefig(joinpath(@__DIR__, "figs", "equilibria_trajectories.pdf"))
+display(plot!())
 
 ## circle eight plot
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
