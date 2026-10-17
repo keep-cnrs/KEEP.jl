@@ -35,7 +35,7 @@ using ComponentArrays: ComponentArray as CA
 using StaticArrays
 using Plots
 
-import KEEP
+using KEEP: KEEP
 using KEEP: TAU0
 using KEEP.PointMass4: dynamics
 using KEEP.PointMassPara: build_vbpara, build_para, lmt
@@ -51,8 +51,8 @@ const SYMS = (:r, :I_eq, :torque_slope)
 
 "Sample the optimized cycle at physical time `t`: (α, τ, dα, dτ) in rad, rad/s."
 function x_optimization_phys(solution_sim, T0, t)
-    s = solution_sim(t / T0, idxs=1:4)
-    return SA[s[1], s[2], T0*s[3], T0*s[4]]
+    s = solution_sim(t / T0; idxs=1:4)
+    return SA[s[1], s[2], T0 * s[3], T0 * s[4]]
 end
 
 """
@@ -81,7 +81,7 @@ function make_setup(; factor=5, opt=nothing)
     end
 
     vbp = build_vbpara(CA(p0; params_opt...))
-    solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
+    solution_sim = lc_shoot(shooting, vbp; save_everystep=true)
     tf = solution_sim.t[end]     # NORMALIZED period [units of T0]
     T0 = lmt(vbp)[3]             # characteristic time (s) = l/v_ref (SI s per normalized unit)
     tf_physical = tf * T0        # PHYSICAL period (s) at the reference wind
@@ -120,9 +120,9 @@ end
 function F_reference(u, params, t=0)
     α, τ, dα, dτ, tf = u
     T = params.l / params.v_ref  # characteristic time of the CURRENT parameters
-    u_dyn = SA[α, τ, T*dα, T*dτ, 0]
+    u_dyn = SA[α, τ, T * dα, T * dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, build_vbpara(params))
-    out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
+    out = tf .* SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2, 0]
     # OrdinaryDiffEq requires typeof(du) === typeof(u); the multiple-shooting
     # discretizer feeds plain Vector slices of the unknown vector, so match
     # the container to the input.
@@ -158,9 +158,9 @@ end
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
     T = params.l / params.v_ref
-    u_dyn = SA[α, τ, T*dα, T*dτ, 0]
+    u_dyn = SA[α, τ, T * dα, T * dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, get_fast_para(params))
-    out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
+    out = tf .* SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2, 0]
     # OrdinaryDiffEq requires typeof(du) === typeof(u); the multiple-shooting
     # discretizer feeds plain Vector slices of the unknown vector, so match
     # the container to the input.
@@ -182,7 +182,13 @@ end
 # between the two discretizations (different unknown-vector layouts) — the
 # "multiple-shooting values are much smaller" artifact. `raw_x` unwraps the
 # saved-solution wrapper that the adaptive-mesh collocation stores per point.
-raw_x(x) = x isa BifurcationKit.BVPSavedSolutionAndState ? BifurcationKit.saved_solution(x) : x
+function raw_x(x)
+    return if x isa BifurcationKit.BVPSavedSolutionAndState
+        BifurcationKit.saved_solution(x)
+    else
+        x
+    end
+end
 record_period(x, p; kwargs...) = (tf=raw_x(x)[5],)
 
 ## ===================================================================== ##
@@ -193,10 +199,15 @@ Selectable via the `BK_ODE_ALG` env var (Tsit5 | Vern7 | Vern9) for the solver
 comparison; defaults to Vern9 — 2–3.5× fewer f-evals than Tsit5 on this RHS
 (benchmark/RESULTS_solvers.md)."
 const ODE_ALG = let name = get(ENV, "BK_ODE_ALG", "Vern9")
-    name == "Tsit5" ? ODE.Tsit5() :
-    name == "Vern7" ? ODEV.Vern7() :
-    name == "Vern9" ? ODEV.Vern9() :
-    error("BK_ODE_ALG must be Tsit5|Vern7|Vern9, got $(repr(name))")
+    if name == "Tsit5"
+        ODE.Tsit5()
+    elseif name == "Vern7"
+        ODEV.Vern7()
+    elseif name == "Vern9"
+        ODEV.Vern9()
+    else
+        error("BK_ODE_ALG must be Tsit5|Vern7|Vern9, got $(repr(name))")
+    end
 end
 
 "Selected discretizer. Uncomment the alternative line to switch method."
@@ -217,7 +228,9 @@ end
 "Shooting needs tight integration tolerances; collocation takes no kwargs.
 Use the passed `disc`, not the selected method, so switching stays one-line."
 make_bvp(model, disc::BVP.Collocation) = BVP.discretize(model, disc)
-make_bvp(model, disc::BVP.Shooting) = BVP.discretize(model, disc; abstol=1e-12, reltol=1e-10)
+function make_bvp(model, disc::BVP.Shooting)
+    return BVP.discretize(model, disc; abstol=1e-12, reltol=1e-10)
+end
 
 "Analytical Jacobian for collocation; shooting differentiates the pinned residual.
 (`FullSparse` is not usable: BK's BVP collocation sparse path hits an
@@ -237,7 +250,7 @@ per-step eigenvalue solve: Finding 1 shows BK's BVP spectra are unusable here an
 the script never reads `br.eig` (ground truth is `floquet_true`), yet
 `compute_eigenvalues` was ~half the continuation time (RESULTS.md #2)."
 function make_contpar(::BVP.Collocation, optn)
-    ContinuationPar(
+    return ContinuationPar(;
         p_min=0.0,
         p_max=25.0,
         dsmax=0.1,
@@ -248,7 +261,7 @@ function make_contpar(::BVP.Collocation, optn)
     )
 end
 function make_contpar(::BVP.Shooting, optn)
-    ContinuationPar(
+    return ContinuationPar(;
         p_min=0.1,
         p_max=50.05,
         dsmax=0.1,
@@ -266,7 +279,7 @@ trailing auxiliary unknown, so pass it the pure DOF block.
 """
 function orbit(disc::BVP.Shooting, bvp, x, p)
     n = BVP.state_dimension(bvp)
-    s = BVP.get_solution_bvp(bvp, @view(x[1:(n*disc.M)]), p)
+    s = BVP.get_solution_bvp(bvp, @view(x[1:(n * disc.M)]), p)
     return s.t, s.u
 end
 function orbit(disc::BVP.Collocation, bvp, x, p)
@@ -277,9 +290,11 @@ end
 "Plot the cycle (dτ vs physical time) — single implementation for both methods."
 function plot_solution(x, p; iter, state, k...)
     bvp = BVP.get_bvp(BifurcationKit.getprob(iter))
-    t, u = orbit(BVP.get_discretizer(bvp), bvp, raw_x(x), BifurcationKit.getparams(iter, state))
+    t, u = orbit(
+        BVP.get_discretizer(bvp), bvp, raw_x(x), BifurcationKit.getparams(iter, state)
+    )
     tf = raw_x(x)[5]
-    plot!(t ./ t[end] .* tf, u[4, :]; ylabel="dτ", k...)
+    return plot!(t ./ t[end] .* tf, u[4, :]; ylabel="dτ", k...)
 end
 
 # Upstream bug fix (determinism), see `BK_parametric_fixed.jl` header:
@@ -296,11 +311,11 @@ function BVP.bvp_residual(d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shootin
     t0, tf = BVP.get_time_interval(model_)
     M = BVP.mesh_size(disc_)
 
-    Xm = reshape(@view(X[1:(n*M)]), n, M)
+    Xm = reshape(@view(X[1:(n * M)]), n, M)
     T = tf - t0
 
     out = similar(X)
-    outm = reshape(@view(out[1:(n*M)]), n, M)
+    outm = reshape(@view(out[1:(n * M)]), n, M)
     BVP.bvp_residual_bare!(d_bvp, outm, Xm, p, T)
     out[end] = X[end]  # pin the auxiliary unknown to zero (deterministic residual)
     return out
@@ -340,8 +355,12 @@ end
 block_jac(::ManualJacFwd, f, x) = BifurcationKit.ForwardDiff.jacobian(f, x)
 block_jac(::ManualJacFD, f, x) = fd_mat(f, x)
 
-function BVP.bvp_jacobian(d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shooting},
-    jac::Union{ManualJacFwd,ManualJacFD}, X, p)
+function BVP.bvp_jacobian(
+    d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shooting},
+    jac::Union{ManualJacFwd,ManualJacFD},
+    X,
+    p,
+)
     model_ = BVP.get_model(d_bvp)
     disc_ = BVP.get_discretizer(d_bvp)
     sh = BVP.get_cache(d_bvp)
@@ -349,7 +368,7 @@ function BVP.bvp_jacobian(d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shootin
     M = BVP.mesh_size(disc_)
     t0, tf = BVP.get_time_interval(model_)
     T = tf - t0
-    U = reshape(@view(X[1:(n*M)]), n, M)
+    U = reshape(@view(X[1:(n * M)]), n, M)
     N = n * M + 1
     J = zeros(eltype(X), N, N)
     In = Matrix{eltype(X)}(LinearAlgebra.I, n, n)
@@ -362,17 +381,17 @@ function BVP.bvp_jacobian(d_bvp::BVP.DiscretizedBVP{<:BVP.BVPModel,<:BVP.Shootin
     else
         (u, i) -> BifurcationKit.evolve(sh.flow, u, p, sh.ds[i] * T).u
     end
-    for i in 1:(M-1)
+    for i in 1:(M - 1)
         ri = (i - 1) * n .+ (1:n)
         J[ri, ri] .= block_jac(jac, u -> flow(u, i), U[:, i])
-        J[ri, i*n .+ (1:n)] .= -In
+        J[ri, i * n .+ (1:n)] .= -In
     end
     u1, uM = U[:, 1], U[:, M]
     uT = flow(uM, M)
     rM = (M - 1) * n .+ (1:n)
     J[rM, 1:n] .= block_jac(jac, u -> model_.g(u, uT, p), u1)
-    J[rM, rM] .+= block_jac(jac, u -> model_.g(u1, u, p), uT) *
-                  block_jac(jac, u -> flow(u, M), uM)
+    J[rM, rM] .+=
+        block_jac(jac, u -> model_.g(u1, u, p), uT) * block_jac(jac, u -> flow(u, M), uM)
     J[end, end] = one(eltype(X))
     return J
 end
@@ -416,8 +435,10 @@ sheet-jumps (only possible where branches crowd, i.e. near folds). Uses the
 branch param column — `br.sol` is a single saved solution, not the path."
 function sheet_jumps(br; factor=1.5)
     dsmax = br.contparams.dsmax
-    return [i for i in 2:length(br)
-                  if abs(br.branch.param[i] - br.branch.param[i-1]) > factor * dsmax]
+    return [
+        i for i in 2:length(br) if
+        abs(br.branch.param[i] - br.branch.param[i - 1]) > factor * dsmax
+    ]
 end
 
 ## Build the problem
@@ -428,15 +449,26 @@ end
 # (default) parameters and sample THAT into the shooting points — the warm start
 # the original `BK_parametric_fixed.jl` used.
 function collocation_cycle(setup)
-    disc_c = BVP.Collocation(Ntst=30, m=5, meshadapt=true)
+    disc_c = BVP.Collocation(; Ntst=30, m=5, meshadapt=true)
     bvp_c = make_bvp(make_model(disc_c, setup), disc_c)
-    x0_c = BVP.generate_solution(bvp_c,
-        t -> vcat(x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t), setup.tf_physical))
-    prob_c = BVP.BVPBifProblem(bvp_c, x0_c, setup.nt_p0, (@optic _.v_ref);
-        jacobian=make_jac(disc_c), record_from_solution=record_period)
+    x0_c = BVP.generate_solution(
+        bvp_c,
+        t -> vcat(
+            x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t),
+            setup.tf_physical,
+        ),
+    )
+    prob_c = BVP.BVPBifProblem(
+        bvp_c,
+        x0_c,
+        setup.nt_p0,
+        (@optic _.v_ref);
+        jacobian=make_jac(disc_c),
+        record_from_solution=record_period,
+    )
     x0_c, res_c = damped_newton(prob_c, x0_c, setup.nt_p0; make_presolve(disc_c)...)
     prob_c = BifurcationKit.re_make(prob_c; u0=x0_c)
-    sol_c = BifurcationKit.solve(prob_c, Newton(), NewtonPar(tol=1e-10, linesearch=true))
+    sol_c = BifurcationKit.solve(prob_c, Newton(), NewtonPar(; tol=1e-10, linesearch=true))
     @assert BifurcationKit.converged(sol_c) "collocation warm start did not converge"
     println("collocation warm-start residual: ", res_c)
     return bvp_c, sol_c
@@ -446,7 +478,7 @@ end
 function shooting_warm_start(bvp_s, disc_s, setup)
     bvp_c, sol_c = collocation_cycle(setup)
     bs = BVP.get_solution_bvp(bvp_c, sol_c.u, setup.nt_p0)
-    ts = collect(bs.t);
+    ts = collect(bs.t)
     ts ./= ts[end]
     n = BVP.state_dimension(bvp_s)
     M = BVP.mesh_size(disc_s)
@@ -454,8 +486,8 @@ function shooting_warm_start(bvp_s, disc_s, setup)
     for i in 1:M
         s = (i - 1) / M
         j = clamp(searchsortedfirst(ts, s) - 1, 1, length(ts) - 1)
-        θ = (s - ts[j]) / (ts[j+1] - ts[j])
-        x[(i-1)*n .+ (1:n)] .= (1 - θ) .* view(bs.u, :, j) .+ θ .* view(bs.u, :, j + 1)
+        θ = (s - ts[j]) / (ts[j + 1] - ts[j])
+        x[(i - 1) * n .+ (1:n)] .= (1 - θ) .* view(bs.u, :, j) .+ θ .* view(bs.u, :, j + 1)
     end
     x[end] = 0.0  # auxiliary unknown, pinned by the residual override
     return x
@@ -481,8 +513,8 @@ end
 function phys_rhs4(v, p)
     T = p.l / p.v_ref
     α, τ, dα, dτ = v
-    _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T*dα, T*dτ, 0.0], get_fast_para(p))
-    return SA[dα, dτ, ddα/T^2, ddτ/T^2]
+    _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T * dα, T * dτ, 0.0], get_fast_para(p))
+    return SA[dα, dτ, ddα / T ^ 2, ddτ / T ^ 2]
 end
 
 # `fd_mat` (above) is the single implementation; `fd_jac` is its name in the
@@ -498,11 +530,12 @@ function floquet_true(disc, bvp, x, p)
     u = orbit(disc, bvp, raw_x(x), p)[2]
     tf = raw_x(x)[5]
     v0 = u[1:4, 1]
-    pm = v -> begin
-        pr = ODE.ODEProblem((uu, pp, t) -> F_fast(uu, pp, t), vcat(v, tf), (0.0, 1.0), p)
-        s = ODE.solve(pr, ODE_ALG, abstol=1e-13, reltol=1e-13)
-        copy(Array(s.u[end])[1:4])
-    end
+    pm =
+        v -> begin
+            pr = ODE.ODEProblem((uu, pp, t) -> F_fast(uu, pp, t), vcat(v, tf), (0.0, 1.0), p)
+            s = ODE.solve(pr, ODE_ALG; abstol=1e-13, reltol=1e-13)
+            copy(Array(s.u[end])[1:4])
+        end
     return LinearAlgebra.eigvals(fd_jac(pm, v0; h=1e-7))
 end
 
@@ -520,7 +553,7 @@ holding the period `tf` fixed. Building block of `monodromy`.
 """
 function flowseg(v, tf, ds, p)
     pr = ODE.ODEProblem((uu, pp, t) -> F_fast(uu, pp, t), vcat(v, tf), (0.0, ds), p)
-    return copy(Array(ODE.solve(pr, ODE_ALG, abstol=1e-13, reltol=1e-13).u[end])[1:4])
+    return copy(Array(ODE.solve(pr, ODE_ALG; abstol=1e-13, reltol=1e-13).u[end])[1:4])
 end
 
 """
@@ -540,8 +573,8 @@ accuracy. Tried and rejected — benchmark/RESULTS.md #4.
 """
 function monodromy(u, t, tf, p)
     M = Matrix{Float64}(I, 4, 4)
-    for k in 1:(length(t)-1)
-        ds = t[k+1] - t[k]          # already normalised (orbit output)
+    for k in 1:(length(t) - 1)
+        ds = t[k + 1] - t[k]          # already normalised (orbit output)
         ds <= 0 && continue
         M = fd_jac(x -> flowseg(x, tf, ds, p), u[1:4, k]; h=1e-7) * M
         all(isfinite, M) || break
@@ -598,7 +631,11 @@ end
 shooting branch reaches this window — collocation stalls before the fold."
 function lower_terminus(disc, br; verbose=true)
     if !(disc isa BVP.Shooting)
-        verbose && println("lower-terminus fit: skipped for ", nameof(typeof(disc)), " (does not pass the fold)")
+        verbose && println(
+            "lower-terminus fit: skipped for ",
+            nameof(typeof(disc)),
+            " (does not pass the fold)",
+        )
         return nothing
     end
     # The family folds at low wind: p reaches a minimum p_f at finite tf and
@@ -607,24 +644,52 @@ function lower_terminus(disc, br; verbose=true)
     pp, tt = collect(br.branch.param), collect(br.branch.tf)
     m = (tt .> 4.0) .& (tt .< 30.0) .& (pp .> 2.4580) .& (pp .< 2.55)
     if sum(m) <= 5
-        verbose && println("lower-terminus fit: shooting branch has too few low-wind points (", sum(m), ")")
+        verbose && println(
+            "lower-terminus fit: shooting branch has too few low-wind points (",
+            sum(m),
+            ")",
+        )
         return nothing
     end
     A = fit_fold(pp[m], tt[m])
     B = fit_homoclinic(pp[m], tt[m])
     i0 = argmin(pp)   # true discrete turning point (may sit outside the fit window)
     if verbose
-        println("lower-terminus fit over ", sum(m), " points (tf ∈ [",
-            round(minimum(tt[m]), digits=2), ", ", round(maximum(tt[m]), digits=2),
-            "] s, p ∈ [", round(minimum(pp[m]), digits=4), ", ",
-            round(maximum(pp[m]), digits=4), "]):")
-        println("  fold       : p = p_f + γ(tf - tf_f)²   RMS(Δp)   = ",
-            round(A.rms, sigdigits=3), "   vertex p_f = ", round(A.pf, digits=5),
-            " (tf_f = ", round(A.tff, digits=3), " s, extrapolated)")
-        println("  homoclinic : p = p_f + A exp(-tf/b)    RMS(Δlog) = ",
-            round(B.rms, sigdigits=3), "   p_f = ", round(B.pf, digits=5))
-        println("  discrete minimum: p = ", round(pp[i0], digits=5), " at tf = ",
-            round(tt[i0], digits=2), " s")
+        println(
+            "lower-terminus fit over ",
+            sum(m),
+            " points (tf ∈ [",
+            round(minimum(tt[m]); digits=2),
+            ", ",
+            round(maximum(tt[m]); digits=2),
+            "] s, p ∈ [",
+            round(minimum(pp[m]); digits=4),
+            ", ",
+            round(maximum(pp[m]); digits=4),
+            "]):",
+        )
+        println(
+            "  fold       : p = p_f + γ(tf - tf_f)²   RMS(Δp)   = ",
+            round(A.rms; sigdigits=3),
+            "   vertex p_f = ",
+            round(A.pf; digits=5),
+            " (tf_f = ",
+            round(A.tff; digits=3),
+            " s, extrapolated)",
+        )
+        println(
+            "  homoclinic : p = p_f + A exp(-tf/b)    RMS(Δlog) = ",
+            round(B.rms; sigdigits=3),
+            "   p_f = ",
+            round(B.pf; digits=5),
+        )
+        println(
+            "  discrete minimum: p = ",
+            round(pp[i0]; digits=5),
+            " at tf = ",
+            round(tt[i0]; digits=2),
+            " s",
+        )
     end
     return (fold=A, homoclinic=B)
 end
@@ -639,10 +704,25 @@ function stability_sweep(disc, bvp, x0, vrefs, setup; tol=1e-9)
     rows = NamedTuple[]
     for vr in vrefs
         p = merge(setup.nt_p0, (v_ref=vr,))
-        prb = BVP.BVPBifProblem(bvp, x, p, (@optic _.v_ref);
-            jacobian=make_jac(disc), record_from_solution=record_period, plot_solution=plot_solution)
+        prb = BVP.BVPBifProblem(
+            bvp,
+            x,
+            p,
+            (@optic _.v_ref);
+            jacobian=make_jac(disc),
+            record_from_solution=record_period,
+            plot_solution=plot_solution,
+        )
         x, res = damped_newton(prb, x, p; tol=tol, max_iter=300)
-        push!(rows, (v_ref=vr, tf=raw_x(x)[5], res=res, mu=sort(abs.(floquet_true(disc, bvp, x, p)), rev=true)))
+        push!(
+            rows,
+            (
+                v_ref=vr,
+                tf=raw_x(x)[5],
+                res=res,
+                mu=sort(abs.(floquet_true(disc, bvp, x, p)); rev=true),
+            ),
+        )
     end
     return rows
 end
@@ -657,12 +737,28 @@ function landscape(disc, bvp, x0, br, setup, plt_land; make_plots=true)
     good(rows) = [r.res < 1e-6 ? r.mu[2] : NaN for r in rows]   # mu sorted desc, [1] = trivial
 
     if make_plots
-        pa = plot(pc, tfc; label=string(nameof(typeof(disc))), xlabel="v_ref", ylabel="tf (s)",
-            title="limit-cycle branch (default params, optimization warm start)")
-        pb = plot([r.v_ref for r in rows_down], good(rows_down); label="from v_ref=9 ↓",
-            color=1, yscale=:log10, xlabel="v_ref", ylabel="max nontrivial |mu|",
-            title="Floquet stability (ground truth)", ylims=(1e-4, 10))
-        plot!(pb, [r.v_ref for r in rows_up], good(rows_up); label="from v_ref=9 ↑", color=2)
+        pa = plot(
+            pc,
+            tfc;
+            label=string(nameof(typeof(disc))),
+            xlabel="v_ref",
+            ylabel="tf (s)",
+            title="limit-cycle branch (default params, optimization warm start)",
+        )
+        pb = plot(
+            [r.v_ref for r in rows_down],
+            good(rows_down);
+            label="from v_ref=9 ↓",
+            color=1,
+            yscale=:log10,
+            xlabel="v_ref",
+            ylabel="max nontrivial |mu|",
+            title="Floquet stability (ground truth)",
+            ylims=(1e-4, 10),
+        )
+        plot!(
+            pb, [r.v_ref for r in rows_up], good(rows_up); label="from v_ref=9 ↑", color=2
+        )
         hline!(pb, [1.0]; label="|mu| = 1 (stability boundary)", color=:gray, ls=:dash)
         plt_land = plot(pa, pb; layout=(2, 1), size=(650, 750))
         savefig(plt_land, joinpath(@__DIR__, "BK_tests_0910_landscape.png"))
@@ -678,8 +774,17 @@ function coexist_cycles(setup; verbose=true)
         vbp = build_vbpara(merge(setup.nt_p0, (v_ref=vr,)))
         for lc in KEEP.LimitCycle.all_limit_cycles(vbp; αmin=(-π), αmax=π, vmax=12, N=40)
             s = KEEP.LimitCycle.build_shooting(lc)
-            push!(rows, (v_ref=vr, α0=s[1], dα0=s[2], dτ0=s[3], T=s[4],
-                power=lc.u[end][5] / lc.t[end]))
+            push!(
+                rows,
+                (
+                    v_ref=vr,
+                    α0=s[1],
+                    dα0=s[2],
+                    dτ0=s[3],
+                    T=s[4],
+                    power=lc.u[end][5] / lc.t[end],
+                ),
+            )
         end
     end
     if verbose
@@ -705,24 +810,40 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     # merely the branch's tf(p) variation (points from both legs share one branch
     # when the fold was not passed), so only genuinely separated refined periods
     # count as two cycles.
-    cand = [(i, s.p, raw_x(s.x)[5]) for (i, s) in enumerate(br.sol) if abs(s.p - VRT) < 0.12]
+    cand = [
+        (i, s.p, raw_x(s.x)[5]) for (i, s) in enumerate(br.sol) if abs(s.p - VRT) < 0.12
+    ]
     cand = [c for c in cand if isfinite(last(c))]
     pv = merge(setup.nt_p0, (v_ref=VRT,))
-    refine(x) = (pr=BVP.BVPBifProblem(bvp, x, pv, (@optic _.v_ref);
-            jacobian=make_jac(disc), record_from_solution=record_period);
-        damped_newton(pr, x, pv; tol=1e-9)[1])
+    refine(x) = (
+        pr=BVP.BVPBifProblem(
+            bvp,
+            x,
+            pv,
+            (@optic _.v_ref);
+            jacobian=make_jac(disc),
+            record_from_solution=record_period,
+        );
+        damped_newton(pr, x, pv; tol=1e-9)[1]
+    )
     if isempty(cand)
         verbose && println("two-cycles: no candidate near v_ref=", VRT, " (", discname, ")")
         return nothing
     end
-    sort!(cand, by=last)
+    sort!(cand; by=last)
     xshort = refine(raw_x(br.sol[cand[1][1]].x))
     xlong = refine(raw_x(br.sol[cand[end][1]].x))
     tf1, tf2 = raw_x(xshort)[5], raw_x(xlong)[5]
     if max(tf1, tf2) / min(tf1, tf2) < 1.3
-        verbose && println("two-cycles: only ONE branch near v_ref=", VRT, " (", discname,
+        verbose && println(
+            "two-cycles: only ONE branch near v_ref=",
+            VRT,
+            " (",
+            discname,
             " did not pass the fold): tf ≈ ",
-            string(round(minimum((tf1, tf2)), digits=2)), " s")
+            string(round(minimum((tf1, tf2)); digits=2)),
+            " s",
+        )
         return nothing
     end
     t1, u1 = orbit(disc, bvp, raw_x(xshort), pv)
@@ -734,21 +855,56 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     mu1 = monodromy_max(u1, t1, tf1, pv)
     mu2 = monodromy_max(u2, t2, tf2, pv)
     if verbose
-        println("two-cycles at v_ref=", VRT, ": max non-trivial |mu| = ",
-            round(mu1, sigdigits=3), " (short), ", round(mu2, sigdigits=3), " (long)")
+        println(
+            "two-cycles at v_ref=",
+            VRT,
+            ": max non-trivial |mu| = ",
+            round(mu1; sigdigits=3),
+            " (short), ",
+            round(mu2; sigdigits=3),
+            " (long)",
+        )
     end
     if make_plots
-        plt2 = plot(layout=(2, 1), size=(800, 620))
-        plot!(plt2[1], t1 ./ t1[end] .* tf1, u1[1, :]; label="short tf=$(round(tf1, digits=2)) s")
-        plot!(plt2[1], t2 ./ t2[end] .* tf2, u2[1, :]; label="long  tf=$(round(tf2, digits=2)) s", lw=2,
-            xlabel="t (s)", ylabel="α (rad)", title="$discname: two cycles at v_ref=$VRT")
+        plt2 = plot(; layout=(2, 1), size=(800, 620))
+        plot!(
+            plt2[1],
+            t1 ./ t1[end] .* tf1,
+            u1[1, :];
+            label="short tf=$(round(tf1, digits=2)) s",
+        )
+        plot!(
+            plt2[1],
+            t2 ./ t2[end] .* tf2,
+            u2[1, :];
+            label="long  tf=$(round(tf2, digits=2)) s",
+            lw=2,
+            xlabel="t (s)",
+            ylabel="α (rad)",
+            title="$discname: two cycles at v_ref=$VRT",
+        )
         plot!(plt2[2], u1[1, :], u1[4, :]; label="short")
-        plot!(plt2[2], u2[1, :], u2[4, :]; label="long", lw=2,
-            xlabel="α (rad)", ylabel="dτ (rad/s)", title="phase portrait")
+        plot!(
+            plt2[2],
+            u2[1, :],
+            u2[4, :];
+            label="long",
+            lw=2,
+            xlabel="α (rad)",
+            ylabel="dτ (rad/s)",
+            title="phase portrait",
+        )
         savefig(plt2, joinpath(@__DIR__, "BK_tests_0910_two_cycles.png"))
     end
-    verbose && println("two-cycles at v_ref=", VRT, ": tf = ", round(tf1, digits=2), " s (short), ",
-        round(tf2, digits=2), " s (long); saved BK_tests_0910_two_cycles.png")
+    verbose && println(
+        "two-cycles at v_ref=",
+        VRT,
+        ": tf = ",
+        round(tf1; digits=2),
+        " s (short), ",
+        round(tf2; digits=2),
+        " s (long); saved BK_tests_0910_two_cycles.png",
+    )
     return (tf_short=tf1, tf_long=tf2, mu_short=mu1, mu_long=mu2)
 end
 
@@ -758,8 +914,16 @@ end
 "Time `f()`; print wall/alloc/GC when `verbose`. Returns `(value, @timed result)`."
 function timed(label, f; verbose=true)
     r = @timed f()
-    verbose && println(label, ": ", round(r.time, digits=2), " s, ",
-        round(r.bytes / 2^20, digits=1), " MiB, gc ", round(100r.gctime / r.time, digits=1), "%")
+    verbose && println(
+        label,
+        ": ",
+        round(r.time; digits=2),
+        " s, ",
+        round(r.bytes / 2^20; digits=1),
+        " MiB, gc ",
+        round(100r.gctime / r.time; digits=1),
+        "%",
+    )
     return r.value, r
 end
 
@@ -772,33 +936,59 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
     discname = nameof(typeof(method))
     model = make_model(method, setup)
     bvp = make_bvp(model, method)
-    x0 = method isa BVP.Shooting ? shooting_warm_start(bvp, method, setup) :
-         BVP.generate_solution(bvp,
-        t -> vcat(x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t), setup.tf_physical))
+    x0 = if method isa BVP.Shooting
+        shooting_warm_start(bvp, method, setup)
+    else
+        BVP.generate_solution(
+        bvp,
+        t -> vcat(
+            x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t),
+            setup.tf_physical,
+        ),
+    )
+    end
 
-    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.v_ref);
+    prob = BVP.BVPBifProblem(
+        bvp,
+        x0,
+        setup.nt_p0,
+        (@optic _.v_ref);
         jacobian=make_jac(method),
         record_from_solution=record_period,
         plot_solution=plot_solution,
     )
 
-    optn = NewtonPar(tol=1e-10, verbose=true, linesearch=true)
+    optn = NewtonPar(; tol=1e-10, verbose=true, linesearch=true)
 
     pre = @timed damped_newton(prob, x0, setup.nt_p0; make_presolve(method)...)
     x0, res_pre = pre.value
     t_pre = pre.time
-    verbose && println(discname, " damped pre-solve residual: ", res_pre, "  (", round(t_pre, digits=2), " s)")
+    verbose && println(
+        discname,
+        " damped pre-solve residual: ",
+        res_pre,
+        "  (",
+        round(t_pre; digits=2),
+        " s)",
+    )
     prob = BifurcationKit.re_make(prob; u0=x0)
 
-    sol, tim_solve = timed("solve", () -> BifurcationKit.solve(prob, Newton(), optn); verbose)
+    sol, tim_solve = timed(
+        "solve", () -> BifurcationKit.solve(prob, Newton(), optn); verbose
+    )
     @assert BifurcationKit.converged(sol) "$discname Newton did not converge"
 
     ## Sanity: converged cycle at the reference wind (exercises the orbit plumbing)
     t_orb, u_orb = orbit(method, bvp, raw_x(sol.u), setup.nt_p0)
     if make_plots
-        plot(t_orb ./ t_orb[end] .* raw_x(sol.u)[5], u_orb[4, :];
-            label=string(discname), xlabel="t (s)", ylabel="dτ (rad/s)",
-            title="converged cycle at v_ref = $(setup.nt_p0.v_ref)")
+        plot(
+            t_orb ./ t_orb[end] .* raw_x(sol.u)[5],
+            u_orb[4, :];
+            label=string(discname),
+            xlabel="t (s)",
+            ylabel="dτ (rad/s)",
+            title="converged cycle at v_ref = $(setup.nt_p0.v_ref)",
+        )
         savefig(joinpath(@__DIR__, "BK_tests_0910_orbit.png"))
     end
 
@@ -807,8 +997,13 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
     # reversed the backward leg and masked sheet-jumps; if that reappears, use the
     # explicit two-direction pattern of `BK_parametric_fixed.jl` (header, item 4).
     optc = make_contpar(method, optn)
-    br, tim_cont = timed("continuation",
-        () -> continuation(prob, PALC(), optc; plot=false, verbosity=1, normC=norminf, bothside=true); verbose)
+    br, tim_cont = timed(
+        "continuation",
+        () -> continuation(
+            prob, PALC(), optc; plot=false, verbosity=1, normC=norminf, bothside=true
+        );
+        verbose,
+    )
 
     verbose && println(discname, " sheet-jumps at indices ", sheet_jumps(br))
     if make_plots
@@ -821,23 +1016,40 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
     land = @timed landscape(method, bvp, sol.u, br, setup, nothing; make_plots)
     rows_down, rows_up, _ = land.value
     t_land = land.time
-    verbose && println("stability sweep (ground truth): ", round(t_land, digits=2), " s")
+    verbose && println("stability sweep (ground truth): ", round(t_land; digits=2), " s")
 
     co = @timed coexist_cycles(setup; verbose)
     coexist = co.value
     t_coexist = co.time
-    verbose && println("coexist: ", round(t_coexist, digits=2), " s")
+    verbose && println("coexist: ", round(t_coexist; digits=2), " s")
 
     tw = @timed two_cycles(method, bvp, br, setup; make_plots, verbose)
     two = tw.value
     t_two = tw.time
-    verbose && println("two-cycles: ", round(t_two, digits=2), " s")
+    verbose && println("two-cycles: ", round(t_two; digits=2), " s")
 
     timings = (
-        presolve=t_pre, solve=tim_solve, continuation=tim_cont,
-        stability=t_land, coexist=t_coexist, twocycles=t_two,
+        presolve=t_pre,
+        solve=tim_solve,
+        continuation=tim_cont,
+        stability=t_land,
+        coexist=t_coexist,
+        twocycles=t_two,
     )
-    return (; setup, method, discname, bvp, prob, sol, br, rows_down, rows_up, coexist, two, timings)
+    return (;
+        setup,
+        method,
+        discname,
+        bvp,
+        prob,
+        sol,
+        br,
+        rows_down,
+        rows_up,
+        coexist,
+        two,
+        timings,
+    )
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
