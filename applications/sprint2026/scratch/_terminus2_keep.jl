@@ -11,30 +11,40 @@ Pkg.activate(@__DIR__)
 using KEEP
 using KEEP.PointMassPara: build_para, build_vbpara
 using KEEP.PointMass4: integrate
-using KEEP.LimitCycle: compute_limit_cycle, build_shooting, unpack_shooting,
-    endpoint_residuals
+using KEEP.LimitCycle:
+    compute_limit_cycle, build_shooting, unpack_shooting, endpoint_residuals
 using StaticArrays, LinearAlgebra, Printf
 
 const NT_P0 = NamedTuple(build_para(build_vbpara()))
 
-fd_jac(f, x; h=1e-6) = (n = length(x); J = Matrix{Float64}(undef, n, n);
-    for i in 1:n
-        e = zeros(n); e[i] = h
-        @views J[:, i] .= (f(x .+ e) .- f(x .- e)) ./ (2h)
-    end; J)
+function fd_jac(f, x; h=1e-6)
+    return (
+        n=length(x);
+        J=Matrix{Float64}(undef, n, n);
+        for i in 1:n
+            e = zeros(n)
+            e[i] = h
+            @views J[:, i] .= (f(x .+ e) .- f(x .- e)) ./ (2h)
+        end;
+        J
+    )
+end
 
 vbp_at(vr) = build_vbpara(merge(NT_P0, (v_ref=vr,)))
 
 function resid(s, vbp)
     u0, T = unpack_shooting(SA[s[1], s[2], s[3], s[4]])
     sol = integrate(u0, T, vbp; tol=1e-11)
-    return collect(endpoint_residuals(sol; sense=+))
+    return collect(endpoint_residuals(sol; sense=(+)))
 end
 
 function multipliers(s, vbp)
     u0, T = unpack_shooting(SA[s[1], s[2], s[3], s[4]])
-    pm = v -> copy(Array(integrate(SA[v[1], v[2], v[3], v[4], 0.0], T, vbp; tol=1e-11).u[end])[1:4])
-    return sort(abs.(eigvals(fd_jac(pm, collect(Array(u0)[1:4])))), rev=true)
+    pm =
+        v -> copy(
+            Array(integrate(SA[v[1], v[2], v[3], v[4], 0.0], T, vbp; tol=1e-11).u[end])[1:4],
+        )
+    return sort(abs.(eigvals(fd_jac(pm, collect(Array(u0)[1:4])))); rev=true)
 end
 
 function newton(s0, vbp)
@@ -63,9 +73,11 @@ function main()
     # Warm-start down to v_ref = 2.5 (compute_limit_cycle tracks reliably).
     s = [-0.7771, 1.3899, 1.8811, 2.82632]
     for vr in (6.0, 4.0, 3.0, 2.75, 2.6, 2.55, 2.52, 2.5)
-        s = build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tol=1e-11))
+        s = build_shooting(
+            compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tol=1e-11)
+        )
     end
-    println("start (v_ref=2.5): T=", round(s[4], digits=5))
+    println("start (v_ref=2.5): T=", round(s[4]; digits=5))
 
     println("\n v_ref      T        tf (s)     |mu| (sorted)                     res")
     vr = 2.5
@@ -73,8 +85,15 @@ function main()
         vbp = vbp_at(vr)
         s, res = newton(s, vbp)
         mu = multipliers(s, vbp)
-        @printf("%7.4f  %9.5f  %8.4f  %s  %.1e%s\n", vr, s[4], s[4] * (NT_P0.l / vr),
-            join([@sprintf("%.5f", m) for m in mu], "  "), res, res < 1e-8 ? "" : "  <-- FAIL")
+        @printf(
+            "%7.4f  %9.5f  %8.4f  %s  %.1e%s\n",
+            vr,
+            s[4],
+            s[4] * (NT_P0.l / vr),
+            join([@sprintf("%.5f", m) for m in mu], "  "),
+            res,
+            res < 1e-8 ? "" : "  <-- FAIL"
+        )
         flush(stdout)
         res < 1e-8 || break
         vr -= 0.001

@@ -1,5 +1,5 @@
-α = (t, sol) -> sol(t, idxs=1)
-τ = (t, sol) -> sol(t, idxs=2)
+α = (t, sol) -> sol(t; idxs=1)
+τ = (t, sol) -> sol(t; idxs=2)
 a_vec = (t, sol) -> begin
     α_ = α(t, sol)
     a = sol.prob.p.l
@@ -18,7 +18,7 @@ end
 r_hat = (t, sol) -> begin
     θ_ = θ(t, sol)
     φ_ = φ(t, sol)
-    SA[sin(θ_)*cos(φ_), sin(θ_)*sin(φ_), cos(θ_)]
+    SA[sin(θ_) * cos(φ_), sin(θ_) * sin(φ_), cos(θ_)]
 end
 r = (t, sol) -> begin
     r_hat_ = r_hat(t, sol)
@@ -33,9 +33,9 @@ r_vec = (t, sol) -> begin
     r_ = r(t, sol)
     r_hat_ * r_
 end
-dα = (t, sol) -> sol(t, idxs=3)
-dτ = (t, sol) -> sol(t, idxs=4)
-ddα = (t, sol) -> sol(t, Val{1}, idxs=3)
+dα = (t, sol) -> sol(t; idxs=3)
+dτ = (t, sol) -> sol(t; idxs=4)
+ddα = (t, sol) -> sol(t, Val{1}; idxs=3)
 T = (t, sol) -> begin
     dα_ = dα(t, sol)
     TF.torque_function(dα_, sol.prob.p) * dα_
@@ -49,4 +49,4 @@ F_l_vec = (t, sol) -> begin
     F_tension = A_tension[:, 1] * ddα(t, sol) + b_tension
 end
 F_l = (t, sol) -> norm(F_l_vec(t, sol))
-P = (t, sol) -> sol(t, Val{1}, idxs=5)
+P = (t, sol) -> sol(t, Val{1}; idxs=5)

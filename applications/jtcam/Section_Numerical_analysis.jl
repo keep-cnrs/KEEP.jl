@@ -24,7 +24,6 @@ using ForwardDiff
 
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
 
-
 ## Determine optimal parameters using kinetic model
 vbp = PMP.build_vbpara()
 _, _, T_dim = PMP.lmt(vbp)
@@ -61,7 +60,9 @@ equilibria.
 Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
 and seed positions / unit field directions for the arrows.
 """
-function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+function streamlines(
+    f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0
+)
     gx, gy = gridsize
     xmin, xmax = xlims
     ymin, ymax = ylims
@@ -87,8 +88,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
         k3 === nothing && return nothing
         k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
         k4 === nothing && return nothing
-        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
-            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+        return (
+            x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]),
+        )
     end
     line_x, line_y = Float32[], Float32[]
     ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
@@ -121,7 +124,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
                 x = step_rk4(x, d, stepsize)
                 x === nothing && break
                 (xmin ≤ x[1] ≤ xmax && ymin ≤ x[2] ≤ ymax) || break
-                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                idx = (
+                    clamp(searchsortedlast(rx, x[1]), 1, gx),
+                    clamp(searchsortedlast(ry, x[2]), 1, gy),
+                )
                 if idx != ccur
                     mask[idx...] || break
                     mask[idx...] = false
@@ -175,9 +181,17 @@ theme = my_theme
 f = q -> SteadyState.ddq_partial(q, vbp)
 
 # Canvas & Layout
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+plot(;
+    xlims=(-π - 0.2, π + 0.2),
+    ylims=(-π - 0.2, π + 0.2),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 
 # Background wind spans
 vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
@@ -189,10 +203,13 @@ line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
 plot!(line_x, line_y; theme.streamlines...)
 
 L, W = 0.2, 0.06
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
-    (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
-    (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
-         for (s, u, v) in zip(zip(ax, ay), au, av)]
+heads = [
+    Shape([
+        (s[1] + L / 2 * u, s[2] + L / 2 * v),
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u),
+    ]) for (s, u, v) in zip(zip(ax, ay), au, av)
+]
 plot!(heads; theme.heads...)
 
 # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
@@ -226,17 +243,16 @@ display(current())
 # https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221o94HCRuzmwEVdA-7pjgq-58mf6-UFtfb%22%5D,%22action%22:%22open%22,%22userId%22:%22107583648323041548472%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
 
 ## All eigen values
-dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
+dyn = (u) -> PM4.dynamics(PM4.build_u(; α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
 
 ss_ = [q for q in ss if q[2] > 0]
 evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
-hline([0], c=:black)
+hline([0]; c=:black)
 # hspan!([-100, 0]; c=:green, alpha=.1, label="Stable")
 # hspan!([0, 100]; c=:red, alpha=.1, label="Unstable")
-scatter!(invert(real.(evs)), c=[ifelse(cos(q[1]) > 0, :green, :red) for q in ss_])
+scatter!(invert(real.(evs)); c=[ifelse(cos(q[1]) > 0, :green, :red) for q in ss_])
 annotate!([2.5, 2.5], [7.5, -1.5], ["Unstable", "Stable"])
-plot!(xlabel="Equilibrium index", ylabel="Re(λ)", ylim=(-3, 15))
-
+plot!(; xlabel="Equilibrium index", ylabel="Re(λ)", ylim=(-3, 15))
 
 ## 1
 using Plots, LinearAlgebra
@@ -245,9 +261,17 @@ using Plots, LinearAlgebra
 theme = my_theme
 f = q -> SteadyState.ddq_partial(q, vbp)
 
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+plot(;
+    xlims=(-π - 0.2, π + 0.2),
+    ylims=(-π - 0.2, π + 0.2),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 
 # Keep vspans very faint (alpha=0.1)
 vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
@@ -307,8 +331,14 @@ for q in ss
         arrow_label = f"{λ:.1f}"
 
         # Draw Arrow
-        plot!([p_start[1], p_end[1]], [p_start[2], p_end[2]],
-            arrow=arrow(:closed, :head, 0.4, 0.3), color=arrow_color, lw=2, label="")
+        plot!(
+            [p_start[1], p_end[1]],
+            [p_start[2], p_end[2]];
+            arrow=arrow(:closed, :head, 0.4, 0.3),
+            color=arrow_color,
+            lw=2,
+            label="",
+        )
 
         # Text positioned toward the center (same system for all annotations)
         ann_pos = q .+ ann_offset * ctr_dir .+ (i == 1 ? ann_sep : -ann_sep) .* ctr_perp
@@ -321,9 +351,16 @@ savefig(joinpath(@__DIR__, "figs", "equilibria_eigenvalues.pdf"))
 
 # 2
 # Use the same base setup as above, with faded vspans and nullclines
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright)
+plot(;
+    xlims=(-π - 0.2, π + 0.2),
+    ylims=(-π - 0.2, π + 0.2),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+)
 
 # ... (Insert faded background and scatter points from Option 1 here) ...
 
@@ -341,10 +378,20 @@ for q in ss
     # |λ| → 0 and log-compresses the large |λ| ≈ 14; clamps keep it on-plot.
     l1 = clamp(0.12 * log(1 + abs(λ1)), 0.05, 0.4)
     l2 = clamp(0.12 * log(1 + abs(λ2)), 0.05, 0.4)
-    plot!([q[1]-l1*v1[1], q[1]+l1*v1[1]], [q[2]-l1*v1[2], q[2]+l1*v1[2]],
-        color=(λ1 < 0 ? :blue : :red), lw=2, label="")
-    plot!([q[1]-l2*v2[1], q[1]+l2*v2[1]], [q[2]-l2*v2[2], q[2]+l2*v2[2]],
-        color=(λ2 < 0 ? :blue : :red), lw=2, label="")
+    plot!(
+        [q[1]-l1*v1[1], q[1]+l1*v1[1]],
+        [q[2]-l1*v1[2], q[2]+l1*v1[2]];
+        color=(λ1 < 0 ? :blue : :red),
+        lw=2,
+        label="",
+    )
+    plot!(
+        [q[1]-l2*v2[1], q[1]+l2*v2[1]],
+        [q[2]-l2*v2[2], q[2]+l2*v2[2]];
+        color=(λ2 < 0 ? :blue : :red),
+        lw=2,
+        label="",
+    )
 
     # 2. Add inline text box with numeric values (e.g., "-5.2, +2.1")
     # Same systematic placement as ## 1: offset toward the plot center
@@ -357,8 +404,8 @@ for q in ss
 end
 
 # Dummy plots to insert clean legend items
-plot!([NaN], [NaN], color=:blue, lw=2, label="Stable (λ < 0)")
-plot!([NaN], [NaN], color=:red, lw=2, label="Unstable (λ > 0)")
+plot!([NaN], [NaN]; color=:blue, lw=2, label="Stable (λ < 0)")
+plot!([NaN], [NaN]; color=:red, lw=2, label="Unstable (λ > 0)")
 
 display(plot!())
 savefig(joinpath(@__DIR__, "figs", "equilibria_compact.pdf"))
@@ -368,9 +415,17 @@ savefig(joinpath(@__DIR__, "figs", "equilibria_compact.pdf"))
 # equally on a circle of radius r_eq at rest (dq = 0, as the ddq = 0 convention
 # of the streamplot), integrated for t_eq with the full 4D dynamics and drawn in
 # translucent black in the (α, τ) plane.
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+plot(;
+    xlims=(-π - 0.2, π + 0.2),
+    ylims=(-π - 0.2, π + 0.2),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 
 vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
 vspan!([π / 2, π]; theme.upwind...)
@@ -384,9 +439,11 @@ scatter!(first.(ss_up), last.(ss_up); theme.eq_up..., label="Equilibrium (up)")
 
 N_eq, r_eq, t_eq = 100, π / 10, 1
 @time for q in ss
-    for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
+    for θ in range(0, 2π; length=N_eq + 1)[1:(end - 1)]
         q0 = q .+ r_eq .* [cos(θ), sin(θ)]
-        local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
+        local sol = PM4.integrate(
+            PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true
+        )
         qs = [sol(t)[1:2] for t in range(0, sol.t[end], 1000)]  # interpolated (α, τ) on a grid
         plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
     end
@@ -398,12 +455,16 @@ display(plot!())
 ## circle eight plot
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
 ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
-p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:green), project_eight=true)
-plot!(title="Downwind arm")
-p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:red), project_eight=true)
-plot!(title="Upwind arm")
+p_downwind = VIZ.plot_eight_circle(
+    ss_downwind, vbp; plot_kwargs=(; color=:green), project_eight=true
+)
+plot!(; title="Downwind arm")
+p_upwind = VIZ.plot_eight_circle(
+    ss_upwind, vbp; plot_kwargs=(; color=:red), project_eight=true
+)
+plot!(; title="Upwind arm")
 
-plot(p_downwind, p_upwind; layout=(1, 2), size=4 .* plot_size(aspect_ratio=3))
+plot(p_downwind, p_upwind; layout=(1, 2), size=4 .* plot_size(; aspect_ratio=3))
 savefig(joinpath(@__DIR__, "figs", "equilibria_eight_circle.pdf"))
 display(current())
 
@@ -439,8 +500,9 @@ time twice, values π and -π) to be drawn dashed.
 """
 function tau_wrap(ts, τm)
     Δt = step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
+    tcross = [
+        ts[i] + Δt * (π - τm[i]) / (τm[i + 1] + 2π - τm[i]) for i in findall(diff(τm) .< -π)
+    ]
     t_jump, y_jump = Float64[], Float64[]
     for tc in tcross
         append!(t_jump, (tc, tc, NaN))
@@ -459,19 +521,33 @@ function plot_avg_power_kW(sol)
     t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
+    dα = sol.(t; idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    avg_power = sol(tf; idxs=5) / (tf - t0) / 1000
     plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
-        label="Average power = $(round(avg_power; digits=2)) kW")
-    plot!(legend=(0.1, -0.2), xlabel="t (s)",
-        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
+    plot!(
+        [t0, tf],
+        [avg_power, avg_power];
+        c=:red,
+        lw=2,
+        label="Average power = $(round(avg_power; digits=2)) kW",
+    )
+    return plot!(;
+        legend=(0.1, -0.2), xlabel="t (s)", left_margin=2Plots.mm, bottom_margin=3Plots.mm
+    )
 end
 
 t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="",
-    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
+p_wts = plot(
+    ts,
+    q_ts[:, [1, 3, 4]];
+    c=[1 3 4],
+    label="",
+    ylabel="q (rad), qd (rad/s)",
+    legend=:bottomleft,
+    xlabel="",
+    xformatter=x->"",
+)
 plot!(t_main, y_main; c=2, lw=2, label="")
 plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
 plot!(t_jump, y_jump; c=2, ls=:dot, label=false, lw=2)
@@ -482,7 +558,7 @@ display(sim_4D_fig)
 
 ## Convergence rate toward limit cycle
 # 1. Reference limit cycle calculation
-u0 = PM4.build_u(dτ=1)
+u0 = PM4.build_u(; dτ=1)
 p = PM4.build_vbpara()
 tf = 100
 cb = LC.build_poincare_callback(eps(1.0))
@@ -490,40 +566,41 @@ sol = PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13)
 x_infty = sol.u[end]
 
 # Reference convergence rate
-errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end-1)]][1:10]
+errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end - 1)]][1:10]
 n = length(errors)
 i1, i2 = 1, 6
 convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
 
 # Base plot setup
-p_conv = plot(
+p_conv = plot(;
     yscale=:log10,
     xlim=(0, n + 1),
     xticks=0:2:100,
     ylim=(1e-16, 1e2),
     yticks=10.0 .^ (0:-3:-16),
     xlabel="Lemniscate revolutions",
-    ylabel="Distance to limit"
+    ylabel="Distance to limit",
 )
 
 # Reference slope line
-plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black)
-annotate!((3.9, 1e-8, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
+plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)); label="", c=:black)
+annotate!((
+    3.9,
+    1e-8,
+    (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black"),
+))
 
 # 2. Integrate multiple initial conditions (N x N grid)
 N = 50
-u0s = [PM4.build_u(; α, τ, dτ=1) for (α, τ) in eachcol(sample(10, Float64[-π, -π], Float64[π, π], HaltonSample()))]
+u0s = [
+    PM4.build_u(; α, τ, dτ=1) for
+    (α, τ) in eachcol(sample(10, Float64[-π, -π], Float64[π, π], HaltonSample()))
+]
 
 # Notice the loop comprehension `for u0 in u0s`
 sols = [PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13) for u0 in u0s]
 
-perturbed_params = (;
-    ls=:dot,
-    lw=2,
-    alpha=0.4,
-    c=:gray,
-    label="Perturbed trajectories"
-)
+perturbed_params = (; ls=:dot, lw=2, alpha=0.4, c=:gray, label="Perturbed trajectories")
 
 # 3. Overlay each trajectory connected by dashed lines
 for (idx, s) in enumerate(sols)
@@ -535,7 +612,15 @@ for (idx, s) in enumerate(sols)
 end
 
 # 4. Highlight the reference points on top
-plot!(errors .+ 1e-16, label="\$|| x_i - x_\\infty  ||\$", color=1, ls=:dash, marker=:circle, linealpha=0.5, markersize=7)
+plot!(
+    errors .+ 1e-16;
+    label="\$|| x_i - x_\\infty  ||\$",
+    color=1,
+    ls=:dash,
+    marker=:circle,
+    linealpha=0.5,
+    markersize=7,
+)
 plot!([NaN], [NaN]; perturbed_params...)
 
 display(p_conv)
@@ -583,22 +668,35 @@ end
 
 n_splits = 4
 # arrows = [permutedims(repeat([true], n_splits - 1)) false]
-plot(aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20, size=plot_size(500, aspect_ratio=1.8))
-plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
-plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
-plot!([NaN], [NaN], c=1, label="D(τ) > 0")
-plot!([NaN], [NaN], c=2, label="D(τ) < 0")
+plot(;
+    aspect_ratio=:equal,
+    xlabel="y (m)",
+    ylabel="z (m)",
+    xtick=-40:10:40,
+    ytick=10:5:20,
+    size=plot_size(500; aspect_ratio=1.8),
+)
+plot!(invert(yz_split(lc_m, n_splits))...; lw=4, c=2, arrows=true)
+plot!(invert(yz_split(lc_p, n_splits))...; lw=2, c=1, arrows=true)
+plot!([NaN], [NaN]; c=1, label="D(τ) > 0")
+plot!([NaN], [NaN]; c=2, label="D(τ) < 0")
 plot!([0], [26])
 c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ, set by hand
 c, δ = [12, 16.5], 0.5
-lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
+lens!(
+    [c[1] - δ, c[1] + δ],
+    [c[2] - δ, c[2] + δ];
+    inset=(1, bbox(0.3, 0.05, 0.3, 0.4)),
+    lw=1.5,
+    lc=:grey,
+)
 l = plot!().inset_subplots[1]
-xticks_ = (c[1]-δ):δ:(c[1]+δ)
-yticks_ = (c[2]-δ):δ:(c[2]+δ)
+xticks_ = (c[1] - δ):δ:(c[1] + δ)
+yticks_ = (c[2] - δ):δ:(c[2] + δ)
 xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
 yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
-plot!(l, tickfontsize=TICKFONTSIZE - 1)
-plot!(leftmargin=1Plots.mm, bottommargin=2Plots.mm)
+plot!(l; tickfontsize=TICKFONTSIZE - 1)
+plot!(; leftmargin=1Plots.mm, bottommargin=2Plots.mm)
 
 display(plot!())
 savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
@@ -645,7 +743,13 @@ if false
         end
         n = length(sol.u)
         (n < 2 || sol.t[end] == tf) && return 0, 0
-        id = LC.distance_on_section(sol.u[end], u₊) < LC.distance_on_section(sol.u[end], u₋) ? 1 : -1
+        id =
+            if LC.distance_on_section(sol.u[end], u₊) <
+               LC.distance_on_section(sol.u[end], u₋)
+                1
+            else
+                -1
+            end
         return n - 1, id
     end
 
@@ -668,7 +772,9 @@ if false
     # states at t ≈ 0 and terminate spuriously whenever dτ > 0.
     dαs = range(-2, 2, n_grid)  # the cycles' fixed points (dα, dτ) ≈ ±(1.4, 1.9) lie inside
     dτs = range(-2, 2, n_grid)
-    @time N1, id1 = basin_scan((dα, dτ) -> PM4.build_u(; α=1e-100, τ=TAU0, dα, dτ), dαs, dτs)
+    @time N1, id1 = basin_scan(
+        (dα, dτ) -> PM4.build_u(; α=1e-100, τ=TAU0, dα, dτ), dαs, dτs
+    )
 
     # Slice 2: (α, τ) plane at dq0 = 0; every grid point shifted off the symmetry
     # axes (as in the equilibria figure above).
@@ -684,17 +790,37 @@ if false
     "τ wrapped to [-π, π), polyline with NaN at the 2π jumps."
     function wrap_nan(τ)
         w = mod.(τ, 2π) .- π
-        [i == firstindex(w) || abs(w[i] - w[i-1]) ≤ π ? w[i] : NaN for i in eachindex(w)]
+        return [
+            i == firstindex(w) || abs(w[i] - w[i - 1]) ≤ π ? w[i] : NaN for
+            i in eachindex(w)
+        ]
     end
 
     slices = [
-        (N=N1, id=id1, xs=dαs, ys=dτs, name="dadtau", eqs=(),
-            cycles=[(getindex.(lc.u, 3), getindex.(lc.u, 4)) for lc in (lc_p, lc_m)]),
-        (N=N2, id=id2, xs=αs, ys=τs, name="alphatau",
+        (
+            N=N1,
+            id=id1,
+            xs=dαs,
+            ys=dτs,
+            name="dadtau",
+            eqs=(),
+            cycles=[(getindex.(lc.u, 3), getindex.(lc.u, 4)) for lc in (lc_p, lc_m)],
+        ),
+        (
+            N=N2,
+            id=id2,
+            xs=αs,
+            ys=τs,
+            name="alphatau",
             eqs=[q for q in ss if -1 ≤ q[1] ≤ 1 && -1 ≤ q[2] ≤ 1],
-            cycles=[(getindex.(lc.u, 1), wrap_nan(getindex.(lc.u, 2))) for lc in (lc_p, lc_m)]),
+            cycles=[
+                (getindex.(lc.u, 1), wrap_nan(getindex.(lc.u, 2))) for lc in (lc_p, lc_m)
+            ],
+        ),
     ]
-    axlabels = Dict("dadtau" => ("dα (rad/s)", "dτ (rad/s)"), "alphatau" => ("α (rad)", "τ (rad)"))
+    axlabels = Dict(
+        "dadtau" => ("dα (rad/s)", "dτ (rad/s)"), "alphatau" => ("α (rad)", "τ (rad)")
+    )
 
     ar = :auto  # :equal
 
@@ -703,16 +829,30 @@ if false
         for c in s.cycles
             plot!(c...; subplot, c=:black, lw=2, label="")
         end
-        isempty(s.eqs) ||
-            scatter!(first.(s.eqs), last.(s.eqs); subplot, c=:black, m=:circle, ms=4, label="Equilibrium")
+        isempty(s.eqs) || scatter!(
+            first.(s.eqs),
+            last.(s.eqs);
+            subplot,
+            c=:black,
+            m=:circle,
+            ms=4,
+            label="Equilibrium",
+        )
         plot!([NaN], [NaN]; subplot, c=:black, lw=2, label="Limit cycle")
         return nothing
     end
 
     "Empty frame for a basin plot of slice `s`."
-    basin_frame(s; kwargs...) = plot(;
-        xlabel=axlabels[s.name][1], ylabel=axlabels[s.name][2],
-        xlims=extrema(s.xs), ylims=extrema(s.ys), aspect_ratio=ar, kwargs...)
+    function basin_frame(s; kwargs...)
+        return plot(;
+            xlabel=axlabels[s.name][1],
+            ylabel=axlabels[s.name][2],
+            xlims=extrema(s.xs),
+            ylims=extrema(s.ys),
+            aspect_ratio=ar,
+            kwargs...,
+        )
+    end
 
     """
     A: hue = basin (Blues for dτ̇ > 0, Oranges for dτ̇ < 0), lightness = N_ε (fast
@@ -722,29 +862,92 @@ if false
     function plot_basins_A(s)
         (; N, id, xs, ys) = s
         Nmax = maximum(N)
-        p = plot(size=(560, 470), layout=@layout([a{0.76w} [b{0.45h}; c{0.55h}]]))
-        plot!(p; subplot=1, xlabel=axlabels[s.name][1], ylabel=axlabels[s.name][2],
-            xlims=extrema(xs), ylims=extrema(ys), aspect_ratio=ar, legend=:topright)
-        any(==(0), id) && heatmap!(p, xs, ys, ifelse.(id .== 0, 1.0, NaN);
-            subplot=1, c=[:black :black], clims=(1, Nmax), colorbar=false)
-        heatmap!(p, xs, ys, ifelse.(id .== 1, float.(N), NaN);
-            subplot=1, c=cgrad(:Blues), clims=(1, Nmax), colorbar=false)
-        heatmap!(p, xs, ys, ifelse.(id .== -1, float.(N), NaN);
-            subplot=1, c=cgrad(:Oranges), clims=(1, Nmax), colorbar=false)
+        p = plot(; size=(560, 470), layout=@layout([a{0.76w} [b{0.45h}; c{0.55h}]]))
+        plot!(
+            p;
+            subplot=1,
+            xlabel=axlabels[s.name][1],
+            ylabel=axlabels[s.name][2],
+            xlims=extrema(xs),
+            ylims=extrema(ys),
+            aspect_ratio=ar,
+            legend=:topright,
+        )
+        any(==(0), id) && heatmap!(
+            p,
+            xs,
+            ys,
+            ifelse.(id .== 0, 1.0, NaN);
+            subplot=1,
+            c=[:black :black],
+            clims=(1, Nmax),
+            colorbar=false,
+        )
+        heatmap!(
+            p,
+            xs,
+            ys,
+            ifelse.(id .== 1, float.(N), NaN);
+            subplot=1,
+            c=cgrad(:Blues),
+            clims=(1, Nmax),
+            colorbar=false,
+        )
+        heatmap!(
+            p,
+            xs,
+            ys,
+            ifelse.(id .== -1, float.(N), NaN);
+            subplot=1,
+            c=cgrad(:Oranges),
+            clims=(1, Nmax),
+            colorbar=false,
+        )
         basin_overlays!(s; subplot=1)
-        scatter!([NaN], [NaN]; subplot=1, m=:square, ms=7, markerstrokewidth=0,
-            c=cgrad(:Blues)[0.6], label="D(τ) > 0 cycle")
-        scatter!([NaN], [NaN]; subplot=1, m=:square, ms=7, markerstrokewidth=0,
-            c=cgrad(:Oranges)[0.6], label="D(τ) < 0 cycle")
+        scatter!(
+            [NaN],
+            [NaN];
+            subplot=1,
+            m=:square,
+            ms=7,
+            markerstrokewidth=0,
+            c=cgrad(:Blues)[0.6],
+            label="D(τ) > 0 cycle",
+        )
+        scatter!(
+            [NaN],
+            [NaN];
+            subplot=1,
+            m=:square,
+            ms=7,
+            markerstrokewidth=0,
+            c=cgrad(:Oranges)[0.6],
+            label="D(τ) < 0 cycle",
+        )
         vbar = reshape(range(1, Nmax; length=256), :, 1)
         ybar = collect(range(1, Nmax; length=256))
-        for (k, cg, ttl) in ((2, cgrad(:Blues), "Nε · dτ > 0"), (3, cgrad(:Oranges), "Nε · dτ < 0"))
-            heatmap!(p, [1.0], ybar, vbar; subplot=k, c=cg, clims=(1, Nmax), colorbar=false,
-                xticks=false, yticks=[1, max(2, Nmax ÷ 2), Nmax], title=ttl,
-                titlefontsize=8, tickfontsize=7, framestyle=:box, grid=false)
+        for (k, cg, ttl) in
+            ((2, cgrad(:Blues), "Nε · dτ > 0"), (3, cgrad(:Oranges), "Nε · dτ < 0"))
+            heatmap!(
+                p,
+                [1.0],
+                ybar,
+                vbar;
+                subplot=k,
+                c=cg,
+                clims=(1, Nmax),
+                colorbar=false,
+                xticks=false,
+                yticks=[1, max(2, Nmax ÷ 2), Nmax],
+                title=ttl,
+                titlefontsize=8,
+                tickfontsize=7,
+                framestyle=:box,
+                grid=false,
+            )
         end
         savefig(joinpath(OUTPATH, "basins_$(s.name)_A.pdf"))
-        display(p)
+        return display(p)
     end
 
     """
@@ -757,22 +960,63 @@ if false
         (; N, id, xs, ys) = s
         cblue, corange = cgrad(:Blues)[0.35], cgrad(:Oranges)[0.45]  # pastels matching viz A
         p = basin_frame(s; legend=:topright, size=(470, 420))
-        heatmap!(xs, ys, ifelse.(id .== 1, 1.0, ifelse.(id .== -1, 2.0, 3.0));
-            c=cgrad([cblue, corange, Plots.RGB(0.05, 0.05, 0.05)]), clims=(1, 3), colorbar=false)
+        heatmap!(
+            xs,
+            ys,
+            ifelse.(id .== 1, 1.0, ifelse.(id .== -1, 2.0, 3.0));
+            c=cgrad([cblue, corange, Plots.RGB(0.05, 0.05, 0.05)]),
+            clims=(1, 3),
+            colorbar=false,
+        )
         Nc = vec(N)[vec(N) .> 0]
         levels = sort(unique(Nc[Nc .> minimum(Nc)]))  # isochrones of the slow region
-        bands = length(levels) <= 3 ? levels : levels[round.(Int, range(1, length(levels); length=3))]
+        bands = if length(levels) <= 3
+            levels
+        else
+            levels[round.(Int, range(1, length(levels); length=3))]
+        end
         for k in eachindex(bands)
-            contourf!(xs, ys, float.(N); levels=[bands[k], maximum(Nc) + 1], c=[:black],
-                alpha=0.15k, colorbar=false)
-            scatter!([NaN], [NaN]; m=:square, ms=7, markerstrokewidth=0, c=:black, alpha=0.15k,
-                label="Nε ≥ $(bands[k])")
+            contourf!(
+                xs,
+                ys,
+                float.(N);
+                levels=[bands[k], maximum(Nc) + 1],
+                c=[:black],
+                alpha=0.15k,
+                colorbar=false,
+            )
+            scatter!(
+                [NaN],
+                [NaN];
+                m=:square,
+                ms=7,
+                markerstrokewidth=0,
+                c=:black,
+                alpha=0.15k,
+                label="Nε ≥ $(bands[k])",
+            )
         end
         basin_overlays!(s)
-        scatter!([NaN], [NaN]; m=:square, ms=7, markerstrokewidth=0, c=cblue, label="D(τ) > 0 basin")
-        scatter!([NaN], [NaN]; m=:square, ms=7, markerstrokewidth=0, c=corange, label="D(τ) < 0 basin")
+        scatter!(
+            [NaN],
+            [NaN];
+            m=:square,
+            ms=7,
+            markerstrokewidth=0,
+            c=cblue,
+            label="D(τ) > 0 basin",
+        )
+        scatter!(
+            [NaN],
+            [NaN];
+            m=:square,
+            ms=7,
+            markerstrokewidth=0,
+            c=corange,
+            label="D(τ) < 0 basin",
+        )
         savefig(joinpath(OUTPATH, "basins_$(s.name)_B.pdf"))
-        display(p)
+        return display(p)
     end
 
     """
@@ -783,16 +1027,40 @@ if false
         (; N, id, xs, ys) = s
         Nmax = maximum(N)
         p = basin_frame(s; legend=:topright, size=(470, 420), colorbar_title="Nε")
-        any(==(0), id) && heatmap!(xs, ys, ifelse.(id .== 0, 1.0, NaN);
-            c=[:black :black], clims=(1, Nmax), colorbar=false)
-        heatmap!(xs, ys, ifelse.(N .== 0, NaN, float.(N)); c=:viridis, clims=(1, Nmax), colorbar=true)
+        any(==(0), id) && heatmap!(
+            xs,
+            ys,
+            ifelse.(id .== 0, 1.0, NaN);
+            c=[:black :black],
+            clims=(1, Nmax),
+            colorbar=false,
+        )
+        heatmap!(
+            xs,
+            ys,
+            ifelse.(N .== 0, NaN, float.(N));
+            c=:viridis,
+            clims=(1, Nmax),
+            colorbar=true,
+        )
         stencil = [isodd(i + j) for i in axes(id, 1), j in axes(id, 2)]  # every other grid point
-        pts = [(xs[j], ys[i]) for i in axes(id, 1), j in axes(id, 2) if id[i, j] == -1 && stencil[i, j]]
-        scatter!(first.(pts), last.(pts); ms=2, c=:white, alpha=0.35, markerstrokewidth=0.3,
-            markerstrokecolor=Plots.RGB(0.3, 0.3, 0.3), label="D(τ) < 0 (stipple)")
+        pts = [
+            (xs[j], ys[i]) for
+            i in axes(id, 1), j in axes(id, 2) if id[i, j] == -1 && stencil[i, j]
+        ]
+        scatter!(
+            first.(pts),
+            last.(pts);
+            ms=2,
+            c=:white,
+            alpha=0.35,
+            markerstrokewidth=0.3,
+            markerstrokecolor=Plots.RGB(0.3, 0.3, 0.3),
+            label="D(τ) < 0 (stipple)",
+        )
         basin_overlays!(s)
         savefig(joinpath(OUTPATH, "basins_$(s.name)_C.pdf"))
-        display(p)
+        return display(p)
     end
 
     for s in slices
