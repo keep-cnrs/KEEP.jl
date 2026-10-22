@@ -186,7 +186,7 @@ function init_plot_eight_circle(vbp; project_eight=false)
     return (plot!(), geom)
 end
 
-function add_point_plot_eight_circle!(q, geom, plot_args...; plot_kwargs...)
+function add_point_plot_eight_circle!(q, geom, plot_args...; marker_kwargs=(;), plot_kwargs...)
     α, τ = q
     arm = geom.l .* PM4.compute_αhat(α)
     if geom.project_eight
@@ -196,7 +196,9 @@ function add_point_plot_eight_circle!(q, geom, plot_args...; plot_kwargs...)
         θ, φ = PM4.τ_to_θφ(τ, geom.plot_vbp)
         tip = (φ, θ)
     end
-    return plot!([0, arm[2], tip[1]], [0, arm[1], tip[2]]; plot_args..., plot_kwargs...)
+    p = plot!([0, arm[2], tip[1]], [0, arm[1], tip[2]]; plot_args..., plot_kwargs...)
+    isempty(marker_kwargs) || scatter!(p, [tip[1]], [tip[2]]; label="", marker_kwargs...)
+    return p
 end
 
 #=
@@ -206,16 +208,21 @@ TODO:
  - draw eight_circle
 =#
 
-function plot_eight_circle(qs, vbp; project_eight=false, plot_kwargs=())
+function plot_eight_circle(qs, vbp; project_eight=false, plot_kwargs=(), marker_kwargs=())
     plot_kwargs_arr = ifelse(
         isa(plot_kwargs, AbstractVector),
         plot_kwargs,
         fill(plot_kwargs, length(qs))
     )
+    marker_kwargs_arr = ifelse(
+        isa(marker_kwargs, AbstractVector),
+        marker_kwargs,
+        fill(marker_kwargs, length(qs))
+    )
 
     fig, geom = init_plot_eight_circle(vbp; project_eight)
-    for (q, plot_kwargs) in zip(qs, plot_kwargs_arr)
-        add_point_plot_eight_circle!(q, geom; plot_kwargs...)
+    for (q, plot_kwargs, marker_kwargs) in zip(qs, plot_kwargs_arr, marker_kwargs_arr)
+        add_point_plot_eight_circle!(q, geom; plot_kwargs..., marker_kwargs)
     end
 
     return fig

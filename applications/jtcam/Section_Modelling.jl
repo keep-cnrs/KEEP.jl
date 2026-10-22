@@ -47,9 +47,9 @@ for αj in lk
 end
 
 fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
-    xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=:topright,
+    xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
     title="Spindle torus, not to scale", label="",
-    size=(800, 800), margin=1Plots.mm)
+    size=SIZE_HALF .* (1.2, 1), margin=1Plots.mm, legend=:outerright)
 
 # set of possible arm-tip positions: circle of radius l in the xy-plane
 θc = range(0, 2π, length=200)
@@ -81,3 +81,32 @@ display(fig)
 
 ## Parametrisation in tau
 # TODO [use the plot from test/publications/ECC2026]
+
+τ_φ = 90.0
+τ_θ = 225.0
+dx, dy = 1 / 4, 1 / 2
+up_col, down_col = 1, 2
+
+τ = range(0, 360, length=501)
+θ = τ -> sind(2 * τ)
+φ = τ -> sind(τ)
+
+plot(xmirror=true)
+plot!(xticks=([-1, 0, 1], (raw"$-Δφ$", raw"$φ = 0$", raw"$Δφ$")),
+    yticks=([-1, 0, 1], (raw"$θ_0 + Δθ$", raw"$θ = θ_0$", raw"$θ_0 - Δθ$"))
+)
+
+plot!(φ.(τ), θ.(τ), c=:grey)
+
+plot!(φ.([0, τ_φ]), θ.([τ_φ, τ_φ]), color=:black)
+annotate!(sum(φ.([0, τ_φ])) / 2, sum(θ.([τ_φ, τ_φ])) / 2 - 0.1, (raw"$Δφ$", ANNOTATIONFONTSIZE, :black, :top))
+
+plot!(φ.([τ_θ, τ_θ]), θ.([τ_θ, 0]), color=:black)
+annotate!(sum(φ.([τ_θ, τ_θ])) / 2 + 0.05, sum(θ.([τ_θ, 0])) / 2, (raw"$Δθ$", ANNOTATIONFONTSIZE, :black, :left))
+quiver!([0], [0], quiver=([dx], [-dy]), c=up_col)
+quiver!([0], [0], quiver=([-dx], [dy]), c=down_col)
+annotate!(dx - 0.05, -dy - 0.25, (raw"$\dot{\tau} > 0$", ANNOTATIONFONTSIZE, :center, PALETTE[up_col]))
+annotate!(-dx + 0.05, dy + 0.25, (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
+plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm)
+display(current())
+savefig(current(), joinpath(OUTPATH, "eight_plot.pdf"))

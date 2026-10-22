@@ -97,7 +97,7 @@ du = (dα, dτ, ddα, ddτ)
 """
 function dynamics(u, p, t=0)
     L, M, T = lmt(p)
-    α, _ = q = u[SA[1, 2]] .+ 1e-100  # Avoid singularity
+    α, _ = q = u[SA[1, 2]]
     dα, _ = dq = u[SA[3, 4]]
 
     # Compute values and derivatives
@@ -141,7 +141,7 @@ function dynamics(u, p, t=0)
 
     # torque_function takes a dimensionless dα
     torque = torque_function(dα * T, p) * M * L^2 * T^-2
-    l_tension = rhat ⋅ (SA[0, 0, 1] × OA)
+    l_tension = rhat ⋅ (SA[0, 0, 1] × OA) + 1e-100  # Avoid division by zero for q = (0, 0)
     A_tension = -(p.I_eq * M * L^2) / l_tension * rhat * SA[1, 0]'
     b_tension = -torque / l_tension * rhat
 

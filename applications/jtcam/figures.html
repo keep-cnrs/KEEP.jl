@@ -69,14 +69,14 @@
 
     <h1>10D model</h1>
 
-    <object data="figs/residuals_10D_interp.pdf" type="application/pdf"></object>
-
-    <p>Dense output evaluated on a logarithmically regular grid. Without callback: O(t) residual on speed, integrated to O(t^2) residual on position. The callback removes the trend, making the residuals O(1) for both, it does not correct for phase error.</p>
-
-    <!-- Full-width figure -->
     <object data="figs/trajectory_10D_short_long_cb.pdf" type="application/pdf"></object>
+    <p>No callback is ok for short integrations (tf = 20 s), but error accumulates for longer integrations(tf = 100 s). Callback fixes that, in exchange for a longer runtime. <pre>tol = 1e-3, alg = Tsit5</pre></p>
 
-    <p>No callback is ok for short integrations, but error accumulates (here exagerated by loose tolerance and an order 5 scheme instead of 9 used otherwise), callback fixes that, at some cost</p>
+    <object data="figs/residuals_10D_interp.pdf" type="application/pdf"></object>
+    <p>Dense output evaluated on a logarithmically regular grid. Without callback: O(t) residual on speed, integrated to O(t^2) residual on position. The callback removes the trend, making both residuals O(1), it does not correct for a potential phase error.</p>
+
+    <object data="figs/three_models_convergence.pdf" type="application/pdf"></object>
+    <p>As we reduce the integration tolerance and for each mof the three models, the sequence of trajectories converge toward the same reference, tight-tolerance trajectory (max_{t in range(0, t_f, N=1001) norm(x_i(t) - x_ref(t))}, where norm is the Euclidean norm on R^3, x_i is the trajectory of interest and x_ref is the reference trajectory). Therefore, we confirm that the model presented in the main section of this paper is equivalent to the original 10D model.</p>
 
     <pre>
       ┌ Info: Timing
@@ -87,33 +87,50 @@
       │ reference to reference+callback = 1.25x slowdown
       │ reference to proposed model = 7.44x speedup
       └ reference+callback to proposed model = 9.29x speedup</pre>
-
-
-    <object data="figs/three_models_convergence.pdf" type="application/pdf"></object>
-    <p>As we reduce the integration tolerance and for each mof the three models, the sequence of trajectories converge toward the same reference, tight-tolerance trajectory (max_{t in range(0, t_f, N=1001) norm(x_i(t) - x_ref(t))}, where norm is the Euclidean norm on R^3, x_i is the trajectory of interest and x_ref is the reference trajectory). Therefore, we confirm that the model presented in the main section of this paper is equivalent to the original 10D model.</p>
+    <p>Note: The runtime of the callback only is twice that of the 4D implementation; the code of 10D + callback would always be slower than 4D, therefore we didn't optimize it as much.</p>
 
     <h1>Modelling</h1>
 
     <object data="figs/spindle_torus.pdf" type="application/pdf"></object>
     <p>Shows the set of possible positions for the kite. The mesh is the border of the unions of spheres of radius $\ell$ whose center lie on the blue circle, which is the set of all arm-tip positions, i.e. a horizontal circle of center O and radius $a$. The kite can only be inside the mesh. It is on the boundary when the arm and the lines are contained in the same vertical plane, and is strictly inside otherwise. The shape is a spindle torus, i.e. it self intersects, because the lines are longer than the arm.</p>
+    <p>I should mention the symmetry in the paper if not already the case (α, τ) -> (-α, τ+π).</p>
+
+    <object data="figs/eight_plot.pdf" type="application/pdf"></object>
+    <p>The lemniscate, which forms the base of the kite's cone of constraints, is parameterized by $\tau$ and its shape is controlled by the design parameters $\theta_0$, $\Delta\theta$, and $\Delta\phi$. Trajectories with increasing $\tau$ (blue) result in a flight path that ascends in the middle and descends at the sides, while decreasing $\tau$ (orange) produces the inverse motion. The $y$-axis is inverted to align with the orientation of the kite's trajectory.</p>
+    <p>Plot all possible positions for (α, τ) in [-π, π]^2, after adding the cone constraint ?</p>
 
     <h1>Numerical analysis of the dynamical system</h1>
 
-    <object data="figs/equilibria.pdf" type="application/pdf"></object>
-    <p>Stream lines of vector field ddq(q, dq=(0,0)) (not physical trajectories) gives an intuition of the stability of each equilibria, where nullclines cross, there is an equilibrium. Red background = upwind arm</p>
+    <object data="figs/equilibria_phase_space.pdf" type="application/pdf"></object>
+    <p>Stream lines of vector field ddq(q, dq=(0,0)) (not physical trajectories) gives an intuition of the stability of each equilibria, where nullclines cross, there is an equilibrium. Red background = upwind arm. Marker nomenclature: white=arm is downwind (i.e. grey region) and black it is upwind, circle=equilibrium near the center and diamond on the sides.</p>
+    <p>Zero acceleration curves and equilibria of the dynamics.
+    The black arrows represent the direction of the vector field $\ddq(\vq, \dq = 0)$, the orange lines are the nullclines of $\ddot \alpha(\alpha, \tau)$, \emph{i.e.} the points $(\alpha, \tau)$ such that $\ddot \alpha(\alpha, \tau) = 0$, and the blue lines are the nullclines of $\ddot \tau(\alpha, \tau)$.
+    At their intersections lie the equilibria of the system (all unstable), with color codes ranging from yellow to blue according to the highest real part of their eigenvalues.
+    The background is grey when the arm points downwind and red when it points upwind</p>
+
     <object data="figs/equilibria_eight_circle.pdf" type="application/pdf"></object>
     <p>Configuration for each equilibria, not a physical representation -- lines and arm are aligned in a vertical plane for all equilibria</p>
+
+    <object data="figs/equilibria_eigvals.pdf" type="application/pdf"></object>
+    <p>All equilibria have at least one eigenvalue with positive real part, therefore they are all unstable. Regarding the magnitude of this real part, we can say that the ones on the side of the eight are <emph>more</emph> unstable than the ones in the center.</p>
+
     <object data="figs/time_series_4D.pdf" type="application/pdf"></object>
-    <p>Trajectory seems to converge rapidly toward a limit cycle</p>
+    <p>All tested (quasi-Monte-Carlo, Halton sequence) initilizations with dα=0 and dτ=1 converge toward a limit cycle in a few revolutions.</p>
+
     <object data="figs/yz_limit_cycles.pdf" type="application/pdf"></object>
-    <p>Depending on init, we have two different limit cycles: prograde(dτ > 0) and retrograde (dτ < 0). They follow different path in 3D space.</p>
+    <p>Depending on init, we have two different limit cycles: prograde (dτ > 0) and retrograde (dτ < 0). They follow different paths in 3D space. We limit our analysis to dτ>0 for the rest of this work (copy justification from ECC)</0></p>
+    <p>ECC: Projection of the kite trajectories onto the $YZ$ plane for the two limit cycles with opposite directions of motion (arrows indicate the direction of the kite motion). Zooming in on the trajectories shows that the two paths are distinct.</p>
+
     <object data="figs/limit_cycle_convergence.pdf" type="application/pdf"></object>
-    <p>start with q=(0,0), dα = 0 and dτ = 1, integrate of record distance on surface of section</p>
+    <p>Convergence toward the limit cycle with initial condition $\vb q = 0$, $\dot \alpha = 0$ and $\dot \tau = 1$. Grey trajectory are for other $\vb q$ choices, sampled over $[-\pi, \pi[^2$.
+    The trajectory gets closer to the limit cycle as the number of lemniscate revolutions (a revolution is defined as a sweep over the interval $[0,2\pi]$ for the angle $\tau$) increases.
+    The linear trend in log-linear plot indicates exponential convergence; after each revolution, the distance to the limit decreases by a factor of $10^{2.64}$, until it stalls near the tolerance of the integration scheme.</p>
 
     <h1>Bifurcation Kit (not for JTCAM)</h1>
     <img src="../sprint2026/fig_fold_zoom.png">
 
     <img src="../sprint2026/fig_timeseries.png">
+
     <img src="../sprint2026/fig_phase_planes.png">
 
 
