@@ -218,15 +218,6 @@ plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 # Equilibria
 ss = SteadyState.all_steady_states(vbp)
 
-# Characteristics table (arm wind × kite side × zone)
-@info "Equilibrium characteristics:"
-for q in sort(ss; by=q -> (!is_down(q), is_left(q), is_center(q)))
-    arm = is_down(q) ? "down" : "up"
-    kite = is_left(q) ? "left" : "right"
-    zone = is_center(q) ? "center" : "side"
-    @info f"α = {q[1]:+.2f}, τ = {q[2]:+.2f}, φ = {φkite(q[2]):+.3f} → arm: {arm}wind, kite: {kite}, zone: {zone}"
-end
-
 styles = ss_style.(ss)
 scatter!(first.(ss), last.(ss);
     c=getproperty.(styles, :c),
@@ -238,7 +229,7 @@ scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 
 savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
 display(current())
-@info "Chance to use Poincaré-Miranda theorem?"
+@info "Chance to use Poincaré-Miranda theorem here?"
 
 #=
 
@@ -269,7 +260,7 @@ hline([0], c=:black)
 # hspan!([-100, 0]; c=:green, alpha=.1, label="Stable")
 # hspan!([0, 100]; c=:red, alpha=.1, label="Unstable")
 for (k, q) in enumerate(ss_)  # same marker style as the equilibria figure
-    style = is_down(q) ? theme.downwind : theme.upwind
+    local style = is_down(q) ? theme.downwind : theme.upwind
     vspan!([k - 1/4, k + 1/4]; style...)
     scatter!(fill(k, length(evs[k])), real.(evs[k]); ss_style(q)...)
 end
@@ -392,10 +383,10 @@ display(sim_4D_fig)
 ## Convergence rate toward limit cycle
 # 1. Reference limit cycle calculation
 u0 = PM4.build_u(dτ=1)
-p = PM4.build_vbpara()
-tf = 100
+tf = 50
 cb = LC.build_poincare_callback(eps(1.0))
-sol = PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13)
+tol = 1e-13
+sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
 x_infty = sol.u[end]
 
 # Reference convergence rate
@@ -424,7 +415,7 @@ N = 50
 u0s = [PM4.build_u(; α, τ, dτ=1) for (α, τ) in eachcol(sample(10, Float64[-π, -π], Float64[π, π], HaltonSample()))]
 
 # Notice the loop comprehension `for u0 in u0s`
-sols = [PM4.integrate(u0, tf, p; callback=cb, save_end=false, tol=1e-13) for u0 in u0s]
+sols = [PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol) for u0 in u0s]
 
 perturbed_params = (;
     ls=:dot,
@@ -451,10 +442,10 @@ display(p_conv)
 savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
 ## 2 convergence rate
-convergence_tol = 1e-13
+tol = 1e-13
 function get_slope(distances; tol_start, tol_end)
-    i1 = findfirst(distances .< tol_start)
-    i2 = findlast(distances .> tol_end)
+    i1 = findfirst(<(tol_start), distances)
+    i2 = findlast(>(tol_end), distances)
     return -(log10(distances[i2]) - log10(distances[i1])) / (i2 - i1)
 end
 i1, i2 = 3, 6
@@ -479,26 +470,101 @@ fig2 = plot(
 )
 figs = (fig1, fig2)
 for (α, τ, dα, dτ) in eachcol(sampled)
-    u0 = PM4.build_u(; α, τ, dα, dτ)
-    sol = PM4.integrate(u0, 50, p; callback=cb, save_end=false, tol=convergence_tol)
+    local u0 = PM4.build_u(; α, τ, dα, dτ)
+    local sol = PM4.integrate(u0, 50, vbp; callback=cb, save_end=false, tol=tol)
     u_infty = sol.u[end]
     group = u_infty[4] > 0 ? 1 : 2
     distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]]
-    slope = get_slope(distances; tol_start=1e-2, tol_end=10convergence_tol)
+    slope = get_slope(distances; tol_start=1e-2, tol_end=10tol)
     append!(slopes[group], slope)
     plot!(figs[group], distances, c=group, linealpha=0.5, ls=:dash)
 end
-for g in 1:2
-    slope = sum(s for s in ss) / length(ss)
-end
 plot(figs...; layout=(1, 2), size=SIZE_FULL)
 display(current())
+
+## Convergence rate of the two cycles, side by side
+# Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
+function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true)
+    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=cb, save_end=false, tol=tol)
+    u_infty = sol.u[end]
+    n_max = 11
+    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
+
+    tol_start, tol_end = 1e-2, 10tol
+    slope = get_slope(distances; tol_start, tol_end)
+    i1 = findfirst(<(tol_start), distances)
+
+    plt = plot(; yscale=:log10, xlim=(0, n_max), xticks=0:2:100,
+        ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
+        xlabel=f"""Lemniscate revolutions, {dτ > 0 ? "D(τ) > 0" : "D(τ) < 0"}""",
+    )
+
+    plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black)
+    for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+        s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=cb, save_end=false, tol=tol)
+        plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
+            perturbed_params..., label="")
+    end
+
+    annotate!((3.9, 1e-9, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
+    distance_style = (; c=color, ls=:dot, marker=:circle, markersize=7)
+    plot!(distances .+ 1e-16; distance_style...)
+
+    if legend
+        plot!([NaN]; distance_style..., label=raw"$|| x_i - x_\infty  ||$")
+        plot!([NaN]; perturbed_params...)
+    end
+    return plt
+end
+
+p_conv_p = plot_convergence_panel(vbp, +1, 1; legend=false)
+p_conv_m = plot_convergence_panel(vbp, -1, 2)
+plot!(p_conv_p, ylabel="Distance to limit")
+conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL,
+    left_margin=5Plots.mm, bottom_margin=5Plots.mm)
+display(conv_two)
+savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_cycles.pdf"))
+
+## Convergence rate of the two cycles, overlaid
+# Reference runs from (0, 0, 0, ±1); data, trend line and slope label share
+# the cycle color. The D(τ) < 0 slope sits above the lines, D(τ) > 0 below.
+conv_over = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:10,
+    ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
+    xlabel="Lemniscate revolutions", ylabel="Distance to limit")
+style = (; ls=:dash, marker=:circle, markersize=7)
+data = (
+    (1, 1, "D(τ) > 0", [NaN]),
+    (-1, 2, "D(τ) < 0", [NaN])
+)
+for (dτ, color, label, slope) in reverse(data)
+    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=tol)
+    u_infty = sol.u[end]
+    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:10]
+    @show u_infty
+    slope .= get_slope(distances; tol_start=1e-2, tol_end=10tol)
+    local i1 = findfirst(<(1e-2), distances)
+    # annotate!((dτ > 0 ? 2.0 : 3.6, dτ > 0 ? 1e-10 : 1e-4, (f"slope = {only(slope):.2f}", :left, ANNOTATIONFONTSIZE, PALETTE[color])))
+
+    plot!(i -> distances[i1] * exp10(-only(slope) * (i - i1)); color, lw=1)
+    plot!(distances .+ 1e-16; style..., color)
+end
+# Blue is drawn last (on top); ghost entries put it first in the legend.
+for (_, color, label, slope) in data
+    plot!([NaN]; style..., lw=2, ms=10, c=color, label=f"{label}, slope={only(slope):.2f}")
+end
+display(conv_over)
+savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
 
 ## Eight-trajectory in YZ plane
 r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
 # include("../../test/publications/ECC2026/state_funcs.jl")
 lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
 lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
+
+@info f"Average power
+D(τ) > 0 : {last(last(lc_p.u)) / 1000last(lc_p.t):.2f} kW,
+D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
+"
 
 """
 Lens geometry for the YZ-plane zoom: locate each limit cycle at phase τ
@@ -567,6 +633,18 @@ savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
 Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
 Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
 =#
+
+
+## Verification of convergence rate with floquet multipliers
+using ForwardDiff
+
+shooting_p = LC.build_shooting(lc_p)
+shooting_m = LC.build_shooting(lc_m)
+
+res = s -> LC.build_shooting(LC.shoot(s, vbp)) - s
+LC.shooting_residuals(shooting_p, vbp)
+
+ForwardDiff.jacobian(s -> LC.shooting_residuals(s, vbp), shooting_p)
 
 ## Limit Cycles
 # TODO
