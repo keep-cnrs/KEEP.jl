@@ -523,7 +523,7 @@ plot!(p_conv_p, ylabel="Distance to limit")
 conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL,
     left_margin=5Plots.mm, bottom_margin=5Plots.mm)
 display(conv_two)
-savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_cycles.pdf"))
+savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_panels.pdf"))
 
 ## Convergence rate of the two cycles, overlaid
 # Reference runs from (0, 0, 0, ±1); data, trend line and slope label share
@@ -554,6 +554,37 @@ for (_, color, label, slope) in data
 end
 display(conv_over)
 savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
+
+## Verification of convergence rate with Floquet multipliers
+# The secant slopes above are measured on the log plots; the multipliers give
+# them independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
+# revolution T (the monodromy matrix): one multiplier is 1 (displacement along
+# the cycle, eigenvector f(x*)) and the largest remaining |μ| < 1 predicts the
+# slope -log10|μ| per revolution. The callback solution stores only
+# Poincaré-section states, so its last two saved times span exactly one
+# revolution and build_shooting(sol) is the cycle's shooting (residuals ~1e-13).
+function Φ(x, T; vbp, tol)
+    Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp; tol).u[end])[1:4]
+end
+
+function floquet_rate(sol, vbp; tol=1e-11)
+    s = LC.build_shooting(sol)
+    u0, T = LC.unpack_shooting(s)
+    x0 = collect(Array(u0))[1:4]
+    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ(x, T; vbp, tol), x0)))  # jacobian is an SMatrix
+    return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, s
+end
+
+@info "Each revolution, the distance is divided by 10^rate"
+for dτ in (+1, -1)
+    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=tol)
+    local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
+    local secant = get_slope(distances; tol_start=1e-2, tol_end=10tol)
+    local rate, μ, s = floquet_rate(sol, vbp)
+    local label = dτ > 0 ? "D(τ) > 0" : "D(τ) < 0"
+    local μ_str = join(round.(abs.(μ); sigdigits=6), ", ")
+    @info f"{label}: secant slope = {secant:.3f}, Floquet slope = {rate:.3f} (T = {s[4]:.6f}, |μ| = {μ_str})"
+end
 
 ## Eight-trajectory in YZ plane
 r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
@@ -622,29 +653,11 @@ plot!(leftmargin=1Plots.mm, bottommargin=2Plots.mm)
 display(plot!())
 savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
 
-# argmax_τ, max_δ = -1., -1.
-# argmax(τ -> compute_lens(lc_p, lc_m, τ, 3)[2], range(0, 2π, 100))
-# for τ in range(0, 2π, 100)
-#     c, δ = compute_lens(lc_p, lc_m, τ, 3) 
-#     @show τ, δ
-# end
-
 #=
 Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
 Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
 =#
 
-
-## Verification of convergence rate with floquet multipliers
-using ForwardDiff
-
-shooting_p = LC.build_shooting(lc_p)
-shooting_m = LC.build_shooting(lc_m)
-
-res = s -> LC.build_shooting(LC.shoot(s, vbp)) - s
-LC.shooting_residuals(shooting_p, vbp)
-
-ForwardDiff.jacobian(s -> LC.shooting_residuals(s, vbp), shooting_p)
 
 ## Limit Cycles
 # TODO
