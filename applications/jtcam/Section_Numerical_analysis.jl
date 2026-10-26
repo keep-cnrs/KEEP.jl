@@ -28,7 +28,7 @@ include(joinpath(@__DIR__, "jtcam_theme.jl"))
 ## Determine optimal parameters using kinetic model
 vbp = PMP.build_vbpara()
 _, _, T_dim = PMP.lmt(vbp)
-@info f"b = torque_slope init : {vbp.torque_slope:.2f}"
+torque_slope_hist = [vbp.torque_slope]
 for i in 1:2
     period = LC.compute_limit_cycle(vbp; sense=(+), tol=1e-3).t[end] / T_dim
     ω = 2π/period
@@ -36,8 +36,12 @@ for i in 1:2
     # b/Iω = 1  =>  b = Iω
     b_pto = vbp.I_eq * ω
     vbp.torque_slope = b_pto
-    @info f"b = torque_slope ({i}) : {vbp.torque_slope:.10f}"
+    append!(torque_slope_hist, vbp.torque_slope)
 end
+
+@info f"Optimal torque slope value
+Initialized at $b_0 = {torque_slope_hist[1]:.2f}\\dots$.
+We evaluate $\\omega_0$ through a numerical simulation to get a new $b_1 = I * \\omega_0 \\approx {torque_slope_hist[2]:.2f}$, evaluate $\\omega_1$ and finally obtain $b = b_2 = I \\omega_1 \\approx {torque_slope_hist[3]:.2f}. We reached a fixed point use that value for the rest of this work"
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -265,12 +269,12 @@ for (k, q) in enumerate(ss_)  # same marker style as the equilibria figure
     scatter!(fill(k, length(evs[k])), real.(evs[k]); ss_style(q)...)
 end
 annotate!([2.5, 2.5], [7.5, -1.5], ["Repulsive", "Attractive"])
-plot!(xlabel="", ylabel=raw"Re(λ${}_i$)", ylim=(-3, 15), grid=false)
+plot!(xlabel="", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
 plot!(xticks=(1:4, ["" for _ in 1:4]))
 plot!(leftmargin=1Plots.mm)
 
-savefig(joinpath(@__DIR__, "figs", "equilibria_eigvals.pdf"))
 display(current())
+savefig(joinpath(@__DIR__, "figs", "equilibria_eigvals.pdf"))
 
 ## Trajectories near equilibria
 # Density of the physical flow around each equilibrium: N_eq trajectories seeded
@@ -295,7 +299,7 @@ scatter!(first.(ss_downwind), last.(ss_downwind); theme.eq_down..., label="Equil
 scatter!(first.(ss_upwind), last.(ss_upwind); theme.eq_up..., label="Equilibrium (up)")
 
 N_eq, r_eq, t_eq = 100, π / 10, 1
-@time for q in ss
+for q in ss
     for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
         q0 = q .+ r_eq .* [cos(θ), sin(θ)]
         local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
