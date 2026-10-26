@@ -320,7 +320,7 @@ for (α, τ) in ss
     τx, τy, _ = PM4.compute_τhat(τ, vbp)
     global all_aligned &= (αx * τy ≈ αy * τx)
 end
-@info "Alignment: $all_aligned\nDo all equilibria have the lines and arm aligned in the xy plane?"
+@info "Are lines and arm aligned at equilbrium? $(ifelse(all_aligned, "YES", "NO"))."
 
 ## ---------------------------------------------------------------------------
 # One simulation: start near the aligned state q = (0, 0) with a prograde
