@@ -13,6 +13,7 @@ using KEEP: SteadyState
 using KEEP: Visualization as VIZ
 using KEEP: LimitCycle as LC
 using KEEP.TorqueFunction: torque_function
+using KEEP: DEFAULT_TOLERANCE
 
 using Plots
 using LinearAlgebra: norm, eigvals
@@ -389,8 +390,8 @@ display(sim_4D_fig)
 u0 = PM4.build_u(dτ=1)
 tf = 50
 cb = LC.build_poincare_callback(eps(1.0))
-tol = 1e-13
-sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
+const LC_CONV_TOL = 1e-13
+sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
 x_infty = sol.u[end]
 
 # Reference convergence rate
@@ -417,9 +418,7 @@ annotate!((3.9, 1e-8, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONT
 # 2. Integrate multiple initial conditions (N x N grid)
 N = 50
 u0s = [PM4.build_u(; α, τ, dτ=1) for (α, τ) in eachcol(sample(10, Float64[-π, -π], Float64[π, π], HaltonSample()))]
-
-# Notice the loop comprehension `for u0 in u0s`
-sols = [PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol) for u0 in u0s]
+sols = [PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL) for u0 in u0s]
 
 perturbed_params = (;
     ls=:dot,
@@ -446,7 +445,6 @@ display(p_conv)
 savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
 ## 2 convergence rate
-tol = 1e-13
 function get_slope(distances; tol_start, tol_end)
     i1 = findfirst(<(tol_start), distances)
     i2 = findlast(>(tol_end), distances)
@@ -475,11 +473,11 @@ fig2 = plot(
 figs = (fig1, fig2)
 for (α, τ, dα, dτ) in eachcol(sampled)
     local u0 = PM4.build_u(; α, τ, dα, dτ)
-    local sol = PM4.integrate(u0, 50, vbp; callback=cb, save_end=false, tol=tol)
+    local sol = PM4.integrate(u0, 50, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
     u_infty = sol.u[end]
     group = u_infty[4] > 0 ? 1 : 2
     distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]]
-    slope = get_slope(distances; tol_start=1e-2, tol_end=10tol)
+    slope = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
     append!(slopes[group], slope)
     plot!(figs[group], distances, c=group, linealpha=0.5, ls=:dash)
 end
@@ -488,8 +486,8 @@ display(current())
 
 ## Convergence rate of the two cycles, side by side
 # Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
-function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true)
-    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=cb, save_end=false, tol=tol)
+function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol=LC_CONV_TOL)
+    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=cb, save_end=false, tol)
     u_infty = sol.u[end]
     n_max = 11
     distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
@@ -500,12 +498,12 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true)
 
     plt = plot(; yscale=:log10, xlim=(0, n_max), xticks=0:2:100,
         ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
-        xlabel=f"""Lemniscate revolutions, {dτ > 0 ? "D(τ) > 0" : "D(τ) < 0"}""",
+        xlabel=f"Lemniscate revolutions, D(τ) {dτ>0 ? ">" : "<"} 0",
     )
 
     plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black)
     for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
-        s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=cb, save_end=false, tol=tol)
+        s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=cb, save_end=false, tol)
         plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
             perturbed_params..., label="")
     end
@@ -529,66 +527,61 @@ conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL,
 display(conv_two)
 savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_panels.pdf"))
 
-## Convergence rate of the two cycles, overlaid
+## Convergence rate of the two cycles, overlaid, verified with Floquet multipliers
 # Reference runs from (0, 0, 0, ±1); data, trend line and slope label share
 # the cycle color. The D(τ) < 0 slope sits above the lines, D(τ) > 0 below.
-conv_over = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:10,
-    ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
-    xlabel="Lemniscate revolutions", ylabel="Distance to limit")
-style = (; ls=:dash, marker=:circle, markersize=7)
-data = (
-    (1, 1, "D(τ) > 0", [NaN]),
-    (-1, 2, "D(τ) < 0", [NaN])
-)
-for (dτ, color, label, slope) in reverse(data)
-    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=tol)
-    u_infty = sol.u[end]
-    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:10]
-    @show u_infty
-    slope .= get_slope(distances; tol_start=1e-2, tol_end=10tol)
-    local i1 = findfirst(<(1e-2), distances)
-    # annotate!((dτ > 0 ? 2.0 : 3.6, dτ > 0 ? 1e-10 : 1e-4, (f"slope = {only(slope):.2f}", :left, ANNOTATIONFONTSIZE, PALETTE[color])))
-
-    plot!(i -> distances[i1] * exp10(-only(slope) * (i - i1)); color, lw=1)
-    plot!(distances .+ 1e-16; style..., color)
-end
-# Blue is drawn last (on top); ghost entries put it first in the legend.
-for (_, color, label, slope) in data
-    plot!([NaN]; style..., lw=2, ms=10, c=color, label=f"{label}, slope={only(slope):.2f}")
-end
-display(conv_over)
-savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
-
-## Verification of convergence rate with Floquet multipliers
-# The secant slopes above are measured on the log plots; the multipliers give
-# them independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
+#
+# The secant slopes are measured on the log plots; the multipliers give them
+# independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
 # revolution T (the monodromy matrix): one multiplier is 1 (displacement along
 # the cycle, eigenvector f(x*)) and the largest remaining |μ| < 1 predicts the
 # slope -log10|μ| per revolution. The callback solution stores only
 # Poincaré-section states, so its last two saved times span exactly one
 # revolution and build_shooting(sol) is the cycle's shooting (residuals ~1e-13).
-function Φ(x, T; vbp, tol)
-    Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp; tol).u[end])[1:4]
+function Φ(x, T; vbp)
+    Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
 end
 
-function floquet_rate(sol, vbp; tol=1e-11)
+function floquet_rate(sol, vbp)
     s = LC.build_shooting(sol)
     u0, T = LC.unpack_shooting(s)
     x0 = collect(Array(u0))[1:4]
-    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ(x, T; vbp, tol), x0)))  # jacobian is an SMatrix
-    return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, s
+    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ(x, T; vbp), x0)))  # jacobian is an SMatrix
+    return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, T
 end
 
-@info "Each revolution, the distance is divided by 10^rate"
-for dτ in (+1, -1)
-    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=tol)
+# One solve per cycle feeds both the plot and the info caption.
+cycles = NamedTuple[]
+for (dτ, color, label) in ((1, 1, "D(τ) > 0"), (-1, 2, "D(τ) < 0"))
+    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
     local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
-    local secant = get_slope(distances; tol_start=1e-2, tol_end=10tol)
-    local rate, μ, s = floquet_rate(sol, vbp)
-    local label = dτ > 0 ? "D(τ) > 0" : "D(τ) < 0"
-    local μ_str = join(round.(abs.(μ); sigdigits=6), ", ")
-    @info f"{label}: secant slope = {secant:.3f}, Floquet slope = {rate:.3f} (T = {s[4]:.6f}, |μ| = {μ_str})"
+    local rate, μ, T = floquet_rate(sol, vbp)
+    local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
+    # largest eigenvalue found with differentiation: predicts the per-revolution rate
+    local λ = maximum(abs, μ[abs.(μ) .< 1/2])
+    push!(cycles, (; dτ, color, label, distances, secant, rate, λ, T))
 end
+
+conv_over = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:10,
+    ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
+    xlabel="Lemniscate revolutions", ylabel="Distance to limit")
+style = (; ls=:dash, marker=:circle, markersize=7)
+for c in reverse(cycles)  # blue (D(τ) > 0) is drawn last, on top
+    local i1 = findfirst(<(1e-2), c.distances)
+    plot!(i -> c.distances[i1] * exp10(-c.secant * (i - i1)); c.color, lw=1)
+    plot!(c.distances .+ 1e-16; style..., c.color)
+end
+# Ghost entries put the blue cycle first in the legend.
+for c in cycles
+    plot!([NaN]; style..., lw=2, ms=10, c=c.color, label=f"{c.label}, slope={c.secant:.2f}")
+end
+display(conv_over)
+savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
+
+cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
+    f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
+@info f"""Each revolution, the distance is divided by 10^slope. The eigenvalues λ are the dominant non-unit Floquet multipliers found with differentiation.
+{join(cycle_lines, '\n')}"""
 
 ## Eight-trajectory in YZ plane
 r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)

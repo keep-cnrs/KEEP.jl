@@ -1,4 +1,5 @@
 [deps]
+BifurcationKit = "0f109fa4-8a5d-4b75-95aa-f515264e7665"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 KEEP = "43413fff-ad5b-4266-9485-4ac3dd215f36"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
