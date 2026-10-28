@@ -297,8 +297,14 @@ vspan!([-π / 2, π / 2]; theme.downwind..., label="Arm downwind")
 contour!(αs, τs, last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
 contour!(αs, τs, first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
 
-scatter!(first.(ss_downwind), last.(ss_downwind); theme.eq_down..., label="Equilibrium (down)")
-scatter!(first.(ss_upwind), last.(ss_upwind); theme.eq_up..., label="Equilibrium (up)")
+styles = ss_style.(ss)
+scatter!(first.(ss), last.(ss);
+    c=getproperty.(styles, :c),
+    markerstrokecolor=getproperty.(styles, :markerstrokecolor),
+    shape=getproperty.(styles, :shape),
+    ms=getproperty.(styles, :ms),
+    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 
 N_eq, r_eq, t_eq = 100, π / 10, 1
 for q in ss
@@ -369,20 +375,24 @@ function plot_avg_power_kW(sol)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
     avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
     plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2,
-        label="Average power = $(round(avg_power; digits=2)) kW")
-    plot!(legend=(0.1, -0.2), xlabel="t (s)",
-        left_margin=2Plots.mm, bottom_margin=3Plots.mm)
+    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2)
+    # plot!([NaN]; c=:red, lw=2, label="avg = $(round(avg_power; digits=2)) kW", legend=(0.1, -0.2))
+    plot!(xlabel="t (s)")
 end
 
 t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
 p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="",
-    ylabel="q (rad), qd (rad/s)", legend=:bottomleft, xlabel="", xformatter=x->"")
+    ylabel="q (rad), qd (rad/s)", legend=:bottomright, xlabel="", xformatter=x->"")
 plot!(t_main, y_main; c=2, lw=2, label="")
-plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
+# plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
 plot!(t_jump, y_jump; c=2, ls=:dot, label=false, lw=2)
+
 pw = plot_avg_power_kW(sol)
-sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.65h}; b]), size=(800, 700))
+# plot!(pw, NaN * (1:6)'; label=(1:6)', legend=:outerbottom, legendcolumns=6)
+
+sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.5h}; b]))
+plot!(sim_4D_fig, NaN * (1:6)', c=[1 2 3 4 :black :red], label=["α" "τ mod 2π" "D(α)" "D(τ)" "P" "Avg(P)"], legend=:outerright)
+plot!(leftmargin=5Plots.mm)
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 display(sim_4D_fig)
 
@@ -441,49 +451,11 @@ end
 # 4. Highlight the reference points on top
 plot!(errors .+ 1e-16, label=raw"$|| x_i - x_\infty  ||$", color=1, ls=:dash, marker=:circle, linealpha=0.5)
 plot!([NaN], [NaN]; perturbed_params...)
+plot!(leftmargin=7Plots.mm, bottommargin=3Plots.mm)
 
 display(p_conv)
 savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
-## 2 convergence rate
-function get_slope(distances; tol_start, tol_end)
-    i1 = findfirst(<(tol_start), distances)
-    i2 = findlast(>(tol_end), distances)
-    return -(log10(distances[i2]) - log10(distances[i1])) / (i2 - i1)
-end
-i1, i2 = 3, 6
-sampled = sample(10, Float64[-π, -π, -1, -1], Float64[π, π, 1, 1], HaltonSample())
-slopes = (Float64[], Float64[])
-fig1 = plot(
-    ylim=(1e-16, 1e2),
-    yticks=10.0 .^ (0:-3:-16),
-    ylabel="Distance to limit",
-    yscale=:log10,
-    xlims=(0, 13),
-    xticks=0:2:20,
-    xlabel="Lemniscate revolutions",
-)
-fig2 = plot(
-    ylim=(1e-16, 1e2),
-    yticks=10.0 .^ (0:-3:-16),
-    yscale=:log10,
-    xlims=(0, 13),
-    xticks=0:2:20,
-    xlabel="Lemniscate revolutions",
-)
-figs = (fig1, fig2)
-for (α, τ, dα, dτ) in eachcol(sampled)
-    local u0 = PM4.build_u(; α, τ, dα, dτ)
-    local sol = PM4.integrate(u0, 50, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
-    u_infty = sol.u[end]
-    group = u_infty[4] > 0 ? 1 : 2
-    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]]
-    slope = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
-    append!(slopes[group], slope)
-    plot!(figs[group], distances, c=group, linealpha=0.5, ls=:dash)
-end
-plot(figs...; layout=(1, 2), size=SIZE_FULL)
-display(current())
 
 ## Convergence rate of the two cycles, side by side
 # Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
@@ -523,8 +495,11 @@ end
 
 p_conv_p = plot_convergence_panel(vbp, +1, 1; legend=false)
 p_conv_m = plot_convergence_panel(vbp, -1, 2)
+plot!(p_conv_p, leftmargin=11Plots.mm)
+plot!(p_conv_m, leftmargin=5Plots.mm)
 plot!(p_conv_p, ylabel="Distance to limit")
 conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
+plot!(bottommargin=7Plots.mm)
 display(conv_two)
 savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_panels.pdf"))
 
@@ -576,6 +551,8 @@ end
 for c in cycles
     plot!([NaN]; style..., lw=2, ms=10, c=c.color, label=f"{c.label}, slope={c.secant:.2f}")
 end
+
+plot!(bottommargin=3Plots.mm, leftmargin=7Plots.mm)
 display(conv_over)
 savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
 
@@ -646,7 +623,7 @@ yticks_ = (c[2]-δ):δ:(c[2]+δ)
 xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
 yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
 plot!(l, tickfontsize=TICKFONTSIZE - 1)
-plot!(leftmargin=1Plots.mm, bottommargin=2Plots.mm)
+plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(0.5, height=2/8))
 
 display(plot!())
 savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
@@ -790,7 +767,7 @@ found = NamedTuple[]
 attempts = zeros(Int, 2)
 n_guess = Ref(0)  # turns actually built (soft-scope-safe counter)
 for sense in (+1, -1)
-    ref = only(filter(r -> r.sense == sense, refs))
+    local ref = only(filter(r -> r.sense == sense, refs))
     defOp = BK.DeflationOperator(2.0, 1.0, [copy(ref.x)])
     for u0 in seeds
         sign(u0[4]) == sense || continue
@@ -798,7 +775,7 @@ for sense in (+1, -1)
         guess = turn_guess(PM4.build_u(u0[1], TAU0, u0[3], u0[4], 0.0))
         guess === nothing && continue
         n_guess[] += 1
-        r = find_cycle(sense, defOp, guess)
+        local r = find_cycle(sense, defOp, guess)
         r === nothing && continue
         (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) && continue
         push!(defOp, copy(r.x))
@@ -811,7 +788,7 @@ end
 cb_conv = LC.build_poincare_callback(1e-8)
 qmc = zeros(Int, 3)  # D(τ) > 0, D(τ) < 0, none
 for u0 in seeds
-    sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
+    local sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
         callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000)
     u = sol.u[end]
     d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf)
