@@ -54,7 +54,7 @@ sol10 = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6
 sol10_cb_f = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=false, tol=1e-6, callback=callback)
 sol10_cb_t = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6, callback=callback_no_save)
 
-ts = logrange(t0_res, sol10.prob.tspan[2], 501)
+ts = logrange(1, sol10.prob.tspan[2], 501)
 res = [PM10.manifold_residuals!(similar(u0_10, 6), sol10(t), p) for t in ts]
 res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), sol10_cb_t(t), p) for t in ts]
 ylim = exp10.((-9.5, 0.5))
@@ -68,8 +68,8 @@ fig_pos = plot!(ts, norm.(getindex.(res_cb, Ref(1:3))), label="With callback")
 plot(; xscale=:log10, xticks=xticks_, xlabel="Time (s)", ylim, yscale=:log10, yticks=yticks_, ylabel="Residual on speed (m/s)")
 plot!(ts, norm.(getindex.(res, Ref(4:6))))
 fig_speed = plot!(ts, norm.(getindex.(res_cb, Ref(4:6))))
-plot(fig_pos, fig_speed, layout=(2, 1), size=SIZE_HALF)
-
+plot(fig_pos, fig_speed, layout=(2, 1), size=SIZE_HALF .* (1, 1.5))
+plot!(bottommargin=3Plots.mm, leftmargin=6Plots.mm)
 display(current())
 savefig(current(), joinpath(@__DIR__, "figs", "residuals_10D_interp.pdf"))
 
@@ -114,7 +114,7 @@ cmp = plot(v1, v3, layout=(1, 2), size=SIZE_FULL)
 savefig(cmp, joinpath(@__DIR__, "figs", "_comparison.pdf"))
 display(cmp)
 
-## Remake
+## Models converge to the same reference trajectory
 pos10(sol) = [PM10.compute_pos1(u[1:5], sol.prob.p) for u in sol.u]
 pos4(sol) = [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
 
@@ -133,6 +133,7 @@ plot!(tols, err10cb, marker=:square, label="10D + callback")
 plot!(tols, err4, marker=:diamond, label="4D")
 plot!(xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15))
 fig = plot!(xflip=true, ymirror=true, legend=:topright, size=SIZE_HALF)
+plot!(bottommargin=4Plots.mm, rightmargin=6Plots.mm)
 savefig(fig, joinpath(@__DIR__, "figs", "three_models_convergence.pdf"))
 display(fig)
 
