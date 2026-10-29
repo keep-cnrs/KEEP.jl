@@ -45,6 +45,7 @@ plot!(fig_traj_short; title="tf = 20 s", params..., legend=:topleft)
 plot!(fig_traj; title="tf = 100 s", params...)
 plot!(fig_traj_cb; title="tf = 100 s + callback", params...)
 tf_fig = plot(fig_traj_short, fig_traj, fig_traj_cb, layout=(1, 3), size=SIZE_FULL)
+# plot!(leftmargin=2Plots.mm)
 savefig(tf_fig, joinpath(@__DIR__, "figs", "trajectory_10D_short_long_cb.pdf"))
 display(tf_fig)
 

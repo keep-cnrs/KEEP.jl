@@ -11,6 +11,9 @@ Pkg.activate(@__DIR__)
 using Plots
 using LinearAlgebra: norm
 
+include(joinpath(@__DIR__, "jtcam_theme.jl"))
+
+## Spindle torus
 l, r = 2, 3
 
 # sanity check: a sampled point is exactly r from its arm tip
@@ -48,8 +51,7 @@ end
 
 fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
     xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
-    title="Spindle torus, not to scale", label="",
-    size=SIZE_HALF .* (1.2, 1), margin=1Plots.mm, legend=:outerright)
+    title="Spindle torus, not to scale", label="", legend=:outerright)
 
 # set of possible arm-tip positions: circle of radius l in the xy-plane
 θc = range(0, 2π, length=200)
@@ -70,14 +72,16 @@ plot!(fig, (l + r * cos(β0)) .* cos.(θc), (l + r * cos(β0)) .* sin.(θc), fil
 kite_pars = (; c=:red, ms=7, label="Kite")
 scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")
 
-scatter!([]; kite_pars...)
-plot!([]; arm_and_lines_pars...)
-plot!([]; arm_tip_pars...)
-plot!([]; longitude_pars...)
-plot!([]; latitude_pars...)
+scatter!([]; kite_pars..., msw=20, msc=:red)
+plot!([]; arm_and_lines_pars..., lw=default(:lw))
+plot!([]; arm_tip_pars..., lw=default(:lw))
+plot!([]; longitude_pars..., lw=default(:lw))
+plot!([]; latitude_pars..., lw=default(:lw))
+plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
+plot!(size=plot_size(0.53))
 
-savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
 display(fig)
+savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
 
 ## Parametrisation in tau
 # TODO [use the plot from test/publications/ECC2026]
@@ -107,6 +111,6 @@ quiver!([0], [0], quiver=([dx], [-dy]), c=up_col)
 quiver!([0], [0], quiver=([-dx], [dy]), c=down_col)
 annotate!(dx - 0.05, -dy - 0.25, (raw"$\dot{\tau} > 0$", ANNOTATIONFONTSIZE, :center, PALETTE[up_col]))
 annotate!(-dx + 0.05, dy + 0.25, (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
-plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm)
+plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
 display(current())
 savefig(current(), joinpath(OUTPATH, "eight_plot.pdf"))

@@ -142,18 +142,6 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
 end
 
 #! format: off
-old_theme = (;
-    upwind=(; c=:red, alpha=0.1),
-    downwind=(; c=:green, alpha=0.1),
-    streamlines=(; c=:grey, alpha=0.5, lw=0.5),
-    heads=(; c=:grey, alpha=0.6, lw=0),
-    nullcline_tau=(; c=:green, lw=2, ls=:solid),
-    nullcline_alpha=(; c=:magenta, lw=2, ls=:solid),
-    eq_down=(; c=:green, shape=:circle, ms=7, markerstrokewidth=2, markerstrokecolor=:white),
-    eq_up=(; c=:darkred, shape=:circle, ms=7, markerstrokewidth=2, markerstrokecolor=:white),
-    eq_legend=(; c=:black, shape=:circle, ms=6),
-)
-
 my_theme = (;
     downwind        = (; c=plot_color(:grey, 0.08)),
     upwind          = (; c=plot_color(:red, 0.08)),
@@ -192,7 +180,6 @@ f = q -> SteadyState.ddq_partial(q, vbp)
 plot(xlims=(-π - δ, π + δ), ylims=(-π - δ, π + δ), aspect_ratio=:equal,
     xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
     grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
-# plot!(widen=true)
 # Background wind spans
 vspan!([-π, -π / 2]; theme.upwind..., label="Upwind arm")
 vspan!([π / 2, π]; theme.upwind...)
@@ -232,7 +219,7 @@ scatter!(first.(ss), last.(ss);
     markerstrokewidth=getproperty.(styles, :markerstrokewidth))
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 plot!(widen=1.06)
-
+plot!(bottommargin=1Plots.mm, rightmargin=-10Plots.mm, size=plot_size(0.57))
 savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
 display(current())
 @info "Chance to use Poincaré-Miranda theorem here?"
@@ -253,7 +240,7 @@ p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw
     marker_kwargs=ss_style.(ss_upwind), project_eight=true)
 plot!(title="Upwind arm", background_color_subplot=theme.upwind.c)
 
-plot(p_downwind, p_upwind; layout=(1, 2))
+plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(height=0.4))
 savefig(joinpath(@__DIR__, "figs", "equilibria_eight_circle.pdf"))
 display(current())
 
@@ -271,9 +258,9 @@ for (k, q) in enumerate(ss_)  # same marker style as the equilibria figure
     scatter!(fill(k, length(evs[k])), real.(evs[k]); ss_style(q)...)
 end
 annotate!([2.5, 2.5], [7.5, -1.5], ["Repulsive", "Attractive"])
-plot!(xlabel="", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
+plot!(xlabel="Equilibrium", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
 plot!(xticks=(1:4, ["" for _ in 1:4]))
-plot!(leftmargin=1Plots.mm)
+plot!(leftmargin=5Plots.mm, bottommargin=2Plots.mm)
 
 display(current())
 savefig(joinpath(@__DIR__, "figs", "equilibria_eigvals.pdf"))
@@ -315,6 +302,7 @@ for q in ss
         plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
     end
 end
+plot!(bottommargin=1Plots.mm, rightmargin=-10Plots.mm, size=plot_size(0.61))
 
 savefig(joinpath(@__DIR__, "figs", "equilibria_trajectories.pdf"))
 display(plot!())
@@ -374,27 +362,45 @@ function plot_avg_power_kW(sol)
     dα = sol.(t, idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
     avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plot(t, power; c=:black, lw=2, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, lw=2)
-    # plot!([NaN]; c=:red, lw=2, label="avg = $(round(avg_power; digits=2)) kW", legend=(0.1, -0.2))
+    plot(t, power; c=:black, label="", ylabel="Power (kW)")
+    plot!([t0, tf], [avg_power, avg_power]; c=:red)
+    # plot!([NaN]; c=:red, label="avg = $(round(avg_power; digits=2)) kW", legend=(0.1, -0.2))
     plot!(xlabel="t (s)")
 end
 
 t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
 p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="",
-    ylabel="q (rad), qd (rad/s)", legend=:bottomright, xlabel="", xformatter=x->"")
-plot!(t_main, y_main; c=2, lw=2, label="")
+    ylabel="x (rad, rad/s)", legend=:bottomright, xlabel="", xformatter=x->"")
+plot!(t_main, y_main; c=2, label="")
 # plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
-plot!(t_jump, y_jump; c=2, ls=:dot, label=false, lw=2)
+plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
 
 pw = plot_avg_power_kW(sol)
-# plot!(pw, NaN * (1:6)'; label=(1:6)', legend=:outerbottom, legendcolumns=6)
 
-sim_4D_fig = plot(p_wts, pw; layout=@layout([a{0.5h}; b]))
-plot!(sim_4D_fig, NaN * (1:6)', c=[1 2 3 4 :black :red], label=["α" "τ mod 2π" "D(α)" "D(τ)" "P" "Avg(P)"], legend=:outerright)
-plot!(leftmargin=5Plots.mm)
-savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
+# Legend in its own tile, as tall as the two panels together: Plots splits a
+# layout legend between subplots, and a GR legend's swatch shrinks with its axis
+# width, so the entries are drawn by hand (glyph positions are axis fractions).
+# shortcut: the negative margins only cancel the padding Plots reserves between
+# a plot and a legend column; revisit if the layout code changes.
+p_legend = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
+    xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], leftmargin=-2Plots.mm)
+legend_styles = [(; c=1), (; c=2), (; c=3), (; c=4), (; c=:black), (; c=:red)]
+legend_names = ["α", "τ mod 2π", "D(α)", "D(τ)", "P", "Avg(P)"]
+ys = 0.5 .+ 0.07 .* ((length(legend_names) + 1) / 2 .- (1:length(legend_names)))
+plot!(p_legend, Shape([(0.0, last(ys) - 0.05), (0.97, last(ys) - 0.05),
+    (0.97, first(ys) + 0.035), (0.0, first(ys) + 0.035)]); c=:black, lw=1, fillcolor=:white)
+for (y, style, name) in zip(ys, legend_styles, legend_names)
+    plot!(p_legend, [0.05, 0.18], [y, y]; style...)
+    annotate!(p_legend, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+end
+
+plot!(p_wts, rightmargin=-6Plots.mm)  # see shortcut above
+plot!(pw, rightmargin=-6Plots.mm, topmargin=-5Plots.mm)
+sim_4D_fig = plot(p_wts, pw, p_legend; layout=@layout([[a{0.60h}; b] c{0.27w}]))
+plot!(sim_4D_fig, leftmargin=4Plots.mm, bottommargin=4Plots.mm)
+
 display(sim_4D_fig)
+savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 
 ## Convergence rate toward limit cycle
 # 1. Reference limit cycle calculation
@@ -433,7 +439,6 @@ sols = [PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
 
 perturbed_params = (;
     ls=:dot,
-    lw=2,
     alpha=0.4,
     c=:gray,
     label="Perturbed trajectories"
