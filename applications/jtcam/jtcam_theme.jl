@@ -1,5 +1,5 @@
 # jtcam_theme.jl
-import Plots
+using Plots: Plots
 using Plots.PlotMeasures
 
 Plots.gr()
@@ -9,7 +9,7 @@ function setup_font(font_filename="LinLibertine_R.ttf")
     paths = [
         joinpath(@__DIR__, font_filename),
         joinpath(expanduser("~/Library/Fonts"), font_filename),
-        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename)
+        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename),
     ]
 
     idx = findfirst(isfile, paths)
@@ -95,11 +95,10 @@ const PALETTE = Plots.palette(:auto)
 #     RGB(90/255, 110/255, 195/255),  # 8. Cornflower Indigo
 # ]
 
-
 # --- Publication Defaults ---
 function my_defaults()
     Plots.default()
-    Plots.default(
+    return Plots.default(;
         thickness_scaling=0.5,
         dpi=DPI,
         fontfamily=FONT,
@@ -131,7 +130,7 @@ function my_defaults()
         # Margins & Legends
         margin=0Plots.mm, # 4Plots.mm,
         legend=:topright,
-        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85)
+        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85),
     )
 end
 

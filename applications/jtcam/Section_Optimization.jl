@@ -50,7 +50,7 @@ replaces, for a fraction of the cost.
 """
 function extrema_tension(sol)
     tmin, tmax = sol.prob.tspan
-    ts = range(tmin, tmin + (tmax - tmin) / 2, length=2001)
+    ts = range(tmin, tmin + (tmax - tmin) / 2; length=2001)
     return extrema(PM4.compute_line_tension.(sol.(ts), Ref(sol.prob.p)))
 end
 
@@ -74,7 +74,7 @@ function compute_results(param, value; syms, p0, sense, tol)
     # Optimize the selected parameters
     lower, upper = OPT.make_bounds(p0, syms)
     _, stats, model = with_logger(NullLogger()) do
-        OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=MAX_WALL_TIME)
+        return OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=MAX_WALL_TIME)
     end
     para_dims, _, iterate_dims, _ = OPT.compute_dims(p0, syms)
     solution = stats.solution  # dimensionless
@@ -82,12 +82,14 @@ function compute_results(param, value; syms, p0, sense, tol)
 
     # Compute limit cycle and corresponding stats for the optimized parameters
     vbp = copy(vbp0)
-    vbp[syms] .= solution[(end-length(syms)+1):end]
+    vbp[syms] .= solution[(end - length(syms) + 1):end]
     lc_opt = LC.compute_limit_cycle(vbp; sense=sense, save_everystep=true, tol=tol)
     stats_opt = trajectory_stats(lc_opt)
 
     # Error between the limit cycle found by ipopt and by our own method
-    (α0, dα0, dτ0), tf, P = lc_opt.u[1][[1, 3, 4]], lc_opt.t[end], lc_opt.u[end][5] / lc_opt.t[end]
+    (α0, dα0, dτ0), tf, P = lc_opt.u[1][[1, 3, 4]],
+    lc_opt.t[end],
+    lc_opt.u[end][5] / lc_opt.t[end]
     println("$param = $value
     opt error = $(norm(model.c!(model.meta.ucon, solution)))
     LC error =  $(norm((solution .* iterate_dims)[1:5] - [α0, dα0, dτ0, tf, P]))")
@@ -96,10 +98,7 @@ function compute_results(param, value; syms, p0, sense, tol)
 end
 
 function range_optim(param, values; syms, p_ref, sense, tol)
-    return invert([
-        compute_results(param, v; syms, p0=p_ref, sense, tol)
-        for v in values
-    ])
+    return invert([compute_results(param, v; syms, p0=p_ref, sense, tol) for v in values])
 end
 
 maxnormalize(x) = x ./ maximum(x)
@@ -111,33 +110,52 @@ timer, `t_wall` the wall-clock of the whole call including its initial guess).
 """
 function opt_step(p, syms, lower, upper)
     solve(; compile_only=false) = with_logger(NullLogger()) do
-        OPT.optimize(p, syms, lower, upper; sense=SENSE, tol=TOL, max_wall_time=ifelse(compile_only, 1e-1, MAX_WALL_TIME))
+        return OPT.optimize(
+            p,
+            syms,
+            lower,
+            upper;
+            sense=SENSE,
+            tol=TOL,
+            max_wall_time=ifelse(compile_only, 1e-1, MAX_WALL_TIME),
+        )
     end
     # The first solve with a given variable layout pays Julia's compilation of the
     # dual-number Jacobian inside ipopt's wall clock (100-250 s here), which eats
     # the time cap and truncates the solve. Warm the layout up, keep the second run.
-    solve(compile_only=true)
+    solve(; compile_only=true)
     t_wall = time()
     solution, stats, model = solve()
-    stats.status == :first_order || @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
+    stats.status == :first_order ||
+        @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
     p_next = copy(p)
     p_next[syms] .= solution.params[syms]  # physical units
 
-    return (; p=p_next, P=solution.P, iter=stats.iter, t_solve=stats.elapsed_time,
-        t_wall=time() - t_wall, residual=norm(model.c!(model.meta.ucon, stats.solution)))
+    return (;
+        p=p_next,
+        P=solution.P,
+        iter=stats.iter,
+        t_solve=stats.elapsed_time,
+        t_wall=time() - t_wall,
+        residual=norm(model.c!(model.meta.ucon, stats.solution)),
+    )
 end
 
 "Total power, wall-clock time and ipopt iterations over consecutive optimization steps."
 function path_stats(steps...)
-    return (; P=last(steps).P, t_wall=sum(s -> s.t_wall, steps),
-        t_solve=sum(s -> s.t_solve, steps), iter=sum(s -> s.iter, steps))
+    return (;
+        P=last(steps).P,
+        t_wall=sum(s -> s.t_wall, steps),
+        t_solve=sum(s -> s.t_solve, steps),
+        iter=sum(s -> s.iter, steps),
+    )
 end
 
 ## Numerical: wind sweep
 if PARAMETRIC
-    winds = range(5, 15, length=11)
+    winds = range(5, 15; length=11)
     i_ref = findfirst(x -> x >= WIND_REF, winds)
-    p0 = PMP.build_para(v_ref=WIND_REF)  # Reference parameters at 10 m/s
+    p0 = PMP.build_para(; v_ref=WIND_REF)  # Reference parameters at 10 m/s
 
     # Optimize once at the reference wind speed, then keep those parameters.
     # Warm up the same variable layout first: it is the one whose compilation
@@ -148,13 +166,14 @@ if PARAMETRIC
     p_ref[SYMS_A] .= theta0
 
     # Sweep the wind, with and without re-optimizing the parameters
-    stats_no_opt_vec, stats_opt_vec, theta_vec =
-        range_optim(:v_ref, winds; syms=SYMS_A, p_ref, sense=SENSE, tol=TOL)
+    stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(
+        :v_ref, winds; syms=SYMS_A, p_ref, sense=SENSE, tol=TOL
+    )
 end
 
 ## Numerical: parameter paths A = (r, I_eq, torque_slope), B = (Δθ, Δφ)
 if SHAPE
-    p_start = PMP.build_para(v_ref=WIND_REF)
+    p_start = PMP.build_para(; v_ref=WIND_REF)
     lower_A, upper_A = OPT.make_bounds(p_start, SYMS_A)
     lower_B, upper_B = OPT.make_bounds(p_start, SYMS_B; multiplier=1.5)  # ×3 on Δφ leaves the window
     lower_AB, upper_AB = vcat(lower_A, lower_B), vcat(upper_A, upper_B)
@@ -165,8 +184,11 @@ if SHAPE
     step_B_A = opt_step(step_B.p, SYMS_A, lower_A, upper_A)  # B, then A
     step_AB = opt_step(p_start, vcat(SYMS_A, SYMS_B), lower_AB, upper_AB)  # joint
 
-    P_start = trajectory_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_start);
-        sense=SENSE, tol=TOL, save_everystep=true))[1]
+    P_start = trajectory_stats(
+        LC.compute_limit_cycle(
+            PMP.build_vbpara(p_start); sense=SENSE, tol=TOL, save_everystep=true
+        ),
+    )[1]
 
     # Path totals and final parameter vectors
     x_path(p) = vcat(collect(p[SYMS_A]), collect(p[SYMS_B]))
@@ -174,80 +196,156 @@ if SHAPE
     # symmetric relative distance 2|x - y| / |x + y| (dimensionless, one per parameter)
     rel(x, y) = maximum(2 .* abs.(x .- y) ./ abs.(x .+ y))
     Δx_AB(path) = rel(xs[path], xs.AB)  # distance to the joint optimum
-    paths = (; A_B=path_stats(step_A, step_A_B),
-        B_A=path_stats(step_B, step_B_A), AB=path_stats(step_AB))
+    paths = (;
+        A_B=path_stats(step_A, step_A_B),
+        B_A=path_stats(step_B, step_B_A),
+        AB=path_stats(step_AB),
+    )
     Δmax = max(Δx_AB(:A_B), Δx_AB(:B_A), rel(xs.A_B, xs.B_A))
     same_optimum = Δmax <= 10TOL
 
     # parameters sitting on one of their box bounds: the optimum is not interior
     function on_bound(p)
         values = collect(p[vcat(SYMS_A, SYMS_B)])
-        return [s for (s, v, l, u) in zip(vcat(SYMS_A, SYMS_B), values,
-            vcat(lower_A, lower_B), vcat(upper_A, upper_B))
-                      if isapprox(v, l; rtol=1e-3) || isapprox(v, u; rtol=1e-3)]
+        return [
+            s for (s, v, l, u) in zip(
+                vcat(SYMS_A, SYMS_B), values, vcat(lower_A, lower_B), vcat(upper_A, upper_B)
+            ) if isapprox(v, l; rtol=1e-3) || isapprox(v, u; rtol=1e-3)
+        ]
     end
-    bound_hits = (; A_B=on_bound(step_A_B.p), B_A=on_bound(step_B_A.p), AB=on_bound(step_AB.p))
+    bound_hits = (;
+        A_B=on_bound(step_A_B.p), B_A=on_bound(step_B_A.p), AB=on_bound(step_AB.p)
+    )
 
     # Report: total power, wall-clock, ipopt iterations, relative distance to the joint optimum
     println("\nParameter paths (tol = $TOL, boxes ×3 on A, ×1.5 on B)")
-    println(rpad("path", 10), rpad("power", 15), rpad("wall-clock", 12), rpad("solver", 10),
-        lpad("iterations", 10), "  ", rpad("max 2|x-y|/(x+y)", 18), "bounds")
-    for (name, key, path) in (("A → B", :A_B, paths.A_B), ("B → A", :B_A, paths.B_A),
-        ("(A, B)", :AB, paths.AB))
-        println(rpad(name, 10), rpad("$(round(path.P / 1000; digits=2)) kW", 15),
+    println(
+        rpad("path", 10),
+        rpad("power", 15),
+        rpad("wall-clock", 12),
+        rpad("solver", 10),
+        lpad("iterations", 10),
+        "  ",
+        rpad("max 2|x-y|/(x+y)", 18),
+        "bounds",
+    )
+    for (name, key, path) in
+        (("A → B", :A_B, paths.A_B), ("B → A", :B_A, paths.B_A), ("(A, B)", :AB, paths.AB))
+        println(
+            rpad(name, 10),
+            rpad("$(round(path.P / 1000; digits=2)) kW", 15),
             rpad("$(round(path.t_wall; digits=1)) s", 12),
             rpad("$(round(path.t_solve; digits=1)) s", 10),
-            lpad(path.iter, 10), "  ", rpad(round(Δx_AB(key); sigdigits=3), 18),
-            isempty(bound_hits[key]) ? "interior" : "on bound: $(join(bound_hits[key], ", "))")
+            lpad(path.iter, 10),
+            "  ",
+            rpad(round(Δx_AB(key); sigdigits=3), 18),
+            if isempty(bound_hits[key])
+                "interior"
+            else
+                "on bound: $(join(bound_hits[key], ", "))"
+            end,
+        )
     end
     println("\nfinal parameters (A → B | B → A | joint)")
     for (i, sym) in enumerate(vcat(SYMS_A, SYMS_B))
-        println(rpad(string(sym), 14), join(round.((xs.A_B[i], xs.B_A[i], xs.AB[i]);
-            sigdigits=8), "  "))
+        println(
+            rpad(string(sym), 14),
+            join(round.((xs.A_B[i], xs.B_A[i], xs.AB[i]); sigdigits=8), "  "),
+        )
     end
-    println(same_optimum ? "→ all paths reach the same optimum" :
-            "→ the paths reach DIFFERENT optima")
+    println(
+        if same_optimum
+            "→ all paths reach the same optimum"
+        else
+            "→ the paths reach DIFFERENT optima"
+        end,
+    )
 end
 
 ## Plot: wind sweep (needs the PARAMETRIC section)
 if PARAMETRIC
     my_defaults()
     power_vec, min_tension_vec, max_tension_vec, _ = invert(stats_opt_vec)
-    power_no_opt_vec, min_tension_no_opt_vec, max_tension_no_opt_vec, _ =
-        invert(stats_no_opt_vec)
+    power_no_opt_vec, min_tension_no_opt_vec, max_tension_no_opt_vec, _ = invert(
+        stats_no_opt_vec
+    )
     theta_norm = [maxnormalize(theta) for theta in invert(theta_vec)]
 
     ref_style = (; ls=:dot, c=:black)
-    default(xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
+    default(; xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
 
     # Average power
-    f1 = plot(ylabel="Power (kW)", legend=:topleft)
-    plot!(f1, winds, power_no_opt_vec ./ 1000; ref_style..., label="Fixed at $(round(Int, WIND_REF)) m/s")
+    f1 = plot(; ylabel="Power (kW)", legend=:topleft)
+    plot!(
+        f1,
+        winds,
+        power_no_opt_vec ./ 1000;
+        ref_style...,
+        label="Fixed at $(round(Int, WIND_REF)) m/s",
+    )
     plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1, label="Re-optimized")
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
-    f2 = plot(ylabel="Line tension (kN)", legend=:topleft)
-    plot!(f2, winds, [max_tension_no_opt_vec ./ 1000, min_tension_no_opt_vec ./ 1000];
-        ref_style..., label=["Fixed at $(round(Int, WIND_REF)) m/s" ""])
-    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000,
-        c=1, fillalpha=0.1, label="Re-optimized")
+    f2 = plot(; ylabel="Line tension (kN)", legend=:topleft)
+    plot!(
+        f2,
+        winds,
+        [max_tension_no_opt_vec ./ 1000, min_tension_no_opt_vec ./ 1000];
+        ref_style...,
+        label=["Fixed at $(round(Int, WIND_REF)) m/s" ""],
+    )
+    plot!(
+        f2,
+        winds,
+        max_tension_vec ./ 1000;
+        fillrange=min_tension_vec ./ 1000,
+        c=1,
+        fillalpha=0.1,
+        label="Re-optimized",
+    )
     plot!(f2, winds, min_tension_vec ./ 1000; c=1)
 
     # Optimized parameters, normalized by their maximum over the wind range
-    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(-0.1, 1.1), ylabel="Parameters",
-        xformatter=:plain, xlabel="Wind speed (m/s)", legend=:bottomright)
-    plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
-    plot!(f3, winds, theta_norm; marker=[:rect :diamond :star6], ls=[:dash :dot :dashdot], c=[1 2 3],
-        label=["Line length ℓ" "Arm inertia I" "Braking coeff. b"])
+    f3 = plot(;
+        yticks=((0, 1), ("0", "max")),
+        ylim=(-0.1, 1.1),
+        ylabel="Parameters",
+        xformatter=:plain,
+        xlabel="Wind speed (m/s)",
+        legend=:bottomright,
+    )
+    plot!(
+        f3,
+        winds,
+        [[p for _ in winds] for p in invert(theta_norm)[i_ref]];
+        lw=1.5,
+        ref_style...,
+    )
+    plot!(
+        f3,
+        winds,
+        theta_norm;
+        marker=[:rect :diamond :star6],
+        ls=[:dash :dot :dashdot],
+        c=[1 2 3],
+        label=["Line length ℓ" "Arm inertia I" "Braking coeff. b"],
+    )
 
     # three panels of a third of the text height, full text width; the margins
     # leave room for the axis labels (the theme sets margin = 0)
-    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
-        leftmargin=8Plots.mm, bottommargin=4Plots.mm)
+    fig = plot(
+        f1,
+        f2,
+        f3;
+        layout=(3, 1),
+        size=plot_size(1; height=3 * 0.375),
+        leftmargin=8Plots.mm,
+        bottommargin=4Plots.mm,
+    )
     display(fig)
 
     for (f, name) in zip((f1, f2, f3), ("power", "tension", "params"))
-        plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
+        plot!(f; size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
         display(f)
         savefig(f, joinpath(OUTPATH, "optimization_$name.pdf"))
     end
@@ -276,8 +374,7 @@ PATH_FONTSIZE = 9  # annotation size for the diagram, smaller than the paper tex
 "Node box (data coordinates) around (x, y), tall enough for `nlines` text lines."
 function node_box(x, y, nlines; w=0.48)
     h = 0.10 + 0.055nlines
-    return Shape([x - w/2, x + w/2, x + w/2, x - w/2],
-        [y - h/2, y - h/2, y + h/2, y + h/2])
+    return Shape([x - w/2, x + w/2, x + w/2, x - w/2], [y - h/2, y - h/2, y + h/2, y + h/2])
 end
 
 "Block of text centered on (x, y), one `annotate!` per line."
@@ -298,14 +395,27 @@ empty label draws no text). Arrows stop on the border of the node boxes.
 """
 function plot_paths(nodes, edges; title="", accent=:black)
     nlines = Dict(name => length(split(txt, '\n')) for (name, txt) in pairs(nodes))
-    plt = plot(; xlims=(-0.15, 1.15), ylims=(-0.18, 1.15), aspect_ratio=:equal,
-        framestyle=:none, grid=false, ticks=nothing, legend=false, title,
-        titlefontsize=TICKFONTSIZE)
+    plt = plot(;
+        xlims=(-0.15, 1.15),
+        ylims=(-0.18, 1.15),
+        aspect_ratio=:equal,
+        framestyle=:none,
+        grid=false,
+        ticks=nothing,
+        legend=false,
+        title,
+        titlefontsize=TICKFONTSIZE,
+    )
 
     for name in keys(nodes)
         (x, y) = NODE_XY[name]
-        plot!(plt, node_box(x, y, nlines[name]); c=:white,
-            lc=name === :AB ? accent : :black, lw=1.5)
+        plot!(
+            plt,
+            node_box(x, y, nlines[name]);
+            c=:white,
+            lc=name === :AB ? accent : :black,
+            lw=1.5,
+        )
     end
     for e in edges
         (x1, y1), (x2, y2) = NODE_XY[e.from], NODE_XY[e.to]
@@ -336,19 +446,30 @@ if SHAPE
         A="A\nP = $(round(step_A.P / 1000; digits=1)) kW",
         B="B\nP = $(round(step_B.P / 1000; digits=1)) kW",
         AB="(A, B)\nP = $(round(step_AB.P / 1000; digits=1)) kW\nΔmax = $(fmt(Δmax))" *
-            (isempty(bound_hits.AB) ? "" : "\non bound: $(join(bound_hits.AB, ", "))"),
+           (isempty(bound_hits.AB) ? "" : "\non bound: $(join(bound_hits.AB, ", "))"),
     )
     edges_num = [
         (; from=:start, to=:A, label="opt A", c=:black, at=(0.80, 0.80)),
         (; from=:start, to=:B, label="opt B", c=:black, at=(0.20, 0.80)),
         (; from=:start, to=:AB, label="", c=:black, at=(0.5, 0.5)),
-        (; from=:A, to=:AB, label="opt B\nΔ = $(fmt(Δx_AB(:A_B)))",
-            c=Δcolor(Δx_AB(:A_B)), at=(0.90, 0.28)),
-        (; from=:B, to=:AB, label="opt A\nΔ = $(fmt(Δx_AB(:B_A)))",
-            c=Δcolor(Δx_AB(:B_A)), at=(0.10, 0.28)),
+        (;
+            from=:A,
+            to=:AB,
+            label="opt B\nΔ = $(fmt(Δx_AB(:A_B)))",
+            c=Δcolor(Δx_AB(:A_B)),
+            at=(0.90, 0.28),
+        ),
+        (;
+            from=:B,
+            to=:AB,
+            label="opt A\nΔ = $(fmt(Δx_AB(:B_A)))",
+            c=Δcolor(Δx_AB(:B_A)),
+            at=(0.10, 0.28),
+        ),
     ]
-    panel_num = plot_paths(nodes_num, edges_num; title="Numerical",
-        accent=same_optimum ? :green : :red)
+    panel_num = plot_paths(
+        nodes_num, edges_num; title="Numerical", accent=same_optimum ? :green : :red
+    )
 
     # Right panel: same layout, wall-clock time and ipopt iterations per step,
     # and the totals of the three paths in the bottom node
@@ -357,19 +478,39 @@ if SHAPE
         A="A",
         B="B",
         AB="(A, B)\ndirect $(secs(paths.AB.t_wall)) s/$(paths.AB.iter) it\n" *
-            "A→B $(secs(paths.A_B.t_wall)) s/$(paths.A_B.iter) it\n" *
-            "B→A $(secs(paths.B_A.t_wall)) s/$(paths.B_A.iter) it",
+           "A→B $(secs(paths.A_B.t_wall)) s/$(paths.A_B.iter) it\n" *
+           "B→A $(secs(paths.B_A.t_wall)) s/$(paths.B_A.iter) it",
     )
     edges_perf = [
-        (; from=:start, to=:A, label="opt A\n$(secs(step_A.t_wall)) s/$(step_A.iter) it",
-            c=:black, at=(0.80, 0.80)),
-        (; from=:start, to=:B, label="opt B\n$(secs(step_B.t_wall)) s/$(step_B.iter) it",
-            c=:black, at=(0.20, 0.80)),
+        (;
+            from=:start,
+            to=:A,
+            label="opt A\n$(secs(step_A.t_wall)) s/$(step_A.iter) it",
+            c=:black,
+            at=(0.80, 0.80),
+        ),
+        (;
+            from=:start,
+            to=:B,
+            label="opt B\n$(secs(step_B.t_wall)) s/$(step_B.iter) it",
+            c=:black,
+            at=(0.20, 0.80),
+        ),
         (; from=:start, to=:AB, label="", c=:black, at=(0.5, 0.5)),
-        (; from=:A, to=:AB, label="opt B\n$(secs(step_A_B.t_wall)) s/$(step_A_B.iter) it",
-            c=:black, at=(0.90, 0.28)),
-        (; from=:B, to=:AB, label="opt A\n$(secs(step_B_A.t_wall)) s/$(step_B_A.iter) it",
-            c=:black, at=(0.10, 0.28)),
+        (;
+            from=:A,
+            to=:AB,
+            label="opt B\n$(secs(step_A_B.t_wall)) s/$(step_A_B.iter) it",
+            c=:black,
+            at=(0.90, 0.28),
+        ),
+        (;
+            from=:B,
+            to=:AB,
+            label="opt A\n$(secs(step_B_A.t_wall)) s/$(step_B_A.iter) it",
+            c=:black,
+            at=(0.10, 0.28),
+        ),
     ]
     panel_perf = plot_paths(nodes_perf, edges_perf; title="Performance")
 

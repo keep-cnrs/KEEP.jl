@@ -16,29 +16,43 @@ const SPOKE_LW = 5.0
 include(joinpath(HERE, "eight_circle.jl"))
 using .EightCircle
 
-vbp = build_vbpara(build_para(r=OPT.r, I_eq=OPT.I_eq, torque_slope=OPT.torque_slope))
+vbp = build_vbpara(build_para(; r=OPT.r, I_eq=OPT.I_eq, torque_slope=OPT.torque_slope))
 geom = eight_circle_geometry(vbp; mode=EC_MODE, arm_scaling=ARM_SCALING)
 cyc = deserialize(joinpath(HERE, "scratch", "three_cycles_frames.jls"))
 @assert cyc.SNAPS == NFRAMES "frames file has $(cyc.SNAPS) phases, need $NFRAMES"
 
 cycles = [
-    (name="short",     c=cyc.short,    col=:royalblue),
-    (name="long",      c=cyc.long,     col=:crimson),
+    (name="short", c=cyc.short, col=:royalblue),
+    (name="long", c=cyc.long, col=:crimson),
     (name="long-long", c=cyc.longlong, col=:darkorange),
 ]
 
 function build_frame(i)
-    plt = plot(layout=(1, 3), size=SIZE,
-        plot_title="Three prograde limit cycles — each time-scaled to 10 s (v_ref = 2.48)")
+    plt = plot(;
+        layout=(1, 3),
+        size=SIZE,
+        plot_title="Three prograde limit cycles — each time-scaled to 10 s (v_ref = 2.48)",
+    )
     for k in 1:3
         cy = cycles[k].c
         sp = plt[k]
-        plot!(sp; aspect_ratio=:equal, axis=false, grid=false,
-            title="$(cycles[k].name)   tf = $(round(cy.tf, digits=1)) s")
+        plot!(
+            sp;
+            aspect_ratio=:equal,
+            axis=false,
+            grid=false,
+            title="$(cycles[k].name)   tf = $(round(cy.tf, digits=1)) s",
+        )
         draw_background!(sp, geom)
         add_trail!(sp, cy.trail, geom; color=:gray70, alpha=0.25, lw=1, label="")   # faint full cycle
-        add_state!(sp, (cy.frames[1, i], cy.frames[2, i]), geom;
-            color=cycles[k].col, lw=SPOKE_LW, label="")                             # moving spoke
+        add_state!(
+            sp,
+            (cy.frames[1, i], cy.frames[2, i]),
+            geom;
+            color=cycles[k].col,
+            lw=SPOKE_LW,
+            label="",
+        )                             # moving spoke
     end
     return plt
 end
