@@ -127,6 +127,32 @@ function opt_step(p, syms, lower, upper)
         t_wall=time() - t_wall, residual=norm(model.c!(model.meta.ucon, stats.solution)))
 end
 
+"""
+Objective landscape around the optimal point `p`, one parameter at a time:
+scale one parameter by each factor `x ∈ [1 - window, 1 + window]`, keep the
+other parameters at their optimum, and take the power of the limit cycle at
+those fixed parameters — the objective the optimizer maximizes once the cycle
+is solved. Powers are normalized by their value at `x = 1`, so the optimum
+plots at `(1, 1)`. `lower` and `upper` are the box constraints of `syms`
+(physical units), returned as normalized factors so the caller can mark them.
+Returns the factors, the parameter names, one row of normalized powers and one
+`(low, up)` pair of normalized box bounds per parameter.
+"""
+function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
+    xs = range(1 - window, 1 + window, length=npoints)
+    power(sym, x) = begin
+        q = copy(p)
+        q[sym] = x * p[sym]
+        lc = LC.compute_limit_cycle(PMP.build_vbpara(q); sense=SENSE, tol=tol)
+        return lc.u[end][5] / lc.t[end]
+    end
+    vals = [power(sym, x) for sym in syms, x in xs]
+    k0 = findmin(abs.(xs .- 1))[2]  # the optimum, where the landscape is normalized
+    return (; xs=collect(xs), syms=collect(syms), window,
+        ys=[row ./ row[k0] for row in eachrow(vals)],
+        box=[(lo / p[sym], up / p[sym]) for (sym, lo, up) in zip(syms, lower, upper)])
+end
+
 "Total power, wall-clock time and ipopt iterations over consecutive optimization steps."
 function path_stats(steps...)
     return (; P=last(steps).P, t_wall=sum(s -> s.t_wall, steps),
@@ -207,6 +233,9 @@ if SHAPE
     end
     println(same_optimum ? "→ all paths reach the same optimum" :
             "→ the paths reach DIFFERENT optima")
+
+    # Objective landscape around the joint optimum, one parameter at a time
+    LANDSCAPE = landscape(step_AB.p, vcat(SYMS_A, SYMS_B); lower=lower_AB, upper=upper_AB)
 end
 
 ## Plot: wind sweep (needs the PARAMETRIC section)
@@ -399,5 +428,58 @@ if SHAPE
     the shape wants a flatter lemniscate than the ±50 % box allows, while the
     same box is not active for the sequential paths. The gap is therefore a lower
     bound on the path dependence, and it would grow with a wider shape box.
+    =#
+end
+
+## Plot: objective landscape around the joint optimum (needs the SHAPE section)
+"""
+Plot a normalized landscape from `landscape`: one pane per parameter, two
+columns (the last cell stays empty for an odd count). The axis is limited to
+the window and the cost function is drawn as dots. Each box constraint is
+marked with a double vertical line, always drawn (clipped when it falls outside
+the window) and always on top of the dots.
+"""
+function plot_landscape(land)
+    (; xs, syms, ys, window, box) = land
+    nrows = cld(length(syms), 2)
+    lo, hi = 1 - window, 1 + window
+
+    # the margins are per panel (the theme sets margin = 0) and leave room for
+    # the labels the two-column grid would otherwise clip
+    panels = [
+        begin
+            last_row = i >= 2nrows - 1
+            plt = plot(; xlims=(lo, hi), xticks=round.([lo, 1, hi]; digits=2),
+                title=string(sym), ylabel=(isodd(i) ? "P / P*" : ""),
+                xlabel=(last_row ? "θ / θ*" : ""),
+                leftmargin=(isodd(i) ? 9 : 3)Plots.mm, rightmargin=3Plots.mm,
+                bottommargin=(last_row ? 7 : 1)Plots.mm, topmargin=4Plots.mm)
+            scatter!(plt, xs, ys[i]; m=:circle, ms=2.5, c=1)
+            for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
+                vline!(plt, [edge + k * window / 40]; c=:gray30, lw=1.2)
+            end
+            plt
+        end for (i, sym) in enumerate(syms)
+    ]
+
+    return plot(panels...; layout=(nrows, 2), size=plot_size(1; height=nrows * 0.42))
+end
+
+if SHAPE
+    my_defaults()
+    fig_land = plot_landscape(LANDSCAPE)
+    display(fig_land)
+    savefig(fig_land, joinpath(OUTPATH, "optimization_landscape.pdf"))
+
+    #= Observation:
+    Each pane varies one parameter around the joint optimum and re-solves the
+    limit cycle, so the curve is the objective as a function of that parameter
+    alone. The arm length r is the stiffest direction (≈ 5 % of power over
+    ±10 %), the inertia and the braking coefficient are about four and ten times
+    flatter. The shape directions are asymmetric: Δθ and Δφ sit on their lower
+    box bound, the objective still rises just below it, and Δφ already loses
+    4 % at +10 % — the bound, not a flat objective, stops the shape. The window
+    boundaries and the axis limits are the same in every pane, so the slopes
+    compare directly.
     =#
 end
