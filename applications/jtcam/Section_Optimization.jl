@@ -110,13 +110,15 @@ the optimal power and the cost of the solve (`stats.elapsed_time` is ipopt's own
 timer, `t_wall` the wall-clock of the whole call including its initial guess).
 """
 function opt_step(p, syms, lower, upper)
-    solve(; compile_only=false) = with_logger(NullLogger()) do
-        OPT.optimize(p, syms, lower, upper; sense=SENSE, tol=TOL, max_wall_time=ifelse(compile_only, 1e-1, MAX_WALL_TIME))
+    solve() = with_logger(NullLogger()) do
+        OPT.optimize(p, syms, lower, upper; sense=SENSE, tol=TOL, max_wall_time=MAX_WALL_TIME)
     end
     # The first solve with a given variable layout pays Julia's compilation of the
-    # dual-number Jacobian inside ipopt's wall clock (100-250 s here), which eats
-    # the time cap and truncates the solve. Warm the layout up, keep the second run.
-    solve(compile_only=true)
+    # dual-number Jacobian inside ipopt's wall clock (40-245 s here), which eats
+    # the time cap and truncates the solve. Warm the layout up and keep the second
+    # run. The real cap is required: a short one times out before the Jacobian is
+    # compiled, so the second run pays the compilation and is truncated in turn.
+    solve()
     t_wall = time()
     solution, stats, model = solve()
     stats.status == :first_order || @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
@@ -435,9 +437,10 @@ end
 """
 Plot a normalized landscape from `landscape`: one pane per parameter, two
 columns (the last cell stays empty for an odd count). The axis is limited to
-the window and the cost function is drawn as dots. Each box constraint is
-marked with a double vertical line, always drawn (clipped when it falls outside
-the window) and always on top of the dots.
+the window. The cost function is a line, solid inside the box constraint and
+dotted outside it, the crossing interpolated linearly between the two samples
+that bracket the bound. Each box constraint is a black double vertical line,
+always drawn (clipped when it falls outside the window) and on top of the line.
 """
 function plot_landscape(land)
     (; xs, syms, ys, window, box) = land
@@ -454,9 +457,20 @@ function plot_landscape(land)
                 xlabel=(last_row ? "θ / θ*" : ""),
                 leftmargin=(isodd(i) ? 9 : 3)Plots.mm, rightmargin=3Plots.mm,
                 bottommargin=(last_row ? 7 : 1)Plots.mm, topmargin=4Plots.mm)
-            scatter!(plt, xs, ys[i]; m=:circle, ms=2.5, c=1)
+            # value of the sampled curve at x, linearly interpolated
+            interp(x) = begin
+                k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1)
+                ys[i][k] + (x - xs[k]) / (xs[k + 1] - xs[k]) * (ys[i][k + 1] - ys[i][k])
+            end
+            # samples from a to b, with the ends inserted (they need not be samples)
+            piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b)
+            xa, xb = max(box[i][1], lo), min(box[i][2], hi)  # box ∩ window
+            xa < xb && plot!(plt, piece(xa, xb), interp.(piece(xa, xb)); c=1, ls=:solid)
+            for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi))
+                a < b && plot!(plt, piece(a, b), interp.(piece(a, b)); c=1, ls=:dot)
+            end
             for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
-                vline!(plt, [edge + k * window / 40]; c=:gray30, lw=1.2)
+                vline!(plt, [edge + k * window / 40]; c=:black, lw=1.2)
             end
             plt
         end for (i, sym) in enumerate(syms)
