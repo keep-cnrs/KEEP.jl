@@ -140,7 +140,7 @@ savefig(joinpath(OUTPATH, "avg_power.pdf"))
 ## yz_limit_cycles
 import KEEP.LimitCycle as LC
 
-include("ECC2026/state_funcs.jl")
+include("state_funcs.jl")
 
 lc_p = LC.compute_limit_cycle(p; sense=+, save_everystep=true)
 lc_m = LC.compute_limit_cycle(p; sense=-, save_everystep=true)

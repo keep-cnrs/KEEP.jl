@@ -79,7 +79,7 @@ function main()
     # line width, border off, legend
     display(fig)
 
-    # cm.save("test/publications/ECC2026/figs/equilibria.png", fig, px_per_unit=PT_PER_INCH)
+    # cm.save("applications/ecc2026/figs/equilibria.png", fig, px_per_unit=PT_PER_INCH)
     cm.save(joinpath(outpath, "equilibria.pdf"), fig, px_per_unit=PT_PER_INCH * PT)
 
     #=

@@ -1,14 +1,13 @@
 # Optimization section.
 #
 # Two independent studies, each guarded by a flag at the top of the file:
-#  - PARAMETRIC: for each wind speed, maximize the average power over
-#    A = (r, I_eq, torque_slope), with the other parameters at their 10 m/s
-#    optimum. Reproduction of
-#    test/publications/ECC2026/6_fixed_parametrized_optimization.jl.
-#  - SHAPE: do different optimization paths over A (arm) and B = (Δθ, Δφ)
-#    (lemniscate half-height and half-width) reach the same optimum?  A → B,
-#    B → A and both at once (A, B), started from the same parameters; runtime
-#    and ipopt iterations are reported for each path.
+#  - PARAMETRIC: for each wind speed, maximize the average power over one of
+#    the blocks A = (ℓ, I, b), B = (Δθ, Δφ) or (A, B), and compare it with the
+#    joint 10 m/s optimum held fixed.
+#  - SHAPE: does the optimum of the joint (A, B) optimization depend on what was
+#    optimized before it?  A → (A, B), B → (A, B), and (A, B) alone, all started
+#    from the same parameters; runtime and ipopt iterations are reported for
+#    each path.
 #
 # Numerical sections and plot sections are separated by `##` markers: run the
 # file once, then re-run a plot section to iterate on a figure without
@@ -25,6 +24,7 @@ using KEEP: LimitCycle as LC
 using KEEP: Optimization as OPT
 
 using Plots
+using PyFormattedStrings: @f_str
 using SplitApplyCombine: invert
 using Logging: with_logger, NullLogger
 using LinearAlgebra: norm
@@ -40,6 +40,13 @@ const WIND_REF = 10.0
 const SENSE = +
 const SYMS_A = [:r, :I_eq, :torque_slope]  # ℓ, I, b
 const SYMS_B = [:Δθ, :Δφ]                  # lemniscate half-height, half-width
+const SYMS_AB = vcat(SYMS_A, SYMS_B)       # the joint optimization
+
+# Parameter names and units for the axis titles and the legends
+const LABELS = Dict(:r => "ℓ", :I_eq => "I", :torque_slope => "b",
+    :Δθ => "Δθ", :Δφ => "Δφ")
+const UNITS = Dict(:r => "m", :I_eq => "kg m²", :torque_slope => "kg m² s rad⁻¹",
+    :Δθ => "rad", :Δφ => "rad")
 
 ## Helpers
 """
@@ -61,8 +68,8 @@ function trajectory_stats(sol)
 end
 
 # Limit cycle, optimization, and limit cycle of the optimized system, for one
-# value of one parameter.
-function compute_results(param, value; syms, p0, sense, tol)
+# value of one parameter. `lower`/`upper` are the box constraints of `syms`.
+function compute_results(param, value; syms, p0, lower, upper, sense, tol)
     p0 = copy(p0)
     p0[param] = value
 
@@ -72,7 +79,6 @@ function compute_results(param, value; syms, p0, sense, tol)
     stats_no_opt = trajectory_stats(lc)
 
     # Optimize the selected parameters
-    lower, upper = OPT.make_bounds(p0, syms)
     _, stats, model = with_logger(NullLogger()) do
         OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=MAX_WALL_TIME)
     end
@@ -95,11 +101,22 @@ function compute_results(param, value; syms, p0, sense, tol)
     return stats_no_opt, stats_opt, theta
 end
 
-function range_optim(param, values; syms, p_ref, sense, tol)
+function range_optim(param, values; syms, p_ref, lower, upper, sense, tol)
     return invert([
-        compute_results(param, v; syms, p0=p_ref, sense, tol)
+        compute_results(param, v; syms, p0=p_ref, lower, upper, sense, tol)
         for v in values
     ])
+end
+
+"""
+Wind sweep for one parameter block: hold `p_ref` fixed, or re-optimize `syms`
+inside `lower`/`upper` at each wind speed. Returns the block, the statistics
+with and without re-optimization, and the optimized parameters.
+"""
+function wind_sweep(syms, p_ref, winds, lower, upper)
+    no_opt, opt, theta = range_optim(:v_ref, winds;
+        syms, p_ref, lower, upper, sense=SENSE, tol=TOL)
+    return (; syms, no_opt, opt, theta)
 end
 
 maxnormalize(x) = x ./ maximum(x)
@@ -152,6 +169,7 @@ function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
     k0 = findmin(abs.(xs .- 1))[2]  # the optimum, where the landscape is normalized
     return (; xs=collect(xs), syms=collect(syms), window,
         ys=[row ./ row[k0] for row in eachrow(vals)],
+        center=collect(p[syms]),  # the optimum in physical units, for the x axis
         box=[(lo / p[sym], up / p[sym]) for (sym, lo, up) in zip(syms, lower, upper)])
 end
 
@@ -161,27 +179,8 @@ function path_stats(steps...)
         t_solve=sum(s -> s.t_solve, steps), iter=sum(s -> s.iter, steps))
 end
 
-## Numerical: wind sweep
-if PARAMETRIC
-    winds = range(5, 15, length=11)
-    i_ref = findfirst(x -> x >= WIND_REF, winds)
-    p0 = PMP.build_para(v_ref=WIND_REF)  # Reference parameters at 10 m/s
-
-    # Optimize once at the reference wind speed, then keep those parameters.
-    # Warm up the same variable layout first: it is the one whose compilation
-    # would otherwise be charged to this solve (see opt_step).
-    opt_step(p0, SYMS_A, OPT.make_bounds(p0, SYMS_A)...)
-    _, _, theta0 = compute_results(:v_ref, WIND_REF; syms=SYMS_A, p0, sense=SENSE, tol=TOL)
-    p_ref = copy(p0)
-    p_ref[SYMS_A] .= theta0
-
-    # Sweep the wind, with and without re-optimizing the parameters
-    stats_no_opt_vec, stats_opt_vec, theta_vec =
-        range_optim(:v_ref, winds; syms=SYMS_A, p_ref, sense=SENSE, tol=TOL)
-end
-
-## Numerical: parameter paths A = (r, I_eq, torque_slope), B = (Δθ, Δφ)
-if SHAPE
+## Numerical: 10 m/s reference, one optimization per parameter block
+if PARAMETRIC || SHAPE
     p_start = PMP.build_para(v_ref=WIND_REF)
     lower_A, upper_A = OPT.make_bounds(p_start, SYMS_A)
     lower_B, upper_B = OPT.make_bounds(p_start, SYMS_B; multiplier=1.5)  # ×3 on Δφ leaves the window
@@ -189,114 +188,152 @@ if SHAPE
 
     step_A = opt_step(p_start, SYMS_A, lower_A, upper_A)
     step_B = opt_step(p_start, SYMS_B, lower_B, upper_B)
-    step_A_B = opt_step(step_A.p, SYMS_B, lower_B, upper_B)  # A, then B
-    step_B_A = opt_step(step_B.p, SYMS_A, lower_A, upper_A)  # B, then A
-    step_AB = opt_step(p_start, vcat(SYMS_A, SYMS_B), lower_AB, upper_AB)  # joint
+    step_AB = opt_step(p_start, SYMS_AB, lower_AB, upper_AB)  # the joint optimum
+end
+
+## Numerical: wind sweep over A, B and (A, B), from the joint 10 m/s optimum
+if PARAMETRIC
+    winds = range(5, 15, length=11)
+    i_ref = findfirst(x -> x >= WIND_REF, winds)
+    p_ref = step_AB.p  # the joint optimum at the reference wind speed
+    # the boxes of the 10 m/s study, so the sweep moves inside the same region
+    sweeps = (; A=wind_sweep(SYMS_A, p_ref, winds, lower_A, upper_A),
+        B=wind_sweep(SYMS_B, p_ref, winds, lower_B, upper_B),
+        AB=wind_sweep(SYMS_AB, p_ref, winds, lower_AB, upper_AB))
+end
+
+## Numerical: parameter paths A = (r, I_eq, torque_slope), B = (Δθ, Δφ)
+if SHAPE
+    # The second step is always the joint (A, B) optimization: the three paths
+    # differ only by the block optimized before it, or by none at all.
+    step_A_AB = opt_step(step_A.p, SYMS_AB, lower_AB, upper_AB)  # A, then (A, B)
+    step_B_AB = opt_step(step_B.p, SYMS_AB, lower_AB, upper_AB)  # B, then (A, B)
 
     P_start = trajectory_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_start);
         sense=SENSE, tol=TOL, save_everystep=true))[1]
 
     # Path totals and final parameter vectors
     x_path(p) = vcat(collect(p[SYMS_A]), collect(p[SYMS_B]))
-    xs = (; A_B=x_path(step_A_B.p), B_A=x_path(step_B_A.p), AB=x_path(step_AB.p))
+    xs = (; A_AB=x_path(step_A_AB.p), B_AB=x_path(step_B_AB.p), AB=x_path(step_AB.p))
     # symmetric relative distance 2|x - y| / |x + y| (dimensionless, one per parameter)
     rel(x, y) = maximum(2 .* abs.(x .- y) ./ abs.(x .+ y))
     Δx_AB(path) = rel(xs[path], xs.AB)  # distance to the joint optimum
-    paths = (; A_B=path_stats(step_A, step_A_B),
-        B_A=path_stats(step_B, step_B_A), AB=path_stats(step_AB))
-    Δmax = max(Δx_AB(:A_B), Δx_AB(:B_A), rel(xs.A_B, xs.B_A))
+    paths = (; A_AB=path_stats(step_A, step_A_AB),
+        B_AB=path_stats(step_B, step_B_AB), AB=path_stats(step_AB))
+    Δmax = max(Δx_AB(:A_AB), Δx_AB(:B_AB), rel(xs.A_AB, xs.B_AB))
     same_optimum = Δmax <= 10TOL
 
     # parameters sitting on one of their box bounds: the optimum is not interior
     function on_bound(p)
-        values = collect(p[vcat(SYMS_A, SYMS_B)])
-        return [s for (s, v, l, u) in zip(vcat(SYMS_A, SYMS_B), values,
+        values = collect(p[SYMS_AB])
+        return [s for (s, v, l, u) in zip(SYMS_AB, values,
             vcat(lower_A, lower_B), vcat(upper_A, upper_B))
                       if isapprox(v, l; rtol=1e-3) || isapprox(v, u; rtol=1e-3)]
     end
-    bound_hits = (; A_B=on_bound(step_A_B.p), B_A=on_bound(step_B_A.p), AB=on_bound(step_AB.p))
+    bound_hits = (;
+        A_AB=on_bound(step_A_AB.p), B_AB=on_bound(step_B_AB.p), AB=on_bound(step_AB.p))
 
     # Report: total power, wall-clock, ipopt iterations, relative distance to the joint optimum
     println("\nParameter paths (tol = $TOL, boxes ×3 on A, ×1.5 on B)")
-    println(rpad("path", 10), rpad("power", 15), rpad("wall-clock", 12), rpad("solver", 10),
+    println(rpad("path", 14), rpad("power", 15), rpad("wall-clock", 12), rpad("solver", 10),
         lpad("iterations", 10), "  ", rpad("max 2|x-y|/(x+y)", 18), "bounds")
-    for (name, key, path) in (("A → B", :A_B, paths.A_B), ("B → A", :B_A, paths.B_A),
-        ("(A, B)", :AB, paths.AB))
-        println(rpad(name, 10), rpad("$(round(path.P / 1000; digits=2)) kW", 15),
+    for (name, key, path) in (("A → (A, B)", :A_AB, paths.A_AB),
+        ("B → (A, B)", :B_AB, paths.B_AB), ("(A, B)", :AB, paths.AB))
+        println(rpad(name, 14), rpad("$(round(path.P / 1000; digits=2)) kW", 15),
             rpad("$(round(path.t_wall; digits=1)) s", 12),
             rpad("$(round(path.t_solve; digits=1)) s", 10),
             lpad(path.iter, 10), "  ", rpad(round(Δx_AB(key); sigdigits=3), 18),
             isempty(bound_hits[key]) ? "interior" : "on bound: $(join(bound_hits[key], ", "))")
     end
-    println("\nfinal parameters (A → B | B → A | joint)")
-    for (i, sym) in enumerate(vcat(SYMS_A, SYMS_B))
-        println(rpad(string(sym), 14), join(round.((xs.A_B[i], xs.B_A[i], xs.AB[i]);
+    println("\nfinal parameters (A → (A, B) | B → (A, B) | (A, B))")
+    for (i, sym) in enumerate(SYMS_AB)
+        println(rpad(LABELS[sym], 14), join(round.((xs.A_AB[i], xs.B_AB[i], xs.AB[i]);
             sigdigits=8), "  "))
     end
     println(same_optimum ? "→ all paths reach the same optimum" :
             "→ the paths reach DIFFERENT optima")
 
     # Objective landscape around the joint optimum, one parameter at a time
-    LANDSCAPE = landscape(step_AB.p, vcat(SYMS_A, SYMS_B); lower=lower_AB, upper=upper_AB)
+    LANDSCAPE = landscape(step_AB.p, SYMS_AB; lower=lower_AB, upper=upper_AB)
 end
 
 ## Plot: wind sweep (needs the PARAMETRIC section)
-if PARAMETRIC
-    my_defaults()
-    power_vec, min_tension_vec, max_tension_vec, _ = invert(stats_opt_vec)
-    power_no_opt_vec, min_tension_no_opt_vec, max_tension_no_opt_vec, _ =
-        invert(stats_no_opt_vec)
-    theta_norm = [maxnormalize(theta) for theta in invert(theta_vec)]
-
+"""
+Three panels of one wind sweep: average power, line tension (min–max envelope),
+and the re-optimized parameters normalized by their maximum over the wind
+range. The dotted black curve is the 10 m/s reference held fixed.
+"""
+function plot_wind_sweep(winds, sweep, i_ref)
+    (; syms, no_opt, opt, theta) = sweep
+    power_vec, min_tension_vec, max_tension_vec, _ = invert(opt)
+    power0, min_tension0, max_tension0, _ = invert(no_opt)
+    theta_norm = [maxnormalize(θ) for θ in invert(theta)]
+    ref = "Fixed at $(round(Int, WIND_REF)) m/s"
     ref_style = (; ls=:dot, c=:black)
-    default(xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
 
     # Average power
     f1 = plot(ylabel="Power (kW)", legend=:topleft)
-    plot!(f1, winds, power_no_opt_vec ./ 1000; ref_style..., label="Fixed at $(round(Int, WIND_REF)) m/s")
+    plot!(f1, winds, power0 ./ 1000; ref_style..., label=ref)
     plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1, label="Re-optimized")
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
     f2 = plot(ylabel="Line tension (kN)", legend=:topleft)
-    plot!(f2, winds, [max_tension_no_opt_vec ./ 1000, min_tension_no_opt_vec ./ 1000];
-        ref_style..., label=["Fixed at $(round(Int, WIND_REF)) m/s" ""])
+    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000];
+        ref_style..., label=[ref ""])
     plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000,
         c=1, fillalpha=0.1, label="Re-optimized")
     plot!(f2, winds, min_tension_vec ./ 1000; c=1)
 
     # Optimized parameters, normalized by their maximum over the wind range
+    n = length(syms)
     f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(-0.1, 1.1), ylabel="Parameters",
         xformatter=:plain, xlabel="Wind speed (m/s)", legend=:bottomright)
-    plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
-    plot!(f3, winds, theta_norm; marker=[:rect :diamond :star6], ls=[:dash :dot :dashdot], c=[1 2 3],
-        label=["Line length ℓ" "Arm inertia I" "Braking coeff. b"])
+    plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]];
+        lw=1.5, ref_style...)
+    plot!(f3, winds, theta_norm; marker=[:rect :diamond :star6 :utriangle :dtriangle][1:n],
+        ls=[:dash :dot :dashdot :dashdotdot :dash][1:n], c=permutedims(collect(1:n)),
+        label=permutedims([LABELS[s] for s in syms]))
 
     # three panels of a third of the text height, full text width; the margins
     # leave room for the axis labels (the theme sets margin = 0)
     fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
         leftmargin=8Plots.mm, bottommargin=4Plots.mm)
-    display(fig)
+    return (; fig, panels=(f1, f2, f3))
+end
 
-    for (f, name) in zip((f1, f2, f3), ("power", "tension", "params"))
-        plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
-        display(f)
-        savefig(f, joinpath(OUTPATH, "optimization_$name.pdf"))
+if PARAMETRIC
+    my_defaults()
+    default(xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
+
+    for (name, sweep) in pairs(sweeps)
+        (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
+        display(fig)
+        savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_$name.pdf"))
+
+        for (f, panel) in zip(panels, ("power", "tension", "params"))
+            plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
+            display(f)
+            savefig(f, joinpath(OUTPATH, "optimization_$(panel)_$name.pdf"))
+        end
     end
-    savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep.pdf"))
 
     #= Observation:
-    For each wind speed we maximize the average power (top) over the parameters
-    (bottom), while the line tension (min–max envelope, middle) is kept low to
-    wear the lines less. For comparison, power and tension are also computed for
-    the parameters optimized at 10 m/s and held fixed (black, dotted).
-    The 10 m/s parameters are strongly resilient to a change in wind speed:
-    re-optimizing brings close to no improvement in power and tension, but the
-    optimized parameters produce more power while putting less strain on the
-    lines. Along this parameterized optimization the system behaves very
-    linearly, although the arm length is kept constant (and other parameters),
-    so that a perfect scaling of the model with wind speed is impossible.
-    Approximate correlations: power ∝ v³, tension ∝ v², line length ℓ ∝ 1/v,
-    arm inertia I ∝ 1/v, arm braking coefficient b ∝ v, period ∝ 1/v.
+    Each wind speed is run twice: with the joint 10 m/s optimum held fixed
+    (dotted black), and with one block re-optimized inside the same boxes.
+    Re-optimizing the arm A = (ℓ, I, b) is what adapts the system to the wind:
+    +19 % power at 5 m/s, nothing at the reference speed, +6 % at 15 m/s, and at
+    15 m/s the line tension at the same time falls from 34.9 to 32.0 kN. The
+    optimal arm shortens and lightens as the wind picks up (ℓ 40.7 → 32.9 m,
+    I 1480 → 1030 kg m²) while the braking coefficient b more than doubles
+    (1330 → 3050 kg m² s⁻¹ rad⁻¹): the cycle turns faster and the generator
+    takes more out of the same lines.
+    Re-optimizing the shape B = (Δθ, Δφ) changes nothing (at most +2 % at
+    5 m/s). Its optimum sits on the lower box bound of both angles, so with the
+    box fixed the solver has no room to flatten the lemniscate further, and
+    (A, B) reproduces the A curve. The shape is already as flat as the box
+    allows, so the wind-speed adaptation is carried entirely by the arm.
+    The A gain vanishes at the reference speed by construction — 10 m/s is where
+    the fixed parameters were optimized — and grows away from it on both sides.
     =#
 end
 
@@ -373,10 +410,10 @@ if SHAPE
         (; from=:start, to=:A, label="opt A", c=:black, at=(0.80, 0.80)),
         (; from=:start, to=:B, label="opt B", c=:black, at=(0.20, 0.80)),
         (; from=:start, to=:AB, label="", c=:black, at=(0.5, 0.5)),
-        (; from=:A, to=:AB, label="opt B\nΔ = $(fmt(Δx_AB(:A_B)))",
-            c=Δcolor(Δx_AB(:A_B)), at=(0.90, 0.28)),
-        (; from=:B, to=:AB, label="opt A\nΔ = $(fmt(Δx_AB(:B_A)))",
-            c=Δcolor(Δx_AB(:B_A)), at=(0.10, 0.28)),
+        (; from=:A, to=:AB, label="opt (A, B)\nΔ = $(fmt(Δx_AB(:A_AB)))",
+            c=Δcolor(Δx_AB(:A_AB)), at=(0.90, 0.28)),
+        (; from=:B, to=:AB, label="opt (A, B)\nΔ = $(fmt(Δx_AB(:B_AB)))",
+            c=Δcolor(Δx_AB(:B_AB)), at=(0.10, 0.28)),
     ]
     panel_num = plot_paths(nodes_num, edges_num; title="Numerical",
         accent=same_optimum ? :green : :red)
@@ -388,8 +425,8 @@ if SHAPE
         A="A",
         B="B",
         AB="(A, B)\ndirect $(secs(paths.AB.t_wall)) s/$(paths.AB.iter) it\n" *
-            "A→B $(secs(paths.A_B.t_wall)) s/$(paths.A_B.iter) it\n" *
-            "B→A $(secs(paths.B_A.t_wall)) s/$(paths.B_A.iter) it",
+            "A→(A, B) $(secs(paths.A_AB.t_wall)) s/$(paths.A_AB.iter) it\n" *
+            "B→(A, B) $(secs(paths.B_AB.t_wall)) s/$(paths.B_AB.iter) it",
     )
     edges_perf = [
         (; from=:start, to=:A, label="opt A\n$(secs(step_A.t_wall)) s/$(step_A.iter) it",
@@ -397,9 +434,9 @@ if SHAPE
         (; from=:start, to=:B, label="opt B\n$(secs(step_B.t_wall)) s/$(step_B.iter) it",
             c=:black, at=(0.20, 0.80)),
         (; from=:start, to=:AB, label="", c=:black, at=(0.5, 0.5)),
-        (; from=:A, to=:AB, label="opt B\n$(secs(step_A_B.t_wall)) s/$(step_A_B.iter) it",
+        (; from=:A, to=:AB, label="opt (A, B)\n$(secs(step_A_AB.t_wall)) s/$(step_A_AB.iter) it",
             c=:black, at=(0.90, 0.28)),
-        (; from=:B, to=:AB, label="opt A\n$(secs(step_B_A.t_wall)) s/$(step_B_A.iter) it",
+        (; from=:B, to=:AB, label="opt (A, B)\n$(secs(step_B_AB.t_wall)) s/$(step_B_AB.iter) it",
             c=:black, at=(0.10, 0.28)),
     ]
     panel_perf = plot_paths(nodes_perf, edges_perf; title="Performance")
@@ -409,41 +446,40 @@ if SHAPE
     savefig(fig_paths, joinpath(OUTPATH, "optimization_paths.pdf"))
 
     #= Observation:
-    The three paths start from the same unoptimized parameters (P = 12.8 kW) and
-    do NOT reach the same optimum, so the square does not commute:
-      - A → B: 14.3 kW, 17 ipopt iterations
-      - B → A: 15.2 kW, 15 iterations
-      - (A, B): 16.1 kW, 10 iterations
-    Distances are the symmetric relative difference 2|x - y| / (x + y), which puts
-    the five parameters on one scale (verdict threshold 10 tol = 1e-4): the two
-    sequential paths end 50 % (A → B: 108 % of I_eq) away from the joint optimum,
-    i.e. orders of magnitude above the tolerance.
-    The arm (r, I, b) and the lemniscate shape (Δθ, Δφ) are strongly coupled:
-    the arm optimum found on its own (14.0 kW) is a different local optimum from
-    the arm values the joint solve settles on, so optimizing one block first
-    locks the other into a different basin. Re-optimizing the arm after the shape
-    helps more (+1.3 kW) than re-optimizing the shape after the arm (+0.3 kW).
-    Cost: with the parameter boxes fixed, ipopt needs 7 to 17 iterations and
-    about one second per solve, so no path is expensive; the iteration count is
-    the robust cost metric.
-    Caveat: the joint optimum sits on both B box bounds (Δθ = 2.5°, Δφ = 33°):
-    the shape wants a flatter lemniscate than the ±50 % box allows, while the
-    same box is not active for the sequential paths. The gap is therefore a lower
-    bound on the path dependence, and it would grow with a wider shape box.
+    All three paths start from the same unoptimized parameters (P = 12.8 kW) and
+    end with the same joint (A, B) solve; they differ only by the block optimized
+    before it:
+      - A → (A, B): 16.1 kW, 20 ipopt iterations
+      - B → (A, B): 16.1 kW, 17 iterations
+      - (A, B) alone: 16.1 kW, 10 iterations
+    They reach the same optimum to solver accuracy: the largest symmetric
+    relative difference 2|x - y| / (x + y) between the three final points is
+    7.4e-6 (10 tol = 1e-4), i.e. the pre-optimization does not move the joint
+    optimum. Blocking the arm first, then the shape, gave a different result
+    only because that second step was a *restricted* problem (shape optimized at
+    fixed arm); as soon as both blocks are free, the extra start is forgotten.
+    Cost: the direct joint solve is the cheapest (10 iterations, 0.6 s); the
+    pre-optimization adds a full block solve for nothing (1.2 s and 0.8 s), so
+    warm-starting with A or B is not worth it here.
+    All three final points sit on both B box bounds (Δθ = 2.5°, Δφ = 33°): the
+    shape wants a flatter lemniscate than the ±50 % box allows, so the shape
+    optimum is set by the box rather than by the objective.
     =#
 end
 
 ## Plot: objective landscape around the joint optimum (needs the SHAPE section)
 """
 Plot a normalized landscape from `landscape`: one pane per parameter, two
-columns (the last cell stays empty for an odd count). The axis is limited to
-the window. The cost function is a line, solid inside the box constraint and
+columns (the last cell stays empty for an odd count). The x axis is the
+parameter in its own units, spanning ±`window` around the optimum, whose value
+is the middle tick (`-10%`, value, `+10%`). The cost function (still
+normalized by its optimum) is a line, solid inside the box constraint and
 dotted outside it, the crossing interpolated linearly between the two samples
 that bracket the bound. Each box constraint is a black double vertical line,
 always drawn (clipped when it falls outside the window) and on top of the line.
 """
 function plot_landscape(land)
-    (; xs, syms, ys, window, box) = land
+    (; xs, syms, ys, window, box, center) = land
     nrows = cld(length(syms), 2)
     lo, hi = 1 - window, 1 + window
 
@@ -451,26 +487,29 @@ function plot_landscape(land)
     # the labels the two-column grid would otherwise clip
     panels = [
         begin
-            last_row = i >= 2nrows - 1
-            plt = plot(; xlims=(lo, hi), xticks=round.([lo, 1, hi]; digits=2),
-                title=string(sym), ylabel=(isodd(i) ? "P / P*" : ""),
-                xlabel=(last_row ? "θ / θ*" : ""),
-                leftmargin=(isodd(i) ? 9 : 3)Plots.mm, rightmargin=3Plots.mm,
-                bottommargin=(last_row ? 7 : 1)Plots.mm, topmargin=4Plots.mm)
-            # value of the sampled curve at x, linearly interpolated
+            x0 = center[i]  # the optimum, in physical units
+            ticks = ([x0 * lo, x0, x0 * hi],
+                [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
+            plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
+                title="$(LABELS[sym])\n($(UNITS[sym]))",
+                ylabel=(isodd(i) ? "P / P*" : ""),
+                leftmargin=(isodd(i) ? 9 : 5)Plots.mm, rightmargin=5Plots.mm,
+                bottommargin=7Plots.mm, topmargin=4Plots.mm)
+            # value of the sampled curve at a factor x, linearly interpolated
             interp(x) = begin
                 k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1)
-                ys[i][k] + (x - xs[k]) / (xs[k + 1] - xs[k]) * (ys[i][k + 1] - ys[i][k])
+                ys[i][k] + (x - xs[k]) / (xs[k+1] - xs[k]) * (ys[i][k+1] - ys[i][k])
             end
-            # samples from a to b, with the ends inserted (they need not be samples)
+            # factors from a to b, with the ends inserted (they need not be samples)
             piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b)
             xa, xb = max(box[i][1], lo), min(box[i][2], hi)  # box ∩ window
-            xa < xb && plot!(plt, piece(xa, xb), interp.(piece(xa, xb)); c=1, ls=:solid)
+            xa < xb && plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb));
+                c=1, ls=:solid)
             for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi))
-                a < b && plot!(plt, piece(a, b), interp.(piece(a, b)); c=1, ls=:dot)
+                a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=1, ls=:dot)
             end
             for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
-                vline!(plt, [edge + k * window / 40]; c=:black, lw=1.2)
+                vline!(plt, [x0 * (edge + k * window / 40)]; c=:black, lw=1.2)
             end
             plt
         end for (i, sym) in enumerate(syms)
@@ -492,8 +531,8 @@ if SHAPE
     ±10 %), the inertia and the braking coefficient are about four and ten times
     flatter. The shape directions are asymmetric: Δθ and Δφ sit on their lower
     box bound, the objective still rises just below it, and Δφ already loses
-    4 % at +10 % — the bound, not a flat objective, stops the shape. The window
-    boundaries and the axis limits are the same in every pane, so the slopes
-    compare directly.
+    4 % at +10 % — the bound, not a flat objective, stops the shape. Each x axis
+    spans ±10 % of one parameter in its own units, and the dashed–solid split
+    marks the box bound of that parameter.
     =#
 end

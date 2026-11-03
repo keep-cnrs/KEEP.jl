@@ -3,17 +3,11 @@ using SafeTestsets
 using Underscores
 using Logging
 import Plots
-import Makie
 using ProgressMeter
 
 struct PlotSilencer <: AbstractDisplay end
 
 Base.display(d::PlotSilencer, p::Plots.Plot) = nothing
-
-# Still displays Makie figures :(
-Base.display(d::PlotSilencer, f::Makie.Figure) = nothing
-Base.display(d::PlotSilencer, fap::Makie.FigureAxisPlot) = nothing
-Base.display(d::PlotSilencer, s::Makie.Scene) = nothing
 
 function with_no_plots(f)
     silencer = PlotSilencer()
@@ -28,7 +22,6 @@ end
 
 
 const exclude = [
-    "06c_phase_space_plot.jl",  # Uses Makie and is slow
     "05_steady_states.jl",  # SteadyState.all_steady_states throws a mysterious exception, cf. file
     # All slow and old
     "07b_slice_around_optimum.jl",

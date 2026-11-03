@@ -84,7 +84,7 @@ display(fig)
 savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
 
 ## Parametrisation in tau
-# TODO [use the plot from test/publications/ECC2026]
+# TODO [use the plot from applications/ecc2026]
 
 τ_φ = 90.0
 τ_θ = 225.0
