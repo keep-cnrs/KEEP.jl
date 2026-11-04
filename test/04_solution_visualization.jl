@@ -1,6 +1,6 @@
 using Setfield
 using Plots
-using StrFormat
+using PyFormattedStrings: @f_str
 using StaticArrays
 using NonlinearSolve: NewtonRaphson, ReturnCode
 using ADTypes: AutoForwardDiff
@@ -35,13 +35,13 @@ sol10_cb = PM10.integrate(u0, tf, p; save_everystep=false, tol=tol, callback=cb)
 @test sol10_cb.retcode == ReturnCode.Success
 
 VIS.plot_trajectory_10D(sol10; tspan=tf_small)
-fig1 = plot!(title=f"10D model, t=0..\%d(tf_small)s")
+fig1 = plot!(title=f"10D model, t=0..{tf_small:d}s")
 
 VIS.plot_trajectory_10D(sol10; tspan=tf)
-fig2 = plot!(title=f"10D model, t=0..\%d(tf)s")
+fig2 = plot!(title=f"10D model, t=0..{tf:d}s")
 
 VIS.plot_trajectory_10D(sol10_cb; tspan=tf)
-fig3 = plot!(title=f"10D model with callback, t=0..\%d(tf)s")
+fig3 = plot!(title=f"10D model with callback, t=0..{tf:d}s")
 
 plots = [fig1 fig2 fig3]
 display(plot(plots..., size=500 .* size(plots'), layout=size(plots)))
@@ -61,10 +61,10 @@ _, _, T = lmt(p)
 sol4_normed = PM4.integrate(SA[0.0, τ0, 0.0, dτ0*T, 0.0], tf / T, vbp_normed; save_everystep=true)
 
 VIS.plot_trajectory_4D(sol4; tspan=tf)
-fig1 = plot!(title=f"4D model, t=0..\%d(tf)s")
+fig1 = plot!(title=f"4D model, t=0..{tf:d}s")
 
 VIS.plot_trajectory_4D(sol4_normed; tspan=tf / T)
-fig2 = plot!(title=f"Normalised 4D model, t=0..\%d(tf)s")
+fig2 = plot!(title=f"Normalised 4D model, t=0..{tf:d}s")
 
 plots = [fig1 fig2]
 display(plot(plots..., size=500 .* size(plots'), layout=size(plots)))

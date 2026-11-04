@@ -99,10 +99,10 @@ function optimize(vbp, N, syms, lb_vbp, ub_vbp)
     # X1 = @set X0[1:U_end+1] = sol1.u
     # @show sum(abs, sol1.prob.u0 - sol1.u)
     # @info f"Initial guess error
-    # Before adjustment: \%.2e(sum(abs, cons!(ones(5N+6), X0, syms)))
-    # After adjustment:  \%.2e(sum(abs, cons!(ones(5N+6), X1, syms)))
-    # Difference: \%.2e(sum(abs, X0 - X1))
-    # \%.0f(sol1.stats.nsteps) steps in \%.2f(Δt1)
+    # Before adjustment: {sum(abs, cons!(ones(5N+6), X0, syms)):.2e}
+    # After adjustment:  {sum(abs, cons!(ones(5N+6), X1, syms)):.2e}
+    # Difference: {sum(abs, X0 - X1):.2e}
+    # {sol1.stats.nsteps:.0f} steps in {Δt1:.2f}
     # "
 
 

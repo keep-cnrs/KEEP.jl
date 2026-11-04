@@ -1,6 +1,6 @@
 using Test
 using StaticArrays
-using StrFormat
+using PyFormattedStrings: @f_str
 
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
@@ -23,10 +23,10 @@ reset_torque_function!()
 sim_reset = PM4.integrate(u0, tf, vbp)
 
 @info f"[Avg power before/after]
-Default torque function : \%.0f(sim_default.u[end][5] / tf) W
-Linear torque function  : \%.0f(sim_linear.u[end][5] / tf) W
-Rational torque function: \%.0f(sim_rational.u[end][5] / tf) W
-Reset torque function   : \%.0f(sim_reset.u[end][5] / tf) W"
+Default torque function : {sim_default.u[end][5] / tf:.0f} W
+Linear torque function  : {sim_linear.u[end][5] / tf:.0f} W
+Rational torque function: {sim_rational.u[end][5] / tf:.0f} W
+Reset torque function   : {sim_reset.u[end][5] / tf:.0f} W"
 
 # We used a different torque function that produces a different solution
 @test sim_linear.u != sim_rational.u

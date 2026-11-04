@@ -1,5 +1,5 @@
 using Test
-using StrFormat
+using PyFormattedStrings: @f_str
 using Plots
 using ForwardDiff: derivative
 using Setfield
@@ -80,13 +80,13 @@ Upper       : $(upper)"
 
 @info f"
 [Solution validity]
-Status: \%s(stats.status)
--log(norm(c)) > -log(tol) : \%.2f(constraints_neg_log_error) > \%.2f(-log10(tol)) : \%s(constraints_neg_log_error > -log10(tol))
-dτ0 < 0 : \%.2f(solution[3]) < 0 : \%s(solution[3] < 0)
+Status: {stats.status:s}
+-log(norm(c)) > -log(tol) : {constraints_neg_log_error:.2f} > {-log10(tol):.2f} : {constraints_neg_log_error > -log10(tol):s}
+dτ0 < 0 : {solution[3]:.2f} < 0 : {solution[3] < 0:s}
 
 [Objective improvement]
-Initial objective : \%.2f(initial_obj) W
-Final objective   : \%.2f(final_obj) W \%+.2f(100 * (final_obj - initial_obj) / initial_obj)%
+Initial objective : {initial_obj:.2f} W
+Final objective   : {final_obj:.2f} W {100 * (final_obj - initial_obj) / initial_obj:+.2f}%
 Initial objective : %.2f(initial_obj) W
 Final objective   : %.2f(final_obj) W %+.2f(100 * (final_obj - initial_obj) / initial_obj)%
 

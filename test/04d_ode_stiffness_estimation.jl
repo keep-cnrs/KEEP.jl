@@ -4,7 +4,7 @@ using LinearAlgebra: norm
 using StaticArrays
 using Plots
 using Test
-using StrFormat
+using PyFormattedStrings: @f_str
 
 using KEEP: TAU0
 using KEEP.PointMass4: dynamics, integrate
@@ -45,7 +45,7 @@ plot!(Ns_order[1:1], [0], alpha=1, label="")
 i = findnext(orders .< 1, 1)
 
 @info "Observation: the system is NOT stiff since there is no regime for large enough timesteps where the order of the method is not obtained; thus, an explicit method is enough."
-@info f"First N such that the order is less than 1: \%(Ns_order[i]).
-dt = tf / N = \%.1e(tf / Ns_order[i]).
+@info f"First N such that the order is less than 1: {Ns_order[i]}.
+dt = tf / N = {tf / Ns_order[i]:.1e}.
 We can safely choose 1e-3 (slightly less than the above value) as our dt, where numerical errors just begin to appear.
 Note that it is important to normalize the quantities, else the data points are shifted and we would need to adjust our dt accordingly."

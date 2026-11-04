@@ -1,7 +1,7 @@
 using Logging
 using Plots
 using StaticArrays
-using StrFormat
+using PyFormattedStrings: @f_str
 
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
@@ -16,7 +16,7 @@ tol = 1e-13
 lc_neg = compute_limit_cycle(SA[0.0, TAU0, 0.0, -10, 0.0], p; tol=tol, save_everystep=true)
 lc_pos = compute_limit_cycle(SA[0.0, TAU0, 0.0, 10, 0.0], p; tol=tol, save_everystep=true)
 
-@info f"Average power for the negative cycle (good one): \%.2f(lc_neg.u[end][end] / lc_neg.t[end])\n" * f"Average power for the positive cycle (bad one) : \%.2f(lc_pos.u[end][end] / lc_pos.t[end])"
+@info f"Average power for the negative cycle (good one): {lc_neg.u[end][end] / lc_neg.t[end]:.2f}\n" * f"Average power for the positive cycle (bad one) : {lc_pos.u[end][end] / lc_pos.t[end]:.2f}"
 
 t_pos = range(lc_pos.t[1], lc_pos.t[end], length=101)
 t_neg = range(lc_neg.t[1], lc_neg.t[end], length=101)

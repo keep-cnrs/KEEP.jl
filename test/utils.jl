@@ -1,7 +1,7 @@
 # using LinearAlgebra: norm
 # using Plots
 # using Logging
-# using StrFormat
+# using PyFormattedStrings: @f_str
 # using SplitApplyCombine
 
 # using KEEP.TorqueFunction
@@ -95,7 +95,7 @@ end
 #     power = dα .* torque_function.(dα, (p,))
 #     avg_power = sol(tf, idxs=P_ind) / (tf - t0)
 #     plot!(figure, t, power, c=:black, lw=2, label="")
-#     plot!([0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = \%.0f(avg_power) W")
+#     plot!([0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = {avg_power:.0f} W")
 #     plot!(legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 # end
 
@@ -109,7 +109,7 @@ end
 #     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2)
 #     avg_power = sol(tf, idxs=P_ind) / (tf - t0)
 #     plot!(figure, t, power, c=:black, lw=2, label="")
-#     plot!([0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = \%.0f(avg_power) W")
+#     plot!([0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = {avg_power:.0f} W")
 #     default_kwargs = (legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 #     return plot!(; merge(default_kwargs, kwargs)...)
 # end
@@ -138,7 +138,7 @@ end
 #         plot!(xlims=(0, xmax), ylims=(-ymax, ymax), zlims=(0, zmax),
 #             xlabel="x", ylabel="y", zlabel="z",
 #             camera=camera,
-#             titlefont="monospace", title=f"t = \%.2f(t_) s / \%.2f(tf) s",
+#             titlefont="monospace", title=f"t = {t_:.2f} s / {tf:.2f} s",
 #             size=figsize
 #         )
 #     end fps = fps

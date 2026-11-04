@@ -1,7 +1,6 @@
 using Plots
 using StaticArrays
 using LinearAlgebra
-using StrFormat
 
 using KEEP: TAU0
 import KEEP.PointMass4 as PM4

@@ -1,5 +1,5 @@
 using Test
-using StrFormat
+using PyFormattedStrings: @f_str
 using Setfield: @set
 using Plots
 import ComponentArrays: ComponentArray as CA, getaxes
@@ -89,16 +89,16 @@ table_str = join([
     ], "\n")
 
 # Log the result
-@info f"""Status: \%(string(stats.status))
-Constraints neglog error (should be 0 < e < 16): \%.1f(constraints_neg_log_error) (~correct digits)
-dτ0 (should be > 0): \%.3f(dτ0)
+@info f"""Status: {string(stats.status)}
+Constraints neglog error (should be 0 < e < 16): {constraints_neg_log_error:.1f} (~correct digits)
+dτ0 (should be > 0): {dτ0:.3f}
 
 Average power:
-\tInit: \%.1f(x0.P) W
-\tSol : \%.1f(solution.P) W
+\tInit: {x0.P:.1f} W
+\tSol : {solution.P:.1f} W
 
 Variables:
-\%(table_str)
+{table_str}
 """
 
 
@@ -144,8 +144,8 @@ plot!(t_init, initial_guess_power, c=:grey75)
 plot!(t_sol, solution_power, c=:orange)
 hline!([initial_guess_avg_power], c=:grey50, ls=:dash)
 hline!([solution_avg_power], c=:red, ls=:dash)
-annotate!(max_t, initial_guess_avg_power - max_P * 0.05, text(f"\%.0f(initial_guess_avg_power) W", :right))
-annotate!(max_t, solution_avg_power - max_P * 0.05, text(f"\%.0f(solution_avg_power) W", :right))
+annotate!(max_t, initial_guess_avg_power - max_P * 0.05, text(f"{initial_guess_avg_power:.0f} W", :right))
+annotate!(max_t, solution_avg_power - max_P * 0.05, text(f"{solution_avg_power:.0f} W", :right))
 plot!(1:0, c=:grey, label="Initial guess")
 plot!(1:0, c=:red, label="After optimising")
 display(plot!())
@@ -196,14 +196,14 @@ dtorque_dω0_sol = derivative(ω -> torque_function(ω, vbp), 0) * dtorque_dω_d
 
 @info f"""Arm position and velocity
 Initial guess:
-\tmax(α) = \%.2f(α_init_max)° < 90° = \%s(α_init_max < 90)
-\tmax(dα) (\%.2f(dα_init_max) rpm) < Ωmax (\%.2f(Ωmax_init) rpm) : \%s(dα_init_max < Ωmax_init)
-\td(torque)/dω at ω = 0 : \%i(dtorque_dω0_init) kg m^2 s^-1
+\tmax(α) = {α_init_max:.2f}° < 90° = {α_init_max < 90:s}
+\tmax(dα) ({dα_init_max:.2f} rpm) < Ωmax ({Ωmax_init:.2f} rpm) : {dα_init_max < Ωmax_init:s}
+\td(torque)/dω at ω = 0 : {dtorque_dω0_init:d} kg m^2 s^-1
 
 Solution:
-\tmax(α) = \%.2f(α_sol_max)° < 90° = \%s(α_sol_max < 90)
-\tmax(dα) (\%.2f(dα_sol_max) rpm) < Ωmax (\%.2f(Ωmax_sol) rpm) : \%s(dα_sol_max < Ωmax_sol)
-\td(torque)/dω at ω = 0 : \%i(dtorque_dω0_sol) kg m^2 s^-1
+\tmax(α) = {α_sol_max:.2f}° < 90° = {α_sol_max < 90:s}
+\tmax(dα) ({dα_sol_max:.2f} rpm) < Ωmax ({Ωmax_sol:.2f} rpm) : {dα_sol_max < Ωmax_sol:s}
+\td(torque)/dω at ω = 0 : {dtorque_dω0_sol:d} kg m^2 s^-1
 """
 
 ## Line tension comparison
@@ -219,12 +219,12 @@ display(plot!())
 
 @info f"""Line tension comparison
 Before optim:
-\tMin tension: \%.2f(minimum(tension_init)) N
-\tMax tension: \%.2f(maximum(tension_init)) N
+\tMin tension: {minimum(tension_init):.2f} N
+\tMax tension: {maximum(tension_init):.2f} N
 
 After optim:
-\tMin tension: \%.2f(minimum(tension_sol)) N
-\tMax tension: \%.2f(maximum(tension_sol)) N
+\tMin tension: {minimum(tension_sol):.2f} N
+\tMax tension: {maximum(tension_sol):.2f} N
 """
 
 ## Phase evolution comparison

@@ -13,7 +13,7 @@ module Visualization
 
 using Plots
 using SplitApplyCombine
-using StrFormat
+using PyFormattedStrings: @f_str
 using LaTeXStrings
 
 import KEEP.PointMass10 as PM10
@@ -82,7 +82,7 @@ end
 
 function _plot_avg_power(t0, tf, t, power, avg_power)
     plot(t, power, c=:black, lw=2, label="")
-    plot!([t0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = \%.0f(avg_power) W")
+    plot!([t0, tf], avg_power .* [1, 1], c=:red, lw=2, label=f"Average power = {avg_power:.0f} W")
     plot!(legend=:outerbottom, xlabel="t (s)", ylabel="Power (W)")
 end
 
@@ -133,7 +133,7 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
         plot!(xlims=(0, xmax), ylims=(-ymax, ymax), zlims=(0, zmax),
             xlabel="x", ylabel="y", zlabel="z",
             camera=camera,
-            titlefont="monospace", title=f"t = \%.2f(t_) s / \%.2f(tf) s",
+            titlefont="monospace", title=f"t = {t_:.2f} s / {tf:.2f} s",
             size=figsize
         )
     end fps = fps
