@@ -7,7 +7,7 @@
 # Two independent studies, each guarded by a flag at the top of the file:
 #  - PARAMETRIC: for each wind speed, maximize the average power over one of
 #    the blocks A = (ℓ, I, b), B = (Δθ, Δφ) or (A, B), and compare it with the
-#    joint 10 m/s optimum held fixed.
+#    joint 9 m/s optimum held fixed.
 #  - SHAPE: does the optimum of the joint (A, B) optimization depend on what was
 #    optimized before it?  A → (A, B), B → (A, B), and (A, B) alone, all started
 #    from the same parameters; runtime and ipopt iterations are reported for
@@ -41,7 +41,7 @@ const PARAMETRIC = true  # wind sweep without and with re-optimization
 const SHAPE = true       # do the optimization paths over A and B agree?
 const TOL = 1e-5
 const MAX_WALL_TIME = 120.0
-const WIND_REF = 10.0
+const WIND_REF = 9.0
 const SENSE = +
 const SYMS_A = [:r, :I_eq, :torque_slope]  # ℓ, I, b
 const SYMS_B = [:Δθ, :Δφ]                  # lemniscate half-height, half-width
@@ -184,7 +184,7 @@ function path_stats(steps...)
         t_solve=sum(s -> s.t_solve, steps), iter=sum(s -> s.iter, steps))
 end
 
-## Numerical: 10 m/s reference, one optimization per parameter block
+## Numerical: 9 m/s reference, one optimization per parameter block
 if PARAMETRIC || SHAPE
     # Start from the kinetic criterion b = I ω instead of the default torque slope
     p_start = PMP.build_para(v_ref=WIND_REF)
@@ -198,12 +198,12 @@ if PARAMETRIC || SHAPE
     step_AB = opt_step(p_start, SYMS_AB, lower_AB, upper_AB)  # the joint optimum
 end
 
-## Numerical: wind sweep over A, B and (A, B), from the joint 10 m/s optimum
+## Numerical: wind sweep over A, B and (A, B), from the joint 9 m/s optimum
 if PARAMETRIC
     winds = range(5, 15, length=11)
     i_ref = findfirst(x -> x >= WIND_REF, winds)
     p_ref = step_AB.p  # the joint optimum at the reference wind speed
-    # the boxes of the 10 m/s study, so the sweep moves inside the same region
+    # the boxes of the 9 m/s study, so the sweep moves inside the same region
     sweeps = (; A=wind_sweep(SYMS_A, p_ref, winds, lower_A, upper_A),
         B=wind_sweep(SYMS_B, p_ref, winds, lower_B, upper_B),
         AB=wind_sweep(SYMS_AB, p_ref, winds, lower_AB, upper_AB))
@@ -284,7 +284,8 @@ end
 """
 Three panels of one wind sweep: average power, line tension (min–max envelope),
 and the re-optimized parameters normalized by their maximum over the wind
-range. The dotted black curve is the 10 m/s reference held fixed.
+range. The dotted black curve is the 9 m/s reference held fixed, and the grey
+dashed vertical line marks that reference wind speed in every panel.
 """
 function plot_wind_sweep(winds, sweep, i_ref)
     (; syms, no_opt, opt, theta) = sweep
@@ -317,6 +318,9 @@ function plot_wind_sweep(winds, sweep, i_ref)
         ls=[:dash :dot :dashdot :dashdotdot :dash][1:n], c=permutedims(collect(1:n)),
         label=permutedims([LABELS[s] for s in syms]))
 
+    # mark the wind speed the reference parameters were optimized at
+    foreach(f -> vline!(f, [WIND_REF]; c=:gray50, ls=:dash, label=""), (f1, f2, f3))
+
     # three panels of a third of the text height, full text width; the margins
     # leave room for the axis labels (the theme sets margin = 0)
     fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
@@ -341,21 +345,21 @@ if PARAMETRIC
     end
 
     #= Observation:
-    Each wind speed is run twice: with the joint 10 m/s optimum held fixed
+    Each wind speed is run twice: with the joint 9 m/s optimum held fixed
     (dotted black), and with one block re-optimized inside the same boxes.
     Re-optimizing the arm A = (ℓ, I, b) is what adapts the system to the wind:
-    +19 % power at 5 m/s, nothing at the reference speed, +6 % at 15 m/s, and at
-    15 m/s the line tension at the same time falls from 34.9 to 32.0 kN. The
-    optimal arm shortens and lightens as the wind picks up (ℓ 40.7 → 32.9 m,
-    I 1480 → 1030 kg m²) while the braking coefficient b more than doubles
-    (1330 → 3050 kg m² s⁻¹ rad⁻¹): the cycle turns faster and the generator
+    +14 % power at 5 m/s, nothing at the reference speed, +9 % at 15 m/s, and at
+    15 m/s the line tension at the same time falls from 35.8 to 32.0 kN. The
+    optimal arm shortens and lightens as the wind picks up (ℓ 35.4 → 32.9 m,
+    I 1150 → 1025 kg m²) while the braking coefficient b nearly triples
+    (1065 → 3050 kg m² s⁻¹ rad⁻¹): the cycle turns faster and the generator
     takes more out of the same lines.
-    Re-optimizing the shape B = (Δθ, Δφ) changes nothing (at most +2 % at
-    5 m/s). Its optimum sits on the lower box bound of both angles, so with the
-    box fixed the solver has no room to flatten the lemniscate further, and
+    Re-optimizing the shape B = (Δθ, Δφ) changes almost nothing (at most +1.5 %
+    at 5 m/s). Its optimum sits on the lower box bound of both angles, so with
+    the box fixed the solver has no room to flatten the lemniscate further, and
     (A, B) reproduces the A curve. The shape is already as flat as the box
     allows, so the wind-speed adaptation is carried entirely by the arm.
-    The A gain vanishes at the reference speed by construction — 10 m/s is where
+    The A gain vanishes at the reference speed by construction — 9 m/s is where
     the fixed parameters were optimized — and grows away from it on both sides.
     =#
 end
@@ -470,19 +474,19 @@ if SHAPE
 
     #= Observation:
     All three paths start from the same parameters — the b = I ω criterion
-    applied to the defaults, P = 13.2 kW — and end with the same joint (A, B)
+    applied to the defaults, P = 9.6 kW — and end with the same joint (A, B)
     solve; they differ only by the block optimized before it:
-      - A → (A, B): 16.1 kW, 20 ipopt iterations
-      - B → (A, B): 16.1 kW, 17 iterations
-      - (A, B) alone: 16.1 kW, 10 iterations
+      - A → (A, B): 11.8 kW, 20 ipopt iterations
+      - B → (A, B): 11.8 kW, 17 iterations
+      - (A, B) alone: 11.8 kW, 10 iterations
     They reach the same optimum to solver accuracy: the largest symmetric
     relative difference 2|x - y| / (x + y) between the three final points is
-    7e-6 (10 tol = 1e-4), i.e. the pre-optimization does not move the joint
+    7.8e-6 (10 tol = 1e-4), i.e. the pre-optimization does not move the joint
     optimum. Blocking the arm first, then the shape, gave a different result
     only because that second step was a *restricted* problem (shape optimized at
     fixed arm); as soon as both blocks are free, the extra start is forgotten.
-    Cost: the direct joint solve is the cheapest (10 iterations, 0.6 s); the
-    pre-optimization adds a full block solve for nothing (1.2 s and 0.8 s), so
+    Cost: the direct joint solve is the cheapest (10 iterations, 0.7 s); the
+    pre-optimization adds a full block solve for nothing (1.2 s and 1.0 s), so
     warm-starting with A or B is not worth it here.
     All three final points sit on both B box bounds (Δθ = 2.5°, Δφ = 33°): the
     shape wants a flatter lemniscate than the ±50 % box allows, so the shape
@@ -567,12 +571,12 @@ if SHAPE
     #= Observation:
     Each pane varies one parameter around the joint optimum and re-solves the
     limit cycle, so the curve is the objective as a function of that parameter
-    alone. The arm length r is the stiffest direction (≈ 5 % of power over
-    ±10 %), the inertia and the braking coefficient are about four and ten times
-    flatter. The shape directions are asymmetric: Δθ and Δφ sit on their lower
-    box bound, the objective still rises just below it, and Δφ already loses
-    4 % at +10 % — the bound, not a flat objective, stops the shape. Each x axis
-    spans ±10 % of one parameter in its own units, and the dashed–solid split
-    marks the box bound of that parameter.
+    alone. The arm length r is the stiffest direction (≈ 4 % of power over
+    ±10 %), the inertia and the braking coefficient are about four and twelve
+    times flatter. The shape directions are asymmetric: Δθ and Δφ sit on their
+    lower box bound, the objective still rises just below it, and Δφ already
+    loses 4 % at +10 % — the bound, not a flat objective, stops the shape. Each
+    x axis spans ±10 % of one parameter in its own units, and the dashed–solid
+    split marks the box bound of that parameter.
     =#
 end
