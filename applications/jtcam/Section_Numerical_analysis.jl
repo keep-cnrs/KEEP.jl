@@ -12,7 +12,6 @@ using KEEP: PointMassPara as PMP
 using KEEP: SteadyState
 using KEEP: Visualization as VIZ
 using KEEP: LimitCycle as LC
-using KEEP.TorqueFunction: torque_function
 using KEEP: DEFAULT_TOLERANCE, TAU0
 
 using Plots
@@ -24,25 +23,16 @@ using Roots
 using ForwardDiff
 
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
+include(joinpath(@__DIR__, "time_series.jl"))
 
 
 ## Determine optimal parameters using kinetic model
-vbp = PMP.build_vbpara()
-_, _, T_dim = PMP.lmt(vbp)
-torque_slope_hist = [vbp.torque_slope]
-for i in 1:2
-    period = LC.compute_limit_cycle(vbp; sense=(+), tol=1e-3).t[end] / T_dim
-    ω = 2π/period
-
-    # b/Iω = 1  =>  b = Iω
-    b_pto = vbp.I_eq * ω
-    vbp.torque_slope = b_pto
-    append!(torque_slope_hist, vbp.torque_slope)
-end
+p0 = PMP.build_para()
+p0.torque_slope = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
+vbp = PMP.build_vbpara(p0)
 
 @info f"Optimal torque slope value
-Initialized at $b_0 = {torque_slope_hist[1]:.2f}\\dots$.
-We evaluate $\\omega_0$ through a numerical simulation to get a new $b_1 = I * \\omega_0 \\approx {torque_slope_hist[2]:.2f}$, evaluate $\\omega_1$ and finally obtain $b = b_2 = I \\omega_1 \\approx {torque_slope_hist[3]:.2f}. We reached a fixed point use that value for the rest of this work"
+b = I ω ≈ {p0.torque_slope:.2f} kg m² s⁻¹ rad⁻¹, with ω = 2π/period read from a simulation of the limit cycle (fixed point of b = I ω)."
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -325,81 +315,8 @@ end
 u0 = PM4.build_u(; dτ=1)
 sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
 
-N = 500
-ts = range(0, sol.t[end], N)
-q_ts = reduce(hcat, sol.(ts))'  # interpolated states on the grid
-τm = mod.(q_ts[:, 2], 2π) .- π
-@assert all(-π .<= τm .< π)
-@assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
-
-"""
-Wrapped-τ series: main polyline on the grid with a NaN sample at each 2π
-crossing, plus the crossings as NaN-separated vertical segments (crossing
-time twice, values π and -π) to be drawn dashed.
-"""
-function tau_wrap(ts, τm)
-    Δt = step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
-    t_jump, y_jump = Float64[], Float64[]
-    for tc in tcross
-        append!(t_jump, (tc, tc, NaN))
-        append!(y_jump, (π, -π, NaN))
-    end
-    perm = sortperm(vcat(ts, tcross))
-    t_main = vcat(ts, tcross)[perm]
-    y_main = vcat(τm, fill(NaN, length(tcross)))[perm]
-    return t_main, y_main, t_jump, y_jump
-end
-
-"""
-Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W.
-"""
-function plot_avg_power_kW(sol)
-    t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
-    p = sol.prob.p
-    L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
-    power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plot(t, power; c=:black, label="", ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red)
-    # plot!([NaN]; c=:red, label="avg = $(round(avg_power; digits=2)) kW", legend=(0.1, -0.2))
-    plot!(xlabel="t (s)")
-end
-
-t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="",
-    ylabel="x (rad, rad/s)", legend=:bottomright, xlabel="", xformatter=x->"")
-plot!(t_main, y_main; c=2, label="")
-# plot!(1:4, [[NaN] for _ in 1:4]; c=(1:4)', label=["α" "τ mod 2π" "D(α)" "D(τ)"])
-plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
-
-pw = plot_avg_power_kW(sol)
-
-# Legend in its own tile, as tall as the two panels together: Plots splits a
-# layout legend between subplots, and a GR legend's swatch shrinks with its axis
-# width, so the entries are drawn by hand (glyph positions are axis fractions).
-# shortcut: the negative margins only cancel the padding Plots reserves between
-# a plot and a legend column; revisit if the layout code changes.
-p_legend = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
-    xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], leftmargin=-2Plots.mm)
-legend_styles = [(; c=1), (; c=2), (; c=3), (; c=4), (; c=:black), (; c=:red)]
-legend_names = ["α", "τ mod 2π", "D(α)", "D(τ)", "P", "Avg(P)"]
-ys = 0.5 .+ 0.07 .* ((length(legend_names) + 1) / 2 .- (1:length(legend_names)))
-plot!(p_legend, Shape([(0.0, last(ys) - 0.05), (0.97, last(ys) - 0.05),
-    (0.97, first(ys) + 0.035), (0.0, first(ys) + 0.035)]); c=:black, lw=1, fillcolor=:white)
-for (y, style, name) in zip(ys, legend_styles, legend_names)
-    plot!(p_legend, [0.05, 0.18], [y, y]; style...)
-    annotate!(p_legend, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
-end
-
-plot!(p_wts, rightmargin=-6Plots.mm)  # see shortcut above
-plot!(pw, rightmargin=-6Plots.mm, topmargin=-5Plots.mm)
-sim_4D_fig = plot(p_wts, pw, p_legend; layout=@layout([[a{0.60h}; b] c{0.27w}]))
-plot!(sim_4D_fig, leftmargin=4Plots.mm, bottommargin=4Plots.mm)
-
-display(sim_4D_fig)
+sim_4D_fig = plot_time_series(sol)
+# save only: a second render of the same figure fails Plots' layout pass
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 
 ## Convergence rate toward limit cycle

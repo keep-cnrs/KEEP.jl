@@ -5,6 +5,7 @@ module PointMassPara
 using ComponentArrays
 
 export build_para, build_vbpara, lmt, normalize_vbpara, vbpara_set_params, get_char_time
+export optimal_torque_slope
 export VBPara, Para
 export NB_LINES
 
@@ -151,6 +152,37 @@ The length of this approximated path is r * (2Δφ + 4Δθ), and we assume its s
 """
 function get_char_time(p)
     return p.r / p.v_ref * (2p.Δφ + 4p.Δθ)
+end
+
+"""
+    optimal_torque_slope(p = build_para(); sense = +, tol = 1e-3, maxiter = 5, rtol = 1e-4)
+
+Torque slope `b` that satisfies the kinetic criterion `b = I_eq ω`, with `ω` the
+angular frequency of the limit cycle (`ω = 2π/period`, period in seconds from a
+simulation). The period depends on `b`, so the value is a fixed point: solve the
+cycle, set `b = I_eq 2π/period`, solve again until `b` stops moving. Returns `b`
+in the units of `p.torque_slope` and prints nothing.
+
+```julia
+p0 = build_para()
+p0.torque_slope = optimal_torque_slope(p0)
+vbp = build_vbpara(p0)
+```
+
+The limit cycle solver lives in `KEEP.LimitCycle`, which is included after this
+module, hence the runtime lookup.
+"""
+function optimal_torque_slope(p=build_para(); sense=+, tol=1e-3, maxiter=5, rtol=1e-4)
+    vbp = build_vbpara(p)
+    L, M, T = lmt(vbp)
+    b = p.torque_slope
+    for _ in 1:maxiter
+        period = parentmodule(@__MODULE__).LimitCycle.compute_limit_cycle(vbp; sense, tol).t[end]
+        b = p.I_eq * 2π / period
+        abs(vbp.torque_slope * M * L^2 / T - b) <= rtol * b && break
+        vbp.torque_slope = b * T / (M * L^2)  # physical b -> normalized
+    end
+    return b
 end
 
 @doc raw"""

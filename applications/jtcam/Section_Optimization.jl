@@ -1,5 +1,9 @@
 # Optimization section.
 #
+# Both studies start from the default parameters with the torque slope set by
+# the kinetic criterion b = I ω (`PMP.optimal_torque_slope`, one limit cycle per
+# iteration), not from the default torque slope.
+#
 # Two independent studies, each guarded by a flag at the top of the file:
 #  - PARAMETRIC: for each wind speed, maximize the average power over one of
 #    the blocks A = (ℓ, I, b), B = (Δθ, Δφ) or (A, B), and compare it with the
@@ -30,6 +34,7 @@ using Logging: with_logger, NullLogger
 using LinearAlgebra: norm
 
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
+include(joinpath(@__DIR__, "time_series.jl"))
 
 ## Settings
 const PARAMETRIC = true  # wind sweep without and with re-optimization
@@ -45,7 +50,7 @@ const SYMS_AB = vcat(SYMS_A, SYMS_B)       # the joint optimization
 # Parameter names and units for the axis titles and the legends
 const LABELS = Dict(:r => "ℓ", :I_eq => "I", :torque_slope => "b",
     :Δθ => "Δθ", :Δφ => "Δφ")
-const UNITS = Dict(:r => "m", :I_eq => "kg m²", :torque_slope => "kg m² s rad⁻¹",
+const UNITS = Dict(:r => "m", :I_eq => "kg m²", :torque_slope => "kg m² s⁻¹ rad⁻¹",
     :Δθ => "rad", :Δφ => "rad")
 
 ## Helpers
@@ -181,7 +186,9 @@ end
 
 ## Numerical: 10 m/s reference, one optimization per parameter block
 if PARAMETRIC || SHAPE
+    # Start from the kinetic criterion b = I ω instead of the default torque slope
     p_start = PMP.build_para(v_ref=WIND_REF)
+    p_start.torque_slope = PMP.optimal_torque_slope(p_start)
     lower_A, upper_A = OPT.make_bounds(p_start, SYMS_A)
     lower_B, upper_B = OPT.make_bounds(p_start, SYMS_B; multiplier=1.5)  # ×3 on Δφ leaves the window
     lower_AB, upper_AB = vcat(lower_A, lower_B), vcat(upper_A, upper_B)
@@ -245,11 +252,27 @@ if SHAPE
             lpad(path.iter, 10), "  ", rpad(round(Δx_AB(key); sigdigits=3), 18),
             isempty(bound_hits[key]) ? "interior" : "on bound: $(join(bound_hits[key], ", "))")
     end
-    println("\nfinal parameters (A → (A, B) | B → (A, B) | (A, B))")
-    for (i, sym) in enumerate(SYMS_AB)
-        println(rpad(LABELS[sym], 14), join(round.((xs.A_AB[i], xs.B_AB[i], xs.AB[i]);
-            sigdigits=8), "  "))
+    # Limit cycle of the initial, A and joint parameters: period, objective, tension
+    function cycle_stats(p)
+        sol = LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
+        P, tmin, tmax, period = trajectory_stats(sol)
+        return (; P, tmin, tmax, period)
     end
+    states = (init=cycle_stats(p_start), A=cycle_stats(step_A.p), AB=cycle_stats(step_AB.p))
+    cols = ((p_start, states.init), (step_A.p, states.A), (step_AB.p, states.AB))
+    fmt(x) = string(round(x; sigdigits=6))
+    row(name, f) = println(rpad(name, 30), join([lpad(f(c), 14) for c in cols]))
+
+    println("\nfinal parameters")
+    println(rpad("", 30), join(lpad.(["init", "A", "(A, B)"], 14)))
+    for sym in SYMS_AB
+        row("$(LABELS[sym]) ($(UNITS[sym]))", c -> fmt(c[1][sym]))
+    end
+    println()
+    row("period (s)", c -> fmt(c[2].period))
+    row("objective P (kW)", c -> fmt(c[2].P / 1000))
+    row("min tension (kN)", c -> fmt(c[2].tmin / 1000))
+    row("max tension (kN)", c -> fmt(c[2].tmax / 1000))
     println(same_optimum ? "→ all paths reach the same optimum" :
             "→ the paths reach DIFFERENT optima")
 
@@ -446,15 +469,15 @@ if SHAPE
     savefig(fig_paths, joinpath(OUTPATH, "optimization_paths.pdf"))
 
     #= Observation:
-    All three paths start from the same unoptimized parameters (P = 12.8 kW) and
-    end with the same joint (A, B) solve; they differ only by the block optimized
-    before it:
+    All three paths start from the same parameters — the b = I ω criterion
+    applied to the defaults, P = 13.2 kW — and end with the same joint (A, B)
+    solve; they differ only by the block optimized before it:
       - A → (A, B): 16.1 kW, 20 ipopt iterations
       - B → (A, B): 16.1 kW, 17 iterations
       - (A, B) alone: 16.1 kW, 10 iterations
     They reach the same optimum to solver accuracy: the largest symmetric
     relative difference 2|x - y| / (x + y) between the three final points is
-    7.4e-6 (10 tol = 1e-4), i.e. the pre-optimization does not move the joint
+    7e-6 (10 tol = 1e-4), i.e. the pre-optimization does not move the joint
     optimum. Blocking the arm first, then the shape, gave a different result
     only because that second step was a *restricted* problem (shape optimized at
     fixed arm); as soon as both blocks are free, the extra start is forgotten.
@@ -465,6 +488,23 @@ if SHAPE
     shape wants a flatter lemniscate than the ±50 % box allows, so the shape
     optimum is set by the box rather than by the objective.
     =#
+end
+
+## Plot: time series at the init, A and (A, B) parameters
+if SHAPE
+    my_defaults()
+
+    names = (:init, :device, :device_and_shape)
+    sols = map((p_start, step_A.p, step_AB.p)) do p
+        LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
+    end
+    # savefig only: a second render of the same figure fails Plots' layout pass
+    for (name, sol) in zip(names, sols)
+        savefig(plot_time_series(sol),
+            joinpath(OUTPATH, "optimization_timeseries_$name.pdf"))
+    end
+    savefig(plot_time_series_grid(sols),
+        joinpath(OUTPATH, "optimization_timeseries_all.pdf"))
 end
 
 ## Plot: objective landscape around the joint optimum (needs the SHAPE section)

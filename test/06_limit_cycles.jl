@@ -24,24 +24,17 @@ using StaticArrays: SA
 using Setfield
 using Test
 using Logging
-using StrFormat
+using PyFormattedStrings
+using Clustering: dbscan
+using Statistics: mean
+using QuasiMonteCarlo: sample, HaltonSample
+using Plots
 
 import KEEP.PointMass4 as PM4
 import KEEP.Visualization as VIS
 using KEEP.PointMassPara: build_para, build_vbpara, VBPara
 using KEEP.LimitCycle
 using KEEP: DEFAULT_TOLERANCE, TAU0
-
-# using Plots
-# default(formatter=:plain, label="", lw=3)
-
-# xmax = 50
-# plot()
-# hline([0], c=:grey, lw=1)
-# vline!([TAU0] .+ (0:2π:xmax), c=:grey, lw=1, label = "τ = TAU0 mod 2π")
-# plot!(section, 0, xmax, label="Poincare section")
-# # Visually check that section is 0 when τ ≡ TAU0 mod 2π
-
 
 tol = 1e-9
 u0 = SA[0.0, TAU0, 0.0, 0.0, 0.0]
@@ -52,7 +45,7 @@ sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
 
 
 ## Plot convergence toward a fixed point in the Poincaré section
-u = sol.u[1:end-1]
+u = sol.u[1:(end-1)]
 u_ref = sol.u[end]
 errors = [distance_on_section(u, u_ref) for u in u]
 
@@ -62,11 +55,10 @@ convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
 
 @info "Convergence rate = $(convergence_rate)"
 
-using Plots
 default(label="", lw=3)
 plot(title="Convergence of the Poincaré map", xlabel="iteration", ylabel="distance to last iterate", yscale=:log10, yticks=exp10.(-16:2:0))
 scatter!(errors, m=:x)
-plot!([i1, i2], [errors[i1], errors[i2]], c=:red, lw=3, label=f"Convergence rate = \%.2f(convergence_rate)")
+plot!([i1, i2], [errors[i1], errors[i2]], c=:red, lw=3, label=f"Convergence rate = {convergence_rate:.2f}")
 display(plot!())
 
 plot!(xlim=(0, 10))
@@ -85,7 +77,7 @@ If needed:
 # When integrating, it should verify α0 = αf, ...
 # This should be correct up to 2 tol: tol for u0 + tol for uf (approximation?)
 shooting = build_shooting(sol)
-@test maximum(abs, shooting_residuals(shooting, vbp; sense=-, tol=tol / 2)) < tol  # It is a limit cycle with negative dτ
+@test maximum(abs, shooting_residuals(shooting, vbp; sense=(-), tol=tol / 2)) < tol  # It is a limit cycle with negative dτ
 
 
 # Visualise the path
@@ -94,10 +86,6 @@ VIS.plot_trajectory_4D(lc, points_per_second=100)
 
 
 ## Finding all limit cycles
-using Clustering: dbscan
-using StrFormat
-using Statistics: mean
-using QuasiMonteCarlo: sample, HaltonSample
 
 αmin, αmax = 0., 1π
 vmax = 5.
@@ -128,8 +116,8 @@ prop = clusters.counts / sum(clusters.counts)
 Pavg = [average_power(s, vbp; tol=tol) for s in centroids]
 plot(title="Clustering phase space wrt. limit cycles", xlabel="cluster index", xticks=(1:length(centroids), labels))
 plot!(i, prop, seriestype=:bar, seriescolor=1:length(clusters.counts))
-annotate!(i, prop / 2, [f"\%.0f(100 * p)%" for p in prop], :bottom)
-annotate!(i, prop / 2 .+ 0.1, [f"P = \%.0f(Pavg) W" for Pavg in Pavg])
+annotate!(i, prop / 2, [f"{100p:.0f}%" for p in prop], :bottom)
+annotate!(i, prop / 2 .+ 0.1, [f"P = {Pavg:.0f} W" for Pavg in Pavg])
 display(plot!())
 
 # Recomputing the limit cycles with high precision
@@ -141,10 +129,10 @@ err_after = maximum(maximum.(abs, shooting_residuals.(refined_shootings, Ref(vbp
 @test err_after < err_before
 
 @info f"
-Error of the centroids using sqrt(tol) = \%.1e(sqrt(tol)) to find limit cycles (fast computation of many limit cycles)
-\t\%.1e(err_before)
-Error after recomputing the limit cycles using tol = \%.1e(tol) (accurate computation of a few limit cycles after clustering)
-\t\%.1e(err_after)"
+Error of the centroids using sqrt(tol) = {sqrt(tol):.1e} to find limit cycles (fast computation of many limit cycles)
+\t{err_before:.1e}
+Error after recomputing the limit cycles using tol = {tol:.1e} (accurate computation of a few limit cycles after clustering)
+\t{err_after:.1e}"
 
 
 # In one call

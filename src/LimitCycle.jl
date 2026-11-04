@@ -23,7 +23,6 @@ What should go in there :
 
 using DiffEqCallbacks: ContinuousCallback
 using OrdinaryDiffEqVerner: terminate!
-using StrFormat
 using StaticArrays
 using Clustering: dbscan
 using Setfield

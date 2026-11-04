@@ -20,7 +20,6 @@ using Setfield
 using Test
 using ADNLPModels, NLPModelsIpopt
 using NonlinearSolve
-using StrFormat
 
 using KEEP: TAU0
 import KEEP.PointMass4 as PM4
@@ -34,9 +33,9 @@ output : all normalized
 function optimize(vbp, N, syms, lb_vbp, ub_vbp)
     global X0, lb, ub, U_end, sol1
     U_end = 5N + 5
-    get_u(X, i) = @view X[5i-4:5i]
+    get_u(X, i) = @view X[(5i-4):5i]
     get_tf(X) = X[U_end+1]
-    get_p(X) = @view X[U_end+2:end]
+    get_p(X) = @view X[(U_end+2):end]
 
     function objective(X, syms)
         N = get_N(X, syms)
@@ -45,17 +44,17 @@ function optimize(vbp, N, syms, lb_vbp, ub_vbp)
 
     """cons is of size U_end + 1 = 5N + 6"""
     function cons!(cons, X, syms)
-        U = [get_u(X, i) for i in 1:N+1]
-        C = [get_u(cons, i) for i in 1:N+1]
+        U = [get_u(X, i) for i in 1:(N+1)]
+        C = [get_u(cons, i) for i in 1:(N+1)]
         Δt = get_tf(X) / N
 
         # Precompute all dynamics in cache C
         # then overwrite with trapezoid residuals
         vbp_loc = @set vbp[syms] = get_p(X)
-        for i in 1:N+1
+        for i in 1:(N+1)
             C[i] .= PM4.dynamics(U[i], vbp_loc, 0)
         end
-        for i in N+1:-1:2
+        for i in (N+1):-1:2
             @. C[i] = U[i] - U[i-1] - Δt / 2 * (C[i] + C[i-1])
         end
         α0, τ0, dα0, dτ0, W0 = U[1]
@@ -109,9 +108,9 @@ function optimize(vbp, N, syms, lb_vbp, ub_vbp)
 
     αmin, αmax = -π, π
     τmin, τmax = TAU0 - 2π, TAU0
-    dαmax = 10maximum([get_u(X0, i)[3] for i in 1:N+1])
+    dαmax = 10maximum([get_u(X0, i)[3] for i in 1:(N+1)])
     dαmin = -dαmax
-    dτmin, dτmax = minmax(0, 10argmax(abs, [get_u(X0, i)[4] for i in 1:N+1]))
+    dτmin, dτmax = minmax(0, 10argmax(abs, [get_u(X0, i)[4] for i in 1:(N+1)]))
     Wmin, Wmax = 0, 10get_u(X0, N + 1)[5]
 
     ε = 1e-1
@@ -147,9 +146,9 @@ lb_vbp = @set vbp[syms] = vbp[syms] / mult
 ub_vbp = @set vbp[syms] = vbp[syms] * mult
 stats = optimize(vbp, N, [:r, :I_eq], lb_vbp, ub_vbp)
 
-build_para(@set vbp[syms] = stats.solution[end-length(syms)+1:end])[syms]
+build_para(@set vbp[syms] = stats.solution[(end-length(syms)+1):end])[syms]
 
-X_part = X0[1:U_end+1]
+X_part = X0[1:(U_end+1)]
 res_func = make_res(U_end, X0)
 res_func(similar(X_part), X_part)
 
@@ -157,7 +156,7 @@ nlp_init = NonlinearProblem(res_func, X_part)
 solve(nlp_init)
 
 n = 10
-make_func(n) = (A = rand(n, n); b = rand(n); (res, u, p) -> (res .= A * u + b))
+make_func(n) = (A=rand(n, n); b=rand(n); (res, u, p) -> (res .= A * u + b))
 nlp = NonlinearProblem(make_func(n), ones(n), ())
 t = @elapsed sol = solve(nlp; store_trace=Val(true))
 sum(abs, sol.resid)
