@@ -1,8 +1,9 @@
 # time_series.jl
 # One simulation, three panels (states, average power, line tension), shared by
-# the numerical-analysis and optimization sections. Legends are built in, one
-# per row, and a grid of simulations shares the y limits of each row across
-# columns.
+# the numerical-analysis and optimization sections. The legends are drawn by
+# hand, one per row, in a dedicated column so every panel keeps the same width
+# and the x axes can be linked. In a grid, the y limits of a row are shared by
+# all columns.
 # Include after jtcam_theme.jl.
 
 using KEEP: PointMass4 as PM4
@@ -37,15 +38,15 @@ end
 Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W. Returns the
 panel and the y data range, so several simulations can share one power axis.
 """
-function plot_avg_power_kW(sol; legend=:outerright)
+function plot_avg_power_kW(sol)
     t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
     dα = sol.(t, idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
     avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plt = plot(t, power; c=:black, label="P", ylabel="Power (kW)", legend=legend)
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, label="Avg(P)")
+    plt = plot(t, power; c=:black, label="", legend=false, ylabel="Power (kW)")
+    plot!([t0, tf], [avg_power, avg_power]; c=:red, label="")
     plot!(xlabel="t (s)")
     return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
 end
@@ -53,11 +54,10 @@ end
 """
 Three panels of one simulation `sol` (a transient or a limit cycle): the states
 (α, D(α), D(τ), with τ mod 2π), the instantaneous and average power, and the
-line tension, whose y ticks are 0 and the two extrema. `legend` is forwarded to
-each panel: the right-most column of a grid draws it, the other columns pass
-`false`. Returns the panels and the data ranges used to share the y axes.
+line tension, whose y ticks are 0 and the two extrema. Returns the panels and
+the data ranges used to share the y axes.
 """
-function time_series_panels(sol; N=500, legend=:outerright)
+function time_series_panels(sol; N=500)
     ts = range(sol.t[1], sol.t[end], N)
     q_ts = reduce(hcat, sol.(ts))'  # interpolated states on the grid
     τm = mod.(q_ts[:, 2], 2π) .- π
@@ -65,13 +65,12 @@ function time_series_panels(sol; N=500, legend=:outerright)
     @assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-    p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4],
-        label=["α" "D(α)" "D(τ)"], legend=legend,
+    p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="", legend=false,
         ylabel="x (rad, rad/s)", xlabel="", xformatter=x -> "")
-    plot!(t_main, y_main; c=2, label="τ mod 2π")
+    plot!(t_main, y_main; c=2, label="")
     plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
 
-    pw_stats = plot_avg_power_kW(sol; legend)
+    pw_stats = plot_avg_power_kW(sol)
     pw = pw_stats.plt
     plot!(pw, xlabel="", xformatter=x -> "")
 
@@ -81,7 +80,7 @@ function time_series_panels(sol; N=500, legend=:outerright)
     tension = PM4.compute_line_tension.(sol.(ts), Ref(sol.prob.p)) ./ 1000
     ok = isfinite.(tension)
     tmin, tmax = extrema(tension[ok])
-    p_t = plot(ts[ok], tension[ok]; c=5, label="T", legend=legend,
+    p_t = plot(ts[ok], tension[ok]; c=5, label="", legend=false,
         ylabel="Tension (kN)", xlabel="t (s)",
         yticks=([0, tmin, tmax], ["0", f"{tmin:.1f}", f"{tmax:.1f}"]),
         ylim=(0, tmax), widen=true)
@@ -93,29 +92,50 @@ function time_series_panels(sol; N=500, legend=:outerright)
             tension=(0.0, tmax)))
 end
 
-"Time series of one simulation `sol`, one built-in legend per row on the right."
+"""
+Legend tile: `Plots` splits a layout legend between subplots, and a GR legend
+swatch shrinks with its axis width, so the entries are drawn by hand (glyph
+positions are axis fractions). `shortcut`: the negative margins only cancel the
+padding Plots reserves between a plot and a legend column; revisit if the layout
+code changes.
+"""
+function time_series_legend(names, styles)
+    p = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
+        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], leftmargin=-2Plots.mm)
+    n = length(names)
+    ys = 0.5 .+ 0.065 .* ((n + 1) / 2 .- (1:n))
+    plot!(p, Shape([(0.0, last(ys) - 0.05), (0.97, last(ys) - 0.05),
+        (0.97, first(ys) + 0.035), (0.0, first(ys) + 0.035)]); c=:black, lw=1, fillcolor=:white)
+    for (y, style, name) in zip(ys, styles, names)
+        plot!(p, [0.05, 0.18], [y, y]; style...)
+        annotate!(p, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+    end
+    return p
+end
+
+"One hand-drawn legend per row: states, power, tension."
+function time_series_legends()
+    return (states=time_series_legend(("α", "τ mod 2π", "D(α)", "D(τ)"),
+                ((; c=1), (; c=2), (; c=3), (; c=4))),
+        power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red))),
+        tension=time_series_legend(("T",), ((; c=5),)))
+end
+
+"Time series of one simulation `sol`, one hand-drawn legend per row."
 function plot_time_series(sol; N=500)
-    (; wts, pw, tension) = time_series_panels(sol; N, legend=:outerright)
-    # margins go on the panels, not on the composed figure: re-computing the
-    # layout of a figure that already carries margins is not stable in Plots
-    plot!(wts, leftmargin=12Plots.mm, rightmargin=4Plots.mm)
-    plot!(pw, leftmargin=12Plots.mm, rightmargin=4Plots.mm, topmargin=-5Plots.mm)
-    plot!(tension, leftmargin=12Plots.mm, rightmargin=4Plots.mm, topmargin=-5Plots.mm,
-        bottommargin=4Plots.mm)
-    return plot(wts, pw, tension; layout=@layout([a{0.42h}; b; c]),
-        size=plot_size(1; height=1.5))
+    return plot_time_series_grid((sol,); N)  # same layout, so the same legend width
 end
 
 """
 Several simulations side by side: one column per solution, one row per panel
-(states, power, tension). The right-most panel of each row carries the built-in
-legend, all columns of a row share the same y limits, and every panel keeps its
-own y ticks. Only the first column carries the y axis labels.
+(states, power, tension). The hand-drawn legend of each row sits in a dedicated
+last column, so every panel keeps the same width; the x axes are linked inside
+each column. The y limits of a row are shared by all columns, and every panel
+keeps its own y ticks.
 """
 function plot_time_series_grid(sols; N=500)
     n = length(sols)
-    panels = [time_series_panels(sol; N, legend=(j == n ? :outerright : false))
-              for (j, sol) in enumerate(sols)]
+    panels = [time_series_panels(sol; N) for sol in sols]
 
     # one y range per row, common to every column
     states_lims = (minimum(first(q.ylims.states) for q in panels),
@@ -137,7 +157,11 @@ function plot_time_series_grid(sols; N=500)
         end
         plot!(q.tension, bottommargin=4Plots.mm)
     end
-    return plot([q.wts for q in panels]..., [q.pw for q in panels]...,
-        [q.tension for q in panels]...;
-        layout=grid(3, n), size=plot_size(1; height=1.5))
+
+    leg = time_series_legends()
+    return plot([q.wts for q in panels]..., leg.states,
+        [q.pw for q in panels]..., leg.power,
+        [q.tension for q in panels]..., leg.tension;
+        layout=grid(3, n + 1; widths=vcat(fill(0.84 / n, n), 0.16)),
+        link=:x, size=plot_size(1; height=1.5))
 end
