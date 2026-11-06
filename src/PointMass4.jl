@@ -12,7 +12,7 @@ using KEEP.TorqueFunction
 using KEEP.Integrate: _integrate
 import KEEP: DEFAULT_TOLERANCE, TAU0
 
-export dynamics, integrate, build_u
+export dynamics, integrate, build_u, kite_acceleration
 
 @doc raw"""
 Compute the jacobian of `f` at `x`.
@@ -177,6 +177,22 @@ function compute_line_tension(u, p; du=PM4.dynamics(u, p, 0))
     b_tension = -torque / l_tension * rhat
     F_tension = A_tension[:, 1] * ddα + b_tension
     return -F_tension ⋅ rhat
+end
+
+@doc raw"""
+Cartesian acceleration ``\ddot{x}`` of the kite, with ``x = OK(τ, α)``.
+
+`u = (α, τ, dα, dτ, W)` is a state and `p` a `VBPara`. The angular
+accelerations come from `dynamics(u, p, 0)`. Positions from `compute_OK` are in
+metres and time is in seconds — `build_vbpara` keeps `l`, `m` and `v_ref`
+physical — so the result is in m s⁻².
+"""
+function kite_acceleration(u, p)
+    q = u[SA[1, 2]]
+    dq = u[SA[3, 4]]
+    ddq = dynamics(u, p, 0)[SA[3, 4]]
+    pos(q_) = compute_OK(compute_Rτ(q_, p), p)
+    return scnd_deriv_sample(pos, q, dq, dq) + jacobian(pos, q) * ddq
 end
 
 function build_u(α, τ, dα, dτ, W)

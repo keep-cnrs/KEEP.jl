@@ -178,7 +178,16 @@ function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=5, N=100, tol=DEFAULT_T
 
     samples = sample(N, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
     u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
-    rough_shootings = [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s]
+    # A diverging seed can stop after one saved state, and `build_shooting` then
+    # has no pair to work with; skipping it is what the clustering expects.
+    rough_shootings = filter(!isnothing, map(u0s) do u0
+        try
+            build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol)))
+        catch
+            nothing
+        end
+    end)
+    isempty(rough_shootings) && error("no limit cycle seed converged")
 
     clusters = dbscan(reduce(hcat, rough_shootings), 100sqrt(tol))
     rough_centroids = [mean(rough_shootings[c.core_indices]) for c in clusters.clusters]
