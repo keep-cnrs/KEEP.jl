@@ -69,7 +69,7 @@ function plot_trajectory_4D(sol; tspan=extrema(sol.t), points_per_second=DEFAULT
     vbp = sol.prob.p
     t, _ = build_t(tspan, points_per_second)
     q = sol.(t, idxs=1:2)
-    A = [vbp.l * PM4.compute_αhat(q[1]) for q in q]
+    A = [vbp.a * PM4.compute_αhat(q[1]) for q in q]
     K = [PM4.compute_OK(PM4.compute_Rτ(q[1:2], vbp), vbp) for q in q]
 
     arm_and_lines = [[0 * A, A, K, NaN * A] for (A, K) in zip(A, K)]
@@ -119,7 +119,7 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
         t_trail = [max(0, t_-trail_length):trail_step:t_; t_]
         q = sol(t_trail, idxs=1:2)
         α = first(q[end])
-        A = vbp.l * PM4.compute_αhat(α)
+        A = vbp.a * PM4.compute_αhat(α)
         trail_K = [PM4.compute_OK(PM4.compute_Rτ(q, vbp), vbp) for q in q]
         segment = [0 * A, A, trail_K[end]]
 
@@ -141,12 +141,12 @@ function animate_trajectory_4D(sol; tspan=extrema(sol.t), fps=DEFAULT_PPS, trail
 end
 
 function init_plot_eight_circle(vbp; project_eight=false)
-    l = vbp.l
-    R = l * (1 + vbp.r)  # Altitude of the eight center: arm + physical line (vbp.r is normalized by l), in meters
+    a = vbp.a
+    R = a * (1 + vbp.l)  # Altitude of the eight center: arm + physical line (vbp.l is normalized by a), in meters
 
     # Circle (top view of the arm)
     α = range(-π, π, length=100)
-    x, y = l .* invert(sincos.(α))
+    x, y = a .* invert(sincos.(α))
     plot(y, x; aspect_ratio=:equal, color=:black, grid=false, axis=false, label="")
 
     if project_eight
@@ -154,22 +154,22 @@ function init_plot_eight_circle(vbp; project_eight=false)
         τ = range(-π, π, length=100)
         K = R .* PM4.compute_τhat.(τ, Ref(vbp))  # Uses the true θ0, Δθ, φ0, Δφ of the model
         plot!(getindex.(K, 2), getindex.(K, 1); color=:black, label="")
-        geom = (; l, R, vbp, project_eight)
+        geom = (; a, R, vbp, project_eight)
     else
         # Developed ("fake") eight: center at distance R, half-widths = arc lengths R·Δφ, R·Δθ
-        plot_vbp = build_para(l=l, θ0=R, Δθ=R * vbp.Δθ, φ0=0, Δφ=R * vbp.Δφ)
+        plot_vbp = build_para(a=a, θ0=R, Δθ=R * vbp.Δθ, φ0=0, Δφ=R * vbp.Δφ)
         τ = range(-π, π, length=100)
         θ, φ = invert(PM4.τ_to_θφ.(τ, Ref(plot_vbp)))
         plot!(φ, θ; color=:black, label="")
 
-        offset = l / 4
+        offset = a / 4
 
         # order: y, x, φ, θ
-        x_axes = [-l, -l - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset]
-        y_axes = [-l - offset, -l, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ]
+        x_axes = [-a, -a - offset, plot_vbp.φ0 - plot_vbp.Δφ, plot_vbp.φ0 - plot_vbp.Δφ - offset]
+        y_axes = [-a - offset, -a, plot_vbp.θ0 - plot_vbp.Δθ - offset, plot_vbp.θ0 - plot_vbp.Δθ]
 
-        u_axes = [2l, 0, 2l, 0]
-        v_axes = [0, 2l, 0, 2l]
+        u_axes = [2a, 0, 2a, 0]
+        v_axes = [0, 2a, 0, 2a]
         xy_axes = hcat(x_axes, y_axes)
         uv_axes = hcat(u_axes, v_axes)
         quiver!(eachcol(xy_axes)..., quiver=Tuple(eachcol(uv_axes)), c=:black)
@@ -178,9 +178,9 @@ function init_plot_eight_circle(vbp; project_eight=false)
         y_lbl = @. y_axes + v_axes / 2 - u_axes / 4
         labels = text.(["y", "x", L"\phi", L"\theta"], :black, :center, 10)
         annotate!(x_lbl, y_lbl, labels)
-        plot!([-1, -2l], alpha=0, label="")  # Else "y" is not shown
+        plot!([-1, -2a], alpha=0, label="")  # Else "y" is not shown
 
-        geom = (; l, R, vbp, plot_vbp, project_eight)
+        geom = (; a, R, vbp, plot_vbp, project_eight)
     end
 
     return (plot!(), geom)
@@ -188,7 +188,7 @@ end
 
 function add_point_plot_eight_circle!(q, geom, plot_args...; marker_kwargs=(;), plot_kwargs...)
     α, τ = q
-    arm = geom.l .* PM4.compute_αhat(α)
+    arm = geom.a .* PM4.compute_αhat(α)
     if geom.project_eight
         K = geom.R .* PM4.compute_τhat(τ, geom.vbp)
         tip = (K[2], K[1])  # (y, x) like the circle

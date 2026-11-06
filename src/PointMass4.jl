@@ -77,7 +77,7 @@ function compute_Rτ(q, p)
     dot_prod = compute_αhat(α) ⋅ compute_τhat(τ, p)
     # ε = 1e-5
     # my_sqrt(x) = sqrt(sqrt(x^2 + ε^2))
-    return SA[L*(dot_prod+nm.sqrt(p.r^2-(1-dot_prod^2))), q[2]]
+    return SA[L*(dot_prod+nm.sqrt(p.l^2-(1-dot_prod^2))), q[2]]
 end
 
 @doc raw"""
@@ -117,10 +117,10 @@ function dynamics(u, p, t=0)
     rhat = normalize(OK - OA)
 
     # Compute gravity force
-    Fgrav = SA[0, 0, -p.g-p.m_l*p.r] * M * L * T^-2
+    Fgrav = SA[0, 0, -p.g-p.m_l*p.l] * M * L * T^-2
 
     # Compute aerodynamical force
-    wind = SA[abs(OK[3]/(p.h_ref*L))^(1/p.n_wind), 0, 0] * L * T^-1
+    wind = SA[abs(OK[3]/(p.z0*L))^(1/p.n_wind), 0, 0] * L * T^-1
     kite_speed = D_OK * dRτ
     app_wind = wind - kite_speed  # apparent wind, We
 
@@ -134,7 +134,7 @@ function dynamics(u, p, t=0)
 
     lift_k = norm(app_wind)^2 * (p.c_L * M * L^-1)
     drag_k = lift_k / p.f
-    drag_l = (p.c_D_l * M * L^-2) * (p.r * L) * norm(app_wind_perp_to_lines)^2
+    drag_l = (p.c_D_l * M * L^-2) * (p.l * L) * norm(app_wind_perp_to_lines)^2
     Faero_on_kite = -drag_k * xw - lift_k * zw
     Faero_on_lines = drag_l * ew
     Faero = Faero_on_kite + Faero_on_lines
@@ -142,7 +142,7 @@ function dynamics(u, p, t=0)
     # torque_function takes a dimensionless dα
     torque = torque_function(dα * T, p) * M * L^2 * T^-2
     l_tension = rhat ⋅ (SA[0, 0, 1] × OA) + 1e-100  # Avoid division by zero for q = (0, 0)
-    A_tension = -(p.I_eq * M * L^2) / l_tension * rhat * SA[1, 0]'
+    A_tension = -(p.I * M * L^2) / l_tension * rhat * SA[1, 0]'
     b_tension = -torque / l_tension * rhat
 
     D_OK_D_Rτ = D_OK * D_Rτ
@@ -168,12 +168,12 @@ function compute_line_tension(u, p; du=PM4.dynamics(u, p, 0))
     dα = u[3]
     ddα = du[3]
     αhat = PM4.compute_αhat(α)
-    OA = p.l * αhat
+    OA = p.a * αhat
     OK = PM4.compute_OK(PM4.compute_Rτ(u, p), p)
     rhat = normalize(OK - OA)
     torque = torque_function(dα * T, p) * M * L^2 * T^-2
     l_tension = rhat ⋅ (SA[0, 0, 1] × OA) + 1e-100
-    A_tension = -p.I_eq * M * L^2 / l_tension * rhat * SA[1, 0]'
+    A_tension = -p.I * M * L^2 / l_tension * rhat * SA[1, 0]'
     b_tension = -torque / l_tension * rhat
     F_tension = A_tension[:, 1] * ddα + b_tension
     return -F_tension ⋅ rhat
@@ -184,7 +184,7 @@ Cartesian acceleration ``\ddot{x}`` of the kite, with ``x = OK(τ, α)``.
 
 `u = (α, τ, dα, dτ, W)` is a state and `p` a `VBPara`. The angular
 accelerations come from `dynamics(u, p, 0)`. Positions from `compute_OK` are in
-metres and time is in seconds — `build_vbpara` keeps `l`, `m` and `v_ref`
+metres and time is in seconds — `build_vbpara` keeps `a`, `m` and `w0`
 physical — so the result is in m s⁻².
 """
 function kite_acceleration(u, p)
