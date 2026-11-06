@@ -25,7 +25,7 @@ using KEEP: TAU0
 begin
     const vbp0 = build_vbpara()
     const nt_vbp0 = (; zip(keys(vbp0), vbp0)...)
-    const syms = (:r, :I_eq, :torque_slope)
+    const syms = (:l, :I, :b)
 
     function f(x, p, t=0)
         x_dyn = vcat(x, 0)

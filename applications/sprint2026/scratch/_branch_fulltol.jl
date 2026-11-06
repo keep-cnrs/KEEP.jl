@@ -7,7 +7,7 @@ using Serialization, Printf
 include(joinpath(@__DIR__, "..", "BK_tests_0910.jl"))
 
 const OPT = (
-    params_opt=(r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744),
+    params_opt=(l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744),
     shooting=[-1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815],
 )
 const MS = isempty(ARGS) ? [40, 80] : parse.(Int, ARGS)
@@ -17,7 +17,7 @@ function branch_fulltol(M, setup)
     method = BVP.Shooting(M, ODE_ALG, true)
     bvp = make_bvp(make_model(method, setup), method)
     x0 = shooting_warm_start(bvp, method, setup)
-    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.v_ref);
+    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.w0);
         jacobian=make_jac(method), record_from_solution=record_period, plot_solution=plot_solution)
     t0 = time()
     x0, res_pre = damped_newton(prob, x0, setup.nt_p0; make_presolve(method)...)

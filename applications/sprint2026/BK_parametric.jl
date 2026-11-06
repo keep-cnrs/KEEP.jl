@@ -18,7 +18,7 @@ using KEEP.LimitCycle: shoot as lc_shoot
 const vbp0 = build_vbpara()
 const p0 = build_para(vbp0)
 const nt_p0 = (; zip(keys(p0), p0)...)
-const syms = (:r, :I_eq, :torque_slope)
+const syms = (:l, :I, :b)
 
 factor = 5
 lb = p0[syms] ./ factor
@@ -66,7 +66,7 @@ params = nt_p0
 # we could also do x0 = BK.BVP.generate_solution(bvp, my_guess_function)
 x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization))
 
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.w0);
     jacobian=BifurcationKit.DenseAnalytical(),
     # record_from_solution,
     # plot_solution_col
@@ -107,7 +107,7 @@ plot(br)
 
 ## Multiple shooting
 function plot_solution_ms(x, p; kwargs...)
-    sol = BifurcationKit._get_shooting_solution(bvp.cache, reshape(x, 5, disc.M), 1, @set params.v_ref = p)
+    sol = BifurcationKit._get_shooting_solution(bvp.cache, reshape(x, 5, disc.M), 1, @set params.w0 = p)
 
     plot!(sol.t, sol.u[4, :]; ylabel="u(t)", title="Bratu Solution (p₁=)", kwargs...)
 end
@@ -123,7 +123,7 @@ bvp = BifurcationKit.BVP.discretize(model, disc_ms; abstol=1e-12, reltol=1e-10)
 
 x0 = BifurcationKit.BVP.generate_solution(bvp, s -> vcat(x_optimization(tf_optimization * s), tf_optimization))
 
-prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BifurcationKit.BVP.BVPBifProblem(bvp, x0, params, (@optic _.w0);
 )
 
 optn = NewtonPar(tol=1e-10, verbose=true)

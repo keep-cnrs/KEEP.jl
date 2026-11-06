@@ -1,7 +1,7 @@
 # Wind scaling and periodic-orbit continuation of the point-mass kite
 
 Result of the ECC2026 parametric study (`applications/sprint2026`, optimized
-kite of `BK_parametric.jl`; reference wind `v_ref = 9 m/s`). The objective of
+kite of `BK_parametric.jl`; reference wind `w0 = 9 m/s`). The objective of
 `6_fixed_parametrized_optimization.jl` is to probe the system across wind
 speeds with every other physical parameter held fixed: the cycles at different
 winds are therefore expected *not* to be self-similar — that is the intended
@@ -18,9 +18,9 @@ forces `λ = k²`, i.e. a full Froude rescaling of the hardware,
 
 | quantity | law | | quantity | law |
 |---|---|---|---|---|
-| `l, r, h_ref` | ∝ k² | | `I_eq` | ∝ k⁴ |
+| `a, l, z0` | ∝ k² | | `I` | ∝ k⁴ |
 | `Cmax` | ∝ k² | | `Ω`, `d_l`, `S` | ∝ k⁻¹, k⁻², k⁻⁴ |
-| `torque_slope` | ∝ k³ | | `ρ_l` | ∝ k⁶ |
+| `b` | ∝ k³ | | `ρ_l` | ∝ k⁶ |
 
 with `m` fixed. On the family of periodic orbits this implies **period ∝ k,
 mean power ∝ k, line tension invariant** (physical gauge), verified to ~1e-8
@@ -33,20 +33,20 @@ mass, `Cmax`, pump rate and torque slope (each ∝ 1/k² or 1/k) all shift with
 the wind, so different winds are genuinely different normalized problems and
 the cycles should *not* overlay — non-self-similarity is the expected,
 correct outcome. The fixed physical-time BVP (`BK_parametric_fixed.jl`)
-implements exactly that: `v_ref` changes only the wind profile. The figure
+implements exactly that: `w0` changes only the wind profile. The figure
 contrasts the two admissible situations at k = 2: the exact `rescale_wind`
 fiber overlays the reference orbit (α(τ) to 2.6e-7; period, power and tension
-ratios = 1 to ~1e-8), certifying the pipeline, while the old `v_ref` sweep
+ratios = 1 to ~1e-8), certifying the pipeline, while the old `w0` sweep
 leaves the fiber — as any wind-only change must. What disqualified the old
 script was not its objective but its implementation: the RHS evaluated the
-dynamics through `build_vbpara`, which renormalizes with `T(v_ref)`, so
-continuing in `v_ref` rescaled the state units *in addition* to the wind — the
+dynamics through `build_vbpara`, which renormalizes with `T(w0)`, so
+continuing in `w0` rescaled the state units *in addition* to the wind — the
 sweep implemented neither the wind-only physics nor the fiber.
 
 ![VB rescaling](fig_vb_rescale.png)
 
 *Top: normalized phase portrait at k = 2 — the exact `rescale_wind` fiber
-overlays the reference; the old `v_ref`-only sweep does not, as any wind-only
+overlays the reference; the old `w0`-only sweep does not, as any wind-only
 change should. Bottom: similarity-law ratios — gray = exact fiber (laws hold),
 colored = old sweep, correctly off the fiber (its actual flaw is the unit
 leak described above).*
@@ -61,7 +61,7 @@ optimized cycle continues as the family below (`tf` = physical period):
 * **Main branch** (top panel): `tf` falls monotonically from 0.628 s at 9 m/s to
   ≈ 0.12 s at 20 m/s. Collocation, multiple shooting and the bothside runs all
   coincide on it.
-* **Fold tangle at v_ref ≈ 9.2–9.8 m/s** (shaded): several periodic-orbit
+* **Fold tangle at w0 ≈ 9.2–9.8 m/s** (shaded): several periodic-orbit
   branches crowd together (detected folds at 9.24, 9.30, 9.46, 9.54, 9.84 m/s).
   Near it, Newton's corrector can land on a different branch than the predictor —
   the red ✕ markers flag recorded steps with |Δp| > 1.5·dsmax, impossible for a
@@ -69,7 +69,7 @@ optimized cycle continues as the family below (`tf` = physical period):
 * **Low-wind fold** (bottom): the period grows steeply as the wind decreases
   (1/(1/k) law-ish), but it does **not** diverge: the family folds at
   `v* ≈ 2.4586 m/s` where `tf ≈ 49 s` and the branch turns back toward higher
-  wind. Both legs overlap in the (v_ref, tf) projection.
+  wind. Both legs overlap in the (w0, tf) projection.
 
 ## 3. Collocation and multiple shooting agree
 
@@ -98,8 +98,8 @@ smaller") had two independent, non-physical causes, both fixed in
 ## 4. Practical recipe (what the fixed script does)
 
 1. **Physical-time BVP**: state `(α, τ, α̇, τ̇, tf)` in rad, rad/s, s; the
-   characteristic time `T = l/v_ref` is used only to convert to the internally
-   normalized dynamics, so `v_ref` changes *only* the wind magnitude.
+   characteristic time `T = a/w0` is used only to convert to the internally
+   normalized dynamics, so `w0` changes *only* the wind magnitude.
 2. **Deterministic multiple shooting** despite the BifurcationKit 0.8.2
    residual bug (`out[end]` uninitialized): override `bvp_residual` to pin the
    auxiliary unknown (`out[end] = X[end]`, Jacobian row `J[end,end] = 1`).
@@ -137,11 +137,11 @@ distinct discoveries, each forced by an observed symptom:
 1. **The original sweep's implementation was not physical.** Its objective —
    vary the wind with every other physical parameter fixed, yielding
    intentionally non-self-similar cycles — was sound, but the RHS evaluated
-   the dynamics through `build_vbpara`, which renormalizes with `T(v_ref)`: the
+   the dynamics through `build_vbpara`, which renormalizes with `T(w0)`: the
    continuation acted in Vaschy–Buckingham space, silently changing normalized
    gravity, inertia and torque *in addition* to the wind. The fix keeps the
    objective and changes the implementation: a state written in *physical*
-   units so that `v_ref` shifts only the wind profile, with the VB fiber
+   units so that `w0` shifts only the wind profile, with the VB fiber
    (gravity forcing `λ = k²`) kept in the ECC test file as the §1 verification
    control.
 
@@ -154,13 +154,13 @@ distinct discoveries, each forced by an observed symptom:
    "MS values are much smaller" was `norm(x)` collocation vs a *different*
    default for the ODEProblem-wrapped shooting, not dynamics.
 
-3. **"Both branches go right from v_ref = 9" was a plotting artifact.**
+3. **"Both branches go right from w0 = 9" was a plotting artifact.**
    `bothside=true` merges its two legs as `[reverse(backward) ++ forward]`
    (`Results.jl:464`), so the *backward* leg appears first, reversed, starting
    at its endpoint — indistinguishable from a second family going right.
    Single-direction runs behave perfectly; the merged result does not.
 
-4. **Sheet jumps near v_ref ≈ 9.2–9.8.** Recorded steps with |Δp| > dsmax
+4. **Sheet jumps near w0 ≈ 9.2–9.8.** Recorded steps with |Δp| > dsmax
    (impossible for PALC) revealed Newton corrections landing on adjacent branches
    in the fold tangle, then riding the wrong branch to the budget. Fresh-mesh
    runs jump; runs with mesh history reached the low-wind branch — the tangle
@@ -168,12 +168,12 @@ distinct discoveries, each forced by an observed symptom:
    `sheet_jumps()` check and replacing `bothside=true` with two explicit runs.
 
 5. **The "low-wind divergence" is a fold.** Wide-budget runs stalled at
-   v_ref = 2.4585 with huge tf — read as divergence — but the 200-step multiple
+   w0 = 2.4585 with huge tf — read as divergence — but the 200-step multiple
    shooting run passed v* = 2.4586, peaked at tf ≈ 49 s and turned back:
    a fold, not an endpoint. Faster integration (Tsit5 at 1e-10) made this
    affordable at all.
 
-Methodological choices that stuck: fast typed parameter struct + `v_ref`-keyed
+Methodological choices that stuck: fast typed parameter struct + `w0`-keyed
 cache (84% of residual cost), container-matched RHS (`SVector`/`Vector`),
 damped-Armijo pre-solve Newton with step capping, warm-starting MS from the
 converged collocation orbit, and doing all diagnostics on *one* persistent
@@ -217,14 +217,14 @@ From `scratch/brS_shoot.jls` (`i0 = argmin p`, `p_f = 2.458474`, `tf_f = 14.296`
 - Tightest window (long-branch, tf∈[14,15], 5 pts): fold law `p = p_f + γ(tf−tf_f)²`
   gives RMS **4.6e-7 m/s**; the homoclinic log-law **9.6e-5** (200× worse).
 
-So "no prograde cycles below `v_ref*`" is correct **for this branch**.
+So "no prograde cycles below `w0*`" is correct **for this branch**.
 
 **Second fold.** The long-period side does not run away monotonically: on the
 full-tol branches the branch turns a *second* time, at a `p` **maximum**
 (`i2 = argmax p[1:i0]`). Identical at M=40 and M=80, so it is genuine, not a
 discretization artifact:
 
-| fold | `tf` (s) | `v_ref` | type (Floquet) |
+| fold | `tf` (s) | `w0` | type (Floquet) |
 |---|---|---|---|
 | 1 | 14.44 | 2.45848 | `p` min — stable + saddle merge |
 | 2 | 67.67 | 2.48168 | `p` max — saddle + saddle merge |
@@ -234,12 +234,12 @@ through `+1`, quadratic tangency above). What differs is the *global* stability 
 the merging pair: at fold 1 the stable short cycle meets the unstable long cycle,
 while at fold 2 the long and long-long branches — **both unstable** — merge, so the
 second fold annihilates two saddles and leaves only the stable short cycle for
-`v_ref > 2.48168`. Counts in §3.5.
+`w0 > 2.48168`. Counts in §3.5.
 
 The branch is therefore an **S-curve**: short-branch (tf 0.07→14.44), long branch
 (14.44→67.67, `p` rising), and a **long-long branch** (67.67→111+, `p` falling,
 still budget-truncated at `tf≈111.4`). A horizontal cut meets the *computed*
-branch **three times** for `v_ref ∈ (2.4785, 2.48168)` — i.e. three coexisting
+branch **three times** for `w0 ∈ (2.4785, 2.48168)` — i.e. three coexisting
 prograde periods; below that the third (long-long) crossing lies beyond the
 budget truncation (see §3.3, §3.5).
 
@@ -251,11 +251,11 @@ The BVP boundary condition (line 167 of `BK_tests_0910.jl`) enforces
 **not** a BVP solution, so it is out of scope by construction.
 `KEEP.LimitCycle.all_limit_cycles` (`scratch/_bvp_cycles_poincare_tmp.jl`,
 `N=40`, `vmax=12`, `α∈[−π,π]`, filtered to `build_shooting(lc)[3] > 0`)
-**returns NORMALIZED units** (L=2 m, M=6 kg, time `T0 = l/v_ref = 2.0/v_ref` s,
+**returns NORMALIZED units** (L=2 m, M=6 kg, time `T0 = a/w0 = 2.0/w0` s,
 velocities physical×`T0`). Converting to the branch's PHYSICAL/SI convention,
 `tf_SI = T·T0`, `dα_SI = dα0/T0`, `dτ_SI = dτ0/T0`:
 
-| `v_ref` | cycles | `T` (norm.) | `tf = T·T0` (SI) | branch short `tf` (SI) | `α0` | `dα0`(SI) | `dτ0`(SI) | power (W) |
+| `w0` | cycles | `T` (norm.) | `tf = T·T0` (SI) | branch short `tf` (SI) | `α0` | `dα0`(SI) | `dτ0`(SI) | power (W) |
 |---|---|---|---|---|---|---|---|---|
 | 2.42 | **0** | — | — | (below fold) | — | — | — | — |
 | 2.45 | **0** | — | — | (below fold) | — | — | — | — |
@@ -275,7 +275,7 @@ velocities physical×`T0`). Converting to the branch's PHYSICAL/SI convention,
 Data: `scratch/bvp_cycles_poincare.jls`; branch column from
 `scratch/brS_shoot_M40_fulltol.jls`. Consequences:
 
-- **The sampler finds the blue short branch, exactly.** At `v_ref = 2.47` the
+- **The sampler finds the blue short branch, exactly.** At `w0 = 2.47` the
   converted sampler cycle `(α0,dα0,dτ0,tf) = (−0.225, +0.044, +0.671, 11.366)`
   equals the branch's `(−0.22521, +0.04439, +0.67054, 11.36577)`; seeding the
   *normalized* Poincaré flow from the branch state returns the sampler's cycle
@@ -284,14 +284,14 @@ Data: `scratch/bvp_cycles_poincare.jls`; branch column from
   with ≥3 coexisting prograde cycles. There is no separate family — that was a
   unit mismatch. `presentation_figs.jl` no longer overlays it.
 - **No prograde cycle below the fold**: the sampler finds none at
-  `v_ref = 2.42, 2.45, 2.4585`, exactly as the fold requires.
+  `w0 = 2.42, 2.45, 2.4585`, exactly as the fold requires.
 - **The sampler is attractor-only.** Its callback terminates when successive
   section crossings agree, so it only sees *attracting* cycles. It therefore
   finds the stable short branch and **misses** the long / long-long saddle
   branches. Enumerating those needs deflation (§3.4).
-- **Three periods coexist** for `v_ref ∈ (2.4785, 2.48168)` (the computed part of
+- **Three periods coexist** for `w0 ∈ (2.4785, 2.48168)` (the computed part of
   the two folds of §3.2; below `2.4785` the long-long crossing is budget-truncated).
-  A cut at `v_ref = 2.480` meets the S-curve three times — short `10.83 s`, long
+  A cut at `w0 = 2.480` meets the S-curve three times — short `10.83 s`, long
   `49.22 s`, long-long `96.35 s` (§3.5).
 - A retrograde attractor also exists below the fold (`T ≈ 8.5 s`; diagnostic
   `scratch/attractor_family.jls`, probe `scratch/_attractor_probe_tmp.jl`). It is
@@ -304,13 +304,13 @@ Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, pena
 `‖u−u_i‖^{-2p}+α`) is what reaches them. `scratch/_deflate_cycles.jl`
 (M=20, physical/SI BVP) at the two anchors:
 
-| `v_ref` | # cycles | `tf` (s) | `α0` (rad) | max non-trivial \|μ\| | power (W) | cycle res |
+| `w0` | # cycles | `tf` (s) | `α0` (rad) | max non-trivial \|μ\| | power (W) | cycle res |
 |---|---|---|---|---|---|---|
 | 2.47 | 2 | 11.3658 | −0.22521 | 2.94e−01 | 47.3 | 1.6e−16 |
 | 2.47 | | 28.8205 | −0.19298 | 3.47e+16 | 24.4 | 1.9e−12 |
 | 9.00 | 1 | 0.6281 | −0.77710 | 2.80e−03 | 8736.6 | 1.8e−15 |
 
-- **Deflation demonstration (v_ref = 2.47):** with the *short* cycle deflated, a
+- **Deflation demonstration (w0 = 2.47):** with the *short* cycle deflated, a
   deflated Newton started from the long state converges back to the **long
   saddle** (`tf = 28.8205 s`) — i.e. deflation does reach the non-attracting
   branch, which the sampler cannot. The archived short/long periods are
@@ -321,17 +321,17 @@ Deflation (Farrell–Birkisson–Funke, `BifurcationKit.DeflationOperator`, pena
   integrator crawl and `with_timeout` cannot interrupt it, so the search was
   abandoned. A complete enumeration must be seeded from continuation-derived
   states (see §3.7).
-- **Reference wind `v_ref = 9`** (the optimization wind, `build_vbpara()` default)
+- **Reference wind `w0 = 9`** (the optimization wind, `build_vbpara()` default)
   has exactly **one** prograde BVP cycle — the operating cycle. So a deflated
   Newton there returns nothing new to seed an optimization with.
 
 ### 3.5 Three coexisting periods at the second fold
 
-Within `v_ref ∈ (2.4785, 2.48168)` the S-curve is cut three times (below
+Within `w0 ∈ (2.4785, 2.48168)` the S-curve is cut three times (below
 `2.4785` the long-long crossing is past the budget). Crossings
-from the M=40 full-tol branch (`tf` interpolated at fixed `v_ref`):
+from the M=40 full-tol branch (`tf` interpolated at fixed `w0`):
 
-| `v_ref` | cycle 1 (short) | cycle 2 (long) | cycle 3 (long-long) |
+| `w0` | cycle 1 (short) | cycle 2 (long) | cycle 3 (long-long) |
 |---|---|---|---|
 | 2.470 | 11.376 | 28.821 | — (not reached in budget) |
 | 2.478 | 10.919 | 42.442 | — |
@@ -342,7 +342,7 @@ from the M=40 full-tol branch (`tf` interpolated at fixed `v_ref`):
 The three merge at the second fold (`tf = 67.67 s`) and cycle 1's value
 `10.833 s` matches the independent deflation/sampler result `10.8232 s`. The
 long-long branch is **budget-truncated** at `tf ≈ 111.4 s` (it is still
-descending in `v_ref`), not closed by a fold, so a third fold or a homoclinic
+descending in `w0`), not closed by a fold, so a third fold or a homoclinic
 terminus beyond `tf = 111` is unresolved.
 
 **Floquet stability of the three cycles** (`scratch/_floquet_index.jl`): the
@@ -368,18 +368,18 @@ lower bound (≥1).
 ### 3.6 Two-cycle extraction at M=40 (and a silent non-convergence, fixed)
 
 `scratch/_regen_two_cycles_tmp.jl` (`MSTAR=40`, Newton tol `1e-10`) re-extracts
-the `v_ref = 2.47` pair at 40 arcs. First attempt gave short `tf = 11.36577 s`
+the `w0 = 2.47` pair at 40 arcs. First attempt gave short `tf = 11.36577 s`
 (reproduces the archive) but long `tf = 17.15 s`, not the archived `28.82 s`.
 The `17.15` orbit did **not** close — cycle residual `2.1e-3`
 (`|α(tf)−α(0)|` etc.) — i.e. the fixed-parameter Newton from a near-fold
 candidate failed to converge and the script reported it anyway. Diagnosis: at
-`v_ref = 2.47` the long branch crosses once, at `tf ≈ 29 s` (from the M=40
+`w0 = 2.47` the long branch crosses once, at `tf ≈ 29 s` (from the M=40
 full-tol branch: `p = 2.47014` at `tf = 28.998`), but `longs[1]` picked the
 smallest candidate above `1.3·tf_short` — a near-fold point whose refine did not
 close. The archive's `28.82 s` orbit closes to `5.7e-15`, so it was right and the
 M=40 run was a tolerance/candidate-selection failure, not a different solution.
 
-Fix: `_regen` now tries candidates ordered by proximity to `v_ref` and accepts
+Fix: `_regen` now tries candidates ordered by proximity to `w0` and accepts
 only an orbit that closes (cycle residual < `1e-7`). Rerun at M=40:
 
 | cycle | tf (s) | max non-trivial \|μ\| |
@@ -395,7 +395,7 @@ figures keep using `two_cycles_shooting.jls` (identical values).
 ### 3.7 What's next
 
 - **Optimization seeding.** The optimization is warm-started from a single
-  operating orbit. If a deflated Newton at the reference wind (`v_ref = 9`)
+  operating orbit. If a deflated Newton at the reference wind (`w0 = 9`)
   returned a *distinct, stable, higher-power* cycle, it could seed a second
   `optimize()` run to test for a better operating point. At present deflation
   finds only the known operating cycle there, so there is nothing to seed with —
@@ -408,6 +408,6 @@ figures keep using `two_cycles_shooting.jls` (identical values).
   bounded per attempt (a cooperative cancellation hook, or a per-attempt thread
   kill).
 - **Third fold / homoclinic.** The long-long branch is budget-truncated at
-  `tf ≈ 111 s` and still descending in `v_ref`; a longer continuation would show
+  `tf ≈ 111 s` and still descending in `w0`; a longer continuation would show
   whether it folds a third time (a fourth coexisting period) or runs to a
   homoclinic terminus.

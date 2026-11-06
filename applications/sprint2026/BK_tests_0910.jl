@@ -10,7 +10,7 @@
 #    (NamedTuple) vs 0.61 μs (ComponentArray) vs 0.46 μs (typed struct), zero
 #    allocations; cache-miss construction ~5 μs, dominated by `build_vbpara`.
 # 3. `T0` is derived from the OPTIMIZED parameter set (`lmt(vbp)[3]`) —
-#    numerically identical (`l, v_ref ∉ SYMS`) but robust to `SYMS` changes.
+#    numerically identical (`a, w0 ∉ SYMS`) but robust to `SYMS` changes.
 #    Unit convention: `TF` (normalized) × `T0` = physical period at the
 #    reference wind; the period recorded along branches (5th state component)
 #    is physical seconds.
@@ -47,7 +47,7 @@ const BVP = BifurcationKit.BVP
 ## ===================================================================== ##
 ## Setup (method-independent): optimization + sampled orbit              ##
 ## ===================================================================== ##
-const SYMS = (:r, :I_eq, :torque_slope)
+const SYMS = (:l, :I, :b)
 
 "Sample the optimized cycle at physical time `t`: (α, τ, dα, dτ) in rad, rad/s."
 function x_optimization_phys(solution_sim, T0, t)
@@ -83,7 +83,7 @@ function make_setup(; factor=5, opt=nothing)
     vbp = build_vbpara(CA(p0; params_opt...))
     solution_sim = lc_shoot(shooting, vbp, save_everystep=true)
     tf = solution_sim.t[end]     # NORMALIZED period [units of T0]
-    T0 = lmt(vbp)[3]             # characteristic time (s) = l/v_ref (SI s per normalized unit)
+    T0 = lmt(vbp)[3]             # characteristic time (s) = a/w0 (SI s per normalized unit)
     tf_physical = tf * T0        # PHYSICAL period (s) at the reference wind
 
     nt_p0 = NamedTuple(p0)::PARA_NT
@@ -105,12 +105,12 @@ end
 ## BVP model — physical time                                             ##
 ## ===================================================================== ##
 # UNITS. Two conventions meet here:
-#  - NORMALIZED (L=2 m, M=6 kg, time T0 = l/v_ref s): PM4.dynamics, the
+#  - NORMALIZED (L=2 m, M=6 kg, time T0 = a/w0 s): PM4.dynamics, the
 #    optimization, and KEEP.LimitCycle (Poincaré) all live here. Their times
 #    are `t_norm`, their velocities physical×T0.
 #  - PHYSICAL/SI: the BVP unknown below. dα, dτ in rad/s, ddα, ddτ in rad/s²,
 #    `tf` in seconds. Bridge: t_SI = t_norm * T0, dα_SI = dα_norm / T0, with
-#    T0 = lmt(p)[3] = l/v_ref.
+#    T0 = lmt(p)[3] = a/w0.
 #
 # State u = (α, τ, dα, dτ, tf) [α,τ in rad; dα,dτ in rad/s; tf in s],
 # integration variable s ∈ [0, 1] spans one period:
@@ -119,7 +119,7 @@ end
 # Kept only for validation of `F_fast`.
 function F_reference(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref  # characteristic time of the CURRENT parameters
+    T = params.a / params.w0  # characteristic time of the CURRENT parameters
     u_dyn = SA[α, τ, T*dα, T*dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, build_vbpara(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
@@ -132,8 +132,8 @@ end
 # Flat NamedTuple instead of the former FastPara struct: `dynamics` reads its
 # parameters only by getproperty, so the ComponentArray machinery drops out
 # (see header for the measured comparison). ponytail: single-entry cache keyed
-# on v_ref — continuation evaluates many RHS at one parameter value, so we
-# rebuild only when v_ref actually changes.
+# on w0 — continuation evaluates many RHS at one parameter value, so we
+# rebuild only when w0 actually changes.
 #
 # Concrete param types: `build_para`/`build_vbpara` declare an `Any` return
 # (`const Para = VBPara = Any` in KEEP.PointMassPara), so without these
@@ -145,19 +145,19 @@ const NTPARA = typeof(NamedTuple(build_vbpara()))
 const PARAM_CACHE = Ref{Union{Nothing,Tuple{Float64,NTPARA}}}(nothing)
 
 @inline function get_fast_para(params)
-    vref = params.v_ref
+    w0 = params.w0
     c = PARAM_CACHE[]
-    if c !== nothing && c[1] == vref
+    if c !== nothing && c[1] == w0
         return c[2]
     end
     p = NamedTuple(build_vbpara(params))::NTPARA
-    PARAM_CACHE[] = (vref, p)
+    PARAM_CACHE[] = (w0, p)
     return p
 end
 
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref
+    T = params.a / params.w0
     u_dyn = SA[α, τ, T*dα, T*dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, get_fast_para(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
@@ -432,7 +432,7 @@ function collocation_cycle(setup)
     bvp_c = make_bvp(make_model(disc_c, setup), disc_c)
     x0_c = BVP.generate_solution(bvp_c,
         t -> vcat(x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t), setup.tf_physical))
-    prob_c = BVP.BVPBifProblem(bvp_c, x0_c, setup.nt_p0, (@optic _.v_ref);
+    prob_c = BVP.BVPBifProblem(bvp_c, x0_c, setup.nt_p0, (@optic _.w0);
         jacobian=make_jac(disc_c), record_from_solution=record_period)
     x0_c, res_c = damped_newton(prob_c, x0_c, setup.nt_p0; make_presolve(disc_c)...)
     prob_c = BifurcationKit.re_make(prob_c; u0=x0_c)
@@ -470,7 +470,7 @@ end
 # by REAL PART. The recorded set is a mix of spurious and physical modes and
 # the `1+λ` / `Re` counting in the bvp module does not yield Floquet
 # multipliers. (A first pass reading `br.eig` produced a bogus
-# "Neimark–Sacker at v_ref ≈ 7" story; the ground truth below contradicts it.)
+# "Neimark–Sacker at w0 ≈ 7" story; the ground truth below contradicts it.)
 #
 # The genuine multipliers come from the period map: integrate the cycle over
 # s ∈ [0,1] and differentiate the endpoint w.r.t. the initial (α, τ, dα, dτ)
@@ -479,7 +479,7 @@ end
 
 "4 mechanical dofs in physical time (velocities are physical rad/s)."
 function phys_rhs4(v, p)
-    T = p.l / p.v_ref
+    T = p.a / p.w0
     α, τ, dα, dτ = v
     _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T*dα, T*dτ, 0.0], get_fast_para(p))
     return SA[dα, dτ, ddα/T^2, ddτ/T^2]
@@ -630,19 +630,19 @@ function lower_terminus(disc, br; verbose=true)
 end
 
 """
-Continue the cycle in v_ref by damped Newton (warm start, one solution per
-step) and return rows `(v_ref, tf, res, |mu|)` with `|mu|` sorted descending.
+Continue the cycle in w0 by damped Newton (warm start, one solution per
+step) and return rows `(w0, tf, res, |mu|)` with `|mu|` sorted descending.
 Runs until the corrector stops converging — the branch's numerical horizon.
 """
 function stability_sweep(disc, bvp, x0, vrefs, setup; tol=1e-9)
     x = x0
     rows = NamedTuple[]
     for vr in vrefs
-        p = merge(setup.nt_p0, (v_ref=vr,))
-        prb = BVP.BVPBifProblem(bvp, x, p, (@optic _.v_ref);
+        p = merge(setup.nt_p0, (w0=vr,))
+        prb = BVP.BVPBifProblem(bvp, x, p, (@optic _.w0);
             jacobian=make_jac(disc), record_from_solution=record_period, plot_solution=plot_solution)
         x, res = damped_newton(prb, x, p; tol=tol, max_iter=300)
-        push!(rows, (v_ref=vr, tf=raw_x(x)[5], res=res, mu=sort(abs.(floquet_true(disc, bvp, x, p)), rev=true)))
+        push!(rows, (w0=vr, tf=raw_x(x)[5], res=res, mu=sort(abs.(floquet_true(disc, bvp, x, p)), rev=true)))
     end
     return rows
 end
@@ -650,19 +650,19 @@ end
 "Landscape: branch geometry (top) and TRUE Floquet stability (bottom)."
 function landscape(disc, bvp, x0, br, setup, plt_land; make_plots=true)
     pc, tfc = br.branch.param, br.branch.tf
-    # True multipliers, warm-started Newton on both sides of v_ref = 9. Rows with
+    # True multipliers, warm-started Newton on both sides of w0 = 9. Rows with
     # res ≳ 1e-6 did not converge (past the branch's numerical horizon) → dropped.
     rows_down = stability_sweep(disc, bvp, x0, collect(9.0:-0.25:2.5), setup)
     rows_up = stability_sweep(disc, bvp, x0, collect(9.5:0.5:17.0), setup)
     good(rows) = [r.res < 1e-6 ? r.mu[2] : NaN for r in rows]   # mu sorted desc, [1] = trivial
 
     if make_plots
-        pa = plot(pc, tfc; label=string(nameof(typeof(disc))), xlabel="v_ref", ylabel="tf (s)",
+        pa = plot(pc, tfc; label=string(nameof(typeof(disc))), xlabel="w0", ylabel="tf (s)",
             title="limit-cycle branch (default params, optimization warm start)")
-        pb = plot([r.v_ref for r in rows_down], good(rows_down); label="from v_ref=9 ↓",
-            color=1, yscale=:log10, xlabel="v_ref", ylabel="max nontrivial |mu|",
+        pb = plot([r.w0 for r in rows_down], good(rows_down); label="from w0=9 ↓",
+            color=1, yscale=:log10, xlabel="w0", ylabel="max nontrivial |mu|",
             title="Floquet stability (ground truth)", ylims=(1e-4, 10))
-        plot!(pb, [r.v_ref for r in rows_up], good(rows_up); label="from v_ref=9 ↑", color=2)
+        plot!(pb, [r.w0 for r in rows_up], good(rows_up); label="from w0=9 ↑", color=2)
         hline!(pb, [1.0]; label="|mu| = 1 (stability boundary)", color=:gray, ls=:dash)
         plt_land = plot(pa, pb; layout=(2, 1), size=(650, 750))
         savefig(plt_land, joinpath(@__DIR__, "BK_tests_0910_landscape.png"))
@@ -675,24 +675,24 @@ Reveals arcs a single continuation cannot see. Reuses KEEP.LimitCycle."
 function coexist_cycles(setup; verbose=true)
     rows = []
     for vr in (9.0, 5.0, 3.0)
-        vbp = build_vbpara(merge(setup.nt_p0, (v_ref=vr,)))
+        vbp = build_vbpara(merge(setup.nt_p0, (w0=vr,)))
         for lc in KEEP.LimitCycle.all_limit_cycles(vbp; αmin=(-π), αmax=π, vmax=12, N=40)
             s = KEEP.LimitCycle.build_shooting(lc)
-            push!(rows, (v_ref=vr, α0=s[1], dα0=s[2], dτ0=s[3], T=s[4],
+            push!(rows, (w0=vr, α0=s[1], dα0=s[2], dτ0=s[3], T=s[4],
                 power=lc.u[end][5] / lc.t[end]))
         end
     end
     if verbose
-        println("coexisting cycles (v_ref, α0, dα0, dτ0, T, power):")
+        println("coexisting cycles (w0, α0, dα0, dτ0, T, power):")
         foreach(println, rows)
     end
     return rows
 end
 
 """
-Two cycles at ONE v_ref: the stable "short" cycle and the "long" saddle cycle
+Two cycles at ONE w0: the stable "short" cycle and the "long" saddle cycle
 past the fold. `br.sol` saves every continuation step (save_sol_every_step
-defaults to 1), so BOTH crossings of v_ref — descending on the short branch,
+defaults to 1), so BOTH crossings of w0 — descending on the short branch,
 ascending on the long branch — are already present, with no separate
 arclength driver. Requires having passed the fold: shooting does, collocation
 (this build) stalls just above it.
@@ -707,12 +707,12 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     # count as two cycles.
     cand = [(i, s.p, raw_x(s.x)[5]) for (i, s) in enumerate(br.sol) if abs(s.p - VRT) < 0.12]
     cand = [c for c in cand if isfinite(last(c))]
-    pv = merge(setup.nt_p0, (v_ref=VRT,))
-    refine(x) = (pr=BVP.BVPBifProblem(bvp, x, pv, (@optic _.v_ref);
+    pv = merge(setup.nt_p0, (w0=VRT,))
+    refine(x) = (pr=BVP.BVPBifProblem(bvp, x, pv, (@optic _.w0);
             jacobian=make_jac(disc), record_from_solution=record_period);
         damped_newton(pr, x, pv; tol=1e-9)[1])
     if isempty(cand)
-        verbose && println("two-cycles: no candidate near v_ref=", VRT, " (", discname, ")")
+        verbose && println("two-cycles: no candidate near w0=", VRT, " (", discname, ")")
         return nothing
     end
     sort!(cand, by=last)
@@ -720,7 +720,7 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     xlong = refine(raw_x(br.sol[cand[end][1]].x))
     tf1, tf2 = raw_x(xshort)[5], raw_x(xlong)[5]
     if max(tf1, tf2) / min(tf1, tf2) < 1.3
-        verbose && println("two-cycles: only ONE branch near v_ref=", VRT, " (", discname,
+        verbose && println("two-cycles: only ONE branch near w0=", VRT, " (", discname,
             " did not pass the fold): tf ≈ ",
             string(round(minimum((tf1, tf2)), digits=2)), " s")
         return nothing
@@ -734,20 +734,20 @@ function two_cycles(disc, bvp, br, setup; VRT=2.47, make_plots=true, verbose=tru
     mu1 = monodromy_max(u1, t1, tf1, pv)
     mu2 = monodromy_max(u2, t2, tf2, pv)
     if verbose
-        println("two-cycles at v_ref=", VRT, ": max non-trivial |mu| = ",
+        println("two-cycles at w0=", VRT, ": max non-trivial |mu| = ",
             round(mu1, sigdigits=3), " (short), ", round(mu2, sigdigits=3), " (long)")
     end
     if make_plots
         plt2 = plot(layout=(2, 1), size=(800, 620))
         plot!(plt2[1], t1 ./ t1[end] .* tf1, u1[1, :]; label="short tf=$(round(tf1, digits=2)) s")
         plot!(plt2[1], t2 ./ t2[end] .* tf2, u2[1, :]; label="long  tf=$(round(tf2, digits=2)) s", lw=2,
-            xlabel="t (s)", ylabel="α (rad)", title="$discname: two cycles at v_ref=$VRT")
+            xlabel="t (s)", ylabel="α (rad)", title="$discname: two cycles at w0=$VRT")
         plot!(plt2[2], u1[1, :], u1[4, :]; label="short")
         plot!(plt2[2], u2[1, :], u2[4, :]; label="long", lw=2,
             xlabel="α (rad)", ylabel="dτ (rad/s)", title="phase portrait")
         savefig(plt2, joinpath(@__DIR__, "BK_tests_0910_two_cycles.png"))
     end
-    verbose && println("two-cycles at v_ref=", VRT, ": tf = ", round(tf1, digits=2), " s (short), ",
+    verbose && println("two-cycles at w0=", VRT, ": tf = ", round(tf1, digits=2), " s (short), ",
         round(tf2, digits=2), " s (long); saved BK_tests_0910_two_cycles.png")
     return (tf_short=tf1, tf_long=tf2, mu_short=mu1, mu_long=mu2)
 end
@@ -776,7 +776,7 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
          BVP.generate_solution(bvp,
         t -> vcat(x_optimization_phys(setup.solution_sim, setup.T0, setup.tf_physical * t), setup.tf_physical))
 
-    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.v_ref);
+    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.w0);
         jacobian=make_jac(method),
         record_from_solution=record_period,
         plot_solution=plot_solution,
@@ -798,7 +798,7 @@ function run(method=build_disc(); setup=make_setup(), make_plots=true, verbose=t
     if make_plots
         plot(t_orb ./ t_orb[end] .* raw_x(sol.u)[5], u_orb[4, :];
             label=string(discname), xlabel="t (s)", ylabel="dτ (rad/s)",
-            title="converged cycle at v_ref = $(setup.nt_p0.v_ref)")
+            title="converged cycle at w0 = $(setup.nt_p0.w0)")
         savefig(joinpath(@__DIR__, "BK_tests_0910_orbit.png"))
     end
 
@@ -857,38 +857,38 @@ end
 #
 # 2. GROUND-TRUTH STABILITY (period-map finite differences, `floquet_true`).
 #    The cycle has a trivial mu = 1 and three nontrivial multipliers. Over
-#    the whole reachable branch (v_ref ≈ 2.5 → 17) every nontrivial |mu| is
+#    the whole reachable branch (w0 ≈ 2.5 → 17) every nontrivial |mu| is
 #    far below 1 → the cycle is STRONGLY STABLE everywhere. The largest
-#    nontrivial |mu| grows from ≈0.002 near v_ref ≈ 8 to 0.25 at
-#    v_ref ≈ 2.48 and 0.011 at v_ref = 17, but never approaches 1: no fold,
+#    nontrivial |mu| grows from ≈0.002 near w0 ≈ 8 to 0.25 at
+#    w0 ≈ 2.48 and 0.011 at w0 = 17, but never approaches 1: no fold,
 #    no Neimark–Sacker, no period doubling inside the branch.
 #
 # 3. THE LOWER TERMINUS IS A FOLD OF LIMIT CYCLES (saddle-node), NOT A
 #    HOMOCLINIC. The shooting branch `brS` (p, tf profile) has exactly one
 #    turning point: p decreases to a minimum p = 2.4585 at a FINITE period
 #    tf ≈ 14.6 s, then increases again while tf keeps growing to ≥33.7 s. A
-#    limit point in v_ref forces the shooting Jacobian singular, i.e. a
+#    limit point in w0 forces the shooting Jacobian singular, i.e. a
 #    nontrivial Floquet multiplier → +1 (fold). A homoclinic would instead
-#    have tf → ∞ with v_ref decreasing monotonically and no turnaround.
+#    have tf → ∞ with w0 decreasing monotonically and no turnaround.
 #    `fit_fold`/`fit_homoclinic` (called after the branch for the Shooting
 #    discretization) confirm this quantitatively: the √ turning-point law fits
 #    the low-wind window far better than the homoclinic log-law.
 #    The long-period side is a SECOND arc (the saddle branch) reached only
-#    after the fold; collocation stalls before it (v_ref ≈ 2.47, tf ≈ 11 s).
+#    after the fold; collocation stalls before it (w0 ≈ 2.47, tf ≈ 11 s).
 #
 # 4. COEXISTING CYCLES ARE A MIRROR PAIR. `KEEP.LimitCycle.all_limit_cycles`
-#    (Poincaré sampling + clustering) finds TWO cycles per v_ref, related by
-#    the system symmetry (α0, dτ0) → (−α0, −dτ0): e.g. at v_ref = 9,
-#    (α0, P) = (−0.777, 9055 W) and (0.674, 8267 W); at v_ref = 3,
+#    (Poincaré sampling + clustering) finds TWO cycles per w0, related by
+#    the system symmetry (α0, dτ0) → (−α0, −dτ0): e.g. at w0 = 9,
+#    (α0, P) = (−0.777, 9055 W) and (0.674, 8267 W); at w0 = 3,
 #    (∓0.30, ≈150 W). A single continuation sees only one of them; enumerate
 #    with the sampler.
 #
 # 5. EQUILIBRIA AND HOPF. `KEEP.SteadyState.all_steady_states_halton` gives
-#    8 equilibria (4 mirror pairs) at every v_ref ∈ [0.5, 15] tested. ALL are
+#    8 equilibria (4 mirror pairs) at every w0 ∈ [0.5, 15] tested. ALL are
 #    unstable everywhere: the operating cycle (α0 ≈ −0.78) wraps an unstable
 #    focus at α ≈ −0.87 whose complex pair decays as the wind drops
-#    (Re ≈ +1.7 at v_ref = 10 → +0.14 at v_ref = 1.25, grazing 0 near
-#    v_ref ≈ 1) but a real unstable mode remains, so there is NO clean Hopf
+#    (Re ≈ +1.7 at w0 = 10 → +0.14 at w0 = 1.25, grazing 0 near
+#    w0 ≈ 1) but a real unstable mode remains, so there is NO clean Hopf
 #    generating a stable cycle in the reachable range. Equilibria explain the
 #    dynamics (the kite is always on a cycle) but do not localise the arc's
 #    lower terminus.
@@ -911,21 +911,21 @@ end
 #    shooting path silently used the collocation discretizer) and
 #    `sheet_jumps` indexed `br.sol` (a single saved solution, not the path).
 #
-# 9. TWO CYCLES AT ONE v_ref (a consequence of the fold). The family is a
-#    CURVE (v_ref, tf), not a graph tf(v_ref): it turns at
-#    v_ref* = 2.45847 (tf_f = 14.276 s), so v_ref = 2.47 cuts it twice — a
+# 9. TWO CYCLES AT ONE w0 (a consequence of the fold). The family is a
+#    CURVE (w0, tf), not a graph tf(w0): it turns at
+#    w0* = 2.45847 (tf_f = 14.276 s), so w0 = 2.47 cuts it twice — a
 #    strongly stable "short" cycle (tf = 11.37 s, |mu| = {1, 0.294, 9e-4, ~0})
-#    and a "long" cycle (tf = 28.82 s) that is strongly UNSTABLE at v_ref=2.47
+#    and a "long" cycle (tf = 28.82 s) that is strongly UNSTABLE at w0=2.47
 #    (dominant |mu| ≈ 3.5e16, Floquet exponent ≈ 1.3 /s). The two are the
 #    saddle/short pair of the saddle-node: the long cycle's multiplier passes
 #    through +1 only exactly AT the fold and moves far from it at t fixed
-#    v_ref = 2.47, so "long ⇒ mu ≈ +1" is true only in the limit v → v_ref*.
+#    w0 = 2.47, so "long ⇒ mu ≈ +1" is true only in the limit v → w0*.
 #    No separate arclength driver is needed: ContinuationPar defaults to
 #    save_sol_every_step = 1, so the single multiple-shooting continuation
 #    already stores BOTH crossings in br.sol; select those with
-#    |s.p - v_ref*| < tol, sort by raw_x(s.x)[5], take the candidates nearest
-#    v_ref on each branch, then Newton-refine each at v_ref*. Collocation does
-#    NOT pass the fold (it stalls at v_ref ≈ 2.4868, tf ≈ 10.56 s), so it
+#    |s.p - w0*| < tol, sort by raw_x(s.x)[5], take the candidates nearest
+#    w0 on each branch, then Newton-refine each at w0*. Collocation does
+#    NOT pass the fold (it stalls at w0 ≈ 2.4868, tf ≈ 10.56 s), so it
 #    yields only the short cycle — the "try both discretizations" check.
 #    MULTIPLIER CAVEAT: a naive single-shooting period-map FD CANNOT measure
 #    the long cycle — it is so unstable over 28.8 s that the integrated return
@@ -951,9 +951,9 @@ end
 #     and seeds the shooting points (full shooting run ≈ 2.8 min).
 #
 # The core of it is one saddle-node (fold) of limit cycles at low wind:
-# Optimization: pick the operating cycle at v_ref = 9 m/s + 3 parameters (r, I_eq, torque_slope).
-# Continuation then sweeps v_ref. The stable "short" cycle runs tf ≈ 0.63 s @ 9 → 0.12 s @ 20 m/s.
-# Low wind: the family folds at v_ref* ≈ 2.458 m/s (tf ≈ 14.3 s), and the second, long-period branch beyond it is a strongly unstable saddle cycle. That fold is the "hard to pass" part numerically (collocation stalls just above it; multiple shooting gets through).
+# Optimization: pick the operating cycle at w0 = 9 m/s + 3 parameters (r, I, b).
+# Continuation then sweeps w0. The stable "short" cycle runs tf ≈ 0.63 s @ 9 → 0.12 s @ 20 m/s.
+# Low wind: the family folds at w0* ≈ 2.458 m/s (tf ≈ 14.3 s), and the second, long-period branch beyond it is a strongly unstable saddle cycle. That fold is the "hard to pass" part numerically (collocation stalls just above it; multiple shooting gets through).
 # But that's not all that's in here — three secondary things:
 # 1. Fold tangle near 9.2–9.8 m/s: several folds crowd branches, so the Newton corrector can jump branches.
 # 2. Coexisting mirror cycles (symmetry α,dτ → −α,−dτ), found by Poincaré sampling, not by a single continuation.

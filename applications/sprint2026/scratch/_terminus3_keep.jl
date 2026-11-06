@@ -1,8 +1,8 @@
 # Pseudo-arclength continuation of the shooting map to pass the lower limit
-# point in v_ref, and watch a nontrivial Floquet multiplier -> +1 (fold =
+# point in w0, and watch a nontrivial Floquet multiplier -> +1 (fold =
 # saddle-node of cycles) while the period stays finite (not homoclinic).
 #
-# z = [α0, dα0, dτ0, T, v_ref]  (5 unknowns)
+# z = [α0, dα0, dτ0, T, w0]  (5 unknowns)
 # R(z)[1:4] = endpoint residuals ; augmented constraint  τ·(z - z_pred) = 0.
 using Pkg
 Pkg.activate(@__DIR__)
@@ -16,7 +16,7 @@ using StaticArrays, LinearAlgebra, Printf, Logging
 Logging.disable_logging(Logging.Warn)   # keep the ODE divergence warnings out of the log
 
 const NT_P0 = NamedTuple(build_para(build_vbpara()))
-vbp_at(vr) = build_vbpara(merge(NT_P0, (v_ref=vr,)))
+vbp_at(vr) = build_vbpara(merge(NT_P0, (w0=vr,)))
 
 function R4(z)
     u0, T = unpack_shooting(SA[z[1], z[2], z[3], z[4]])
@@ -61,10 +61,10 @@ function main()
     end
     z = [s[1], s[2], s[3], s[4], 2.5]
     τ = tangent(z, ones(5))
-    # orient so v_ref initially decreases
+    # orient so w0 initially decreases
     τ[5] > 0 && (τ = -τ)
 
-    println("\n  v_ref      T        tf (s)     |mu| (sorted)                    res")
+    println("\n  w0      T        tf (s)     |mu| (sorted)                    res")
     ds = 0.02
     for step in 1:400
         zpred = z + ds .* τ
@@ -86,7 +86,7 @@ function main()
         res = norm(R4(zc))
         mu = multipliers(zc)
         @printf("%8.4f  %9.5f  %8.4f  %s  %.1e%s\n", zc[5], zc[4],
-            zc[4] * (NT_P0.l / zc[5]), join([@sprintf("%.5f", m) for m in mu], "  "),
+            zc[4] * (NT_P0.a / zc[5]), join([@sprintf("%.5f", m) for m in mu], "  "),
             res, ok ? "" : "  <-- no conv")
         flush(stdout)
         ok || break

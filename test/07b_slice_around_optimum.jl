@@ -17,13 +17,13 @@ default(lw=3, formatter=:plain, label="")
 tol = 1e-5
 set_torque_function!(LINEAR_TORQUE)
 p0 = build_para()
-syms = [:r, :I_eq, :torque_slope]
+syms = [:l, :I, :b]
 
 lower, upper = make_bounds(p0, syms)
 stats, model = optimize(p0, syms, lower, upper, tol=tol);
 
 #=
-Optim r, Ieq, torque_slope
+Optim r, Ieq, b
 check boites + α/dα + tension (positive et < 100 kg/m^2) + sensibilité autour du max
 (+ nombre d'équilibres/orbites périodiques + coefficients de floquet, si jamais ça change!)
 
@@ -135,12 +135,12 @@ _, _, fig = variation(:n_wind, 3:0.2:10, p0, syms, lower, upper, tol=1e-3)
 display(fig)
 
 # 10 seconds
-_, _, fig = variation(:r, 40:2:80, p0, [:I_eq], [1000], [10000], tol=1e-3)
+_, _, fig = variation(:l, 40:2:80, p0, [:I], [1000], [10000], tol=1e-3)
 display(fig)
 
 # Replace @test in optimize by if ... @warning ... end
 # 10 seconds
-_, _, fig = variation(:I_eq, 1000:1000:10000, p0, [:r], [10], [100], tol=1e-5)
+_, _, fig = variation(:I, 1000:1000:10000, p0, [:l], [10], [100], tol=1e-5)
 display(fig)
 
 function average_power(p; tol)

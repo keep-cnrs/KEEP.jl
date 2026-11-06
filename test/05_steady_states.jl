@@ -34,8 +34,8 @@ ss = all_steady_states(vbp, tol=tol)
 println("\n05_steady_states.jl@18: The differentiation here is broken, running on MacOS works, debugging on MacOS raises a 'DualMismatch' error from ForwardDiff, and the github worker has an error with ReverseDiff.
 
 It happens in `all_steady_states`.")
-all_steady_states(@set vbp[[:r, :Δφ]] = [85, 1.464945])  # Does not throw
-all_steady_states(@set vbp[[:r, :Δφ]] = [85, 1.464944])  # Throws method error
+all_steady_states(@set vbp[[:l, :Δφ]] = [85, 1.464945])  # Does not throw
+all_steady_states(@set vbp[[:l, :Δφ]] = [85, 1.464944])  # Throws method error
 
 @test all([maximum(abs, ddq_partial(ss_i, vbp)) for ss_i in ss] .< tol)  # All steady states
 

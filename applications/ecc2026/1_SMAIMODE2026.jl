@@ -189,7 +189,7 @@ import KEEP.PointMass4 as PM4
 import KEEP.PointMassPara as PMP
 import KEEP.TorqueFunction as TF
 
-syms = [:r, :I_eq, :torque_slope]
+syms = [:l, :I, :b]
 p0 = PMP.build_para()
 lower, upper = OPT.make_bounds(p0, syms)
 tol = 1e-6
@@ -306,7 +306,7 @@ function trajectory_stats(sol)
 end
 
 # function compute_results(wind; syms, p0, sense, tol)
-#     p0_wind = CA(p0; v_ref=wind)
+#     p0_wind = CA(p0; w0=wind)
 #     lower, upper = OPT.make_bounds(p0_wind, syms)
 #     stats, model = with_logger(NullLogger()) do
 #         OPT.optimize(p0_wind, syms, lower, upper; sense=sense, tol=tol)
@@ -379,16 +379,16 @@ minmaxnormalize(x) = (x .- minimum(x)) ./ (maximum(x) - minimum(x))
 maxnormalize(x) = x ./ maximum(x)
 
 sense = +
-syms = [:r, :I_eq, :torque_slope]  # \ell, I, b
+syms = [:l, :I, :b]  # \ell, I, b
 wind_range = range(5, 15, length=11)
 i_ref = findfirst(x -> x >= 10, wind_range)
 wind_ref = wind_range[i_ref]
-p0 = PMP.build_para(v_ref=wind_ref)  # Reference parameters at 10 m/s
+p0 = PMP.build_para(w0=wind_ref)  # Reference parameters at 10 m/s
 tol = 1e-7
-_, _, theta0 = compute_results(:v_ref, wind_ref; syms=syms, p0=p0, sense=sense, tol=tol)
+_, _, theta0 = compute_results(:w0, wind_ref; syms=syms, p0=p0, sense=sense, tol=tol)
 p_ref = CA(p0; (syms .=> theta0)...)
 
-stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:v_ref, wind_range; syms=syms, p_ref=p_ref, sense=sense, tol=tol)
+stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:w0, wind_range; syms=syms, p_ref=p_ref, sense=sense, tol=tol)
 
 ## Plot
 power_vec, min_tension_vec, max_tension_vec, tf_vec, ode_plot_vec = invert(stats_opt_vec)

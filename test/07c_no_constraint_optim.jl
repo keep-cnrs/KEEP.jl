@@ -166,17 +166,17 @@ begin
     α0, dα0, dτ0 = 0, 0, 0
     tol = 1e-9
 
-    # optim_para_syms = [:I_eq]
+    # optim_para_syms = [:I]
     # optim_para_lower = Float64[500]
     # optim_para_upper = Float64[2000]
     # optim_para_dims = [M * L^2]
 
-    # optim_para_syms = [:r, :I_eq, :Δθ, :Δφ]
+    # optim_para_syms = [:l, :I, :Δθ, :Δφ]
     # optim_para_lower = Float64[10, 100, deg2rad(5), deg2rad(5)]
     # optim_para_upper = Float64[100, 10000, deg2rad(20), deg2rad(90)]
     # optim_para_dims = [L, M * L^2, 1, 1]
 
-    optim_para_syms = [:r, :I_eq, :Δφ]
+    optim_para_syms = [:l, :I, :Δφ]
     optim_para_lower = Float64[10, 100, deg2rad(5)]
     optim_para_upper = Float64[200, 40000, deg2rad(90)]
     optim_para_dims = [L, M * L^2, 1]

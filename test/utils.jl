@@ -73,7 +73,7 @@ end
 # function plot_position4(sol, p; t=sol.t, figure=plot())
 #     q = sol.(t; idxs=1:5)
 #     α = first.(q)
-#     A = p.l .* PM4.compute_αhat.(α)
+#     A = p.a .* PM4.compute_αhat.(α)
 #     K = PM4.compute_OK.(PM4.compute_Rτ.(q, (p,)), (p,))
 
 #     # indices : x/y/z, O/A/K2, indice du segment
@@ -125,7 +125,7 @@ end
 #         t_trail = [max(0, t_ - trail_length):trail_step:t_; t_]
 #         q = sol.(t_trail; idxs=1:5)
 #         α = first(q[end])
-#         A = p.l * PM4.compute_αhat(α)
+#         A = p.a * PM4.compute_αhat(α)
 #         trail_K = PM4.compute_OK.(PM4.compute_Rτ.(q, (p,)), (p,))
 #         segment = [zero(A), A, trail_K[end]] |> vecvec2mat
 

@@ -16,7 +16,7 @@
 # in time. A full enumeration must be seeded from continuation-derived states.
 #
 # UNITS: BVP unknown is PHYSICAL/SI (dα,dτ rad/s, tf s). The sampler is NORMALIZED
-# (T0 = l/v_ref s): dα_SI = dα_norm/T0, tf_SI = T_norm*T0.
+# (T0 = a/w0 s): dα_SI = dα_norm/T0, tf_SI = T_norm*T0.
 #
 # Run: VREF=2.47 MSTAR=20 julia --project=applications/sprint2026 scratch/_deflate_cycles.jl
 #      VREF=9.0  MSTAR=20 julia --project=applications/sprint2026 scratch/_deflate_cycles.jl
@@ -28,20 +28,20 @@ import KEEP.LimitCycle as LC
 using KEEP.PointMassPara: build_vbpara
 
 const OPT = (
-    params_opt=(r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744),
+    params_opt=(l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744),
     shooting=[-1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815],
 )
 const VREF = parse(Float64, get(ENV, "VREF", "2.47"))
 const MSTAR = parse(Int, get(ENV, "MSTAR", "20"))
 
 nearest_poincare(v) = (rows = deserialize(joinpath(@__DIR__, "bvp_cycles_poincare.jls"));
-    rows[argmin(abs.([r.v_ref for r in rows] .- v))])
+    rows[argmin(abs.([r.w0 for r in rows] .- v))])
 
 "BVP warm start (SI): integrate the nearest normalized cycle, sample M arcs."
 function warm_from_sampler(bvp, setup)
     row = nearest_poincare(VREF)
-    T0 = setup.vbp.l / row.v_ref
-    vbp = build_vbpara(merge(setup.nt_p0, (v_ref=row.v_ref,)))
+    T0 = setup.vbp.a / row.w0
+    vbp = build_vbpara(merge(setup.nt_p0, (w0=row.w0,)))
     u0, Tn = LC.unpack_shooting(SA[row.α0, row.dα0, row.dτ0, row.T])
     sol = PM4.integrate(u0, Tn, vbp; tol=1e-11, save_everystep=true)
     tt = collect(sol.t) ./ sol.t[end]
@@ -49,7 +49,7 @@ function warm_from_sampler(bvp, setup)
     interp = t -> (i = clamp(searchsortedfirst(tt, t), 1, length(tt));
         SA[U[1, i], U[2, i], U[3, i] / T0, U[4, i] / T0, Tn * T0])
     x = BVP.generate_solution(bvp, interp); x[end] = 0.0
-    @printf("warm start from sampler v_ref=%.4f (tf=%.4f s)\n", row.v_ref, Tn * T0); flush(stdout)
+    @printf("warm start from sampler w0=%.4f (tf=%.4f s)\n", row.w0, Tn * T0); flush(stdout)
     return x
 end
 
@@ -66,7 +66,7 @@ cycle_res(u) = maximum(abs.((u[1, end] - u[1, 1], u[2, end] - u[2, 1] - 2π,
     u[3, end] - u[3, 1], u[4, end] - u[4, 1])))
 
 function avg_power(u, pv, setup)
-    T0 = setup.vbp.l / VREF
+    T0 = setup.vbp.a / VREF
     pw = [PM4.dynamics(SA[u[1, k], u[2, k], T0 * u[3, k], T0 * u[4, k], 0.0], get_fast_para(pv))[5]
           for k in 1:size(u, 2)]
     return sum(pw) / length(pw)
@@ -76,9 +76,9 @@ function main()
     setup = make_setup(opt=OPT)
     method = BVP.Shooting(MSTAR, ODE_ALG, true)
     bvp = make_bvp(make_model(method, setup), method)
-    pv = merge(setup.nt_p0, (v_ref=VREF,))
+    pv = merge(setup.nt_p0, (w0=VREF,))
     jac = make_jac(method)
-    mkprob(x) = BVP.BVPBifProblem(bvp, x, pv, (@optic _.v_ref);
+    mkprob(x) = BVP.BVPBifProblem(bvp, x, pv, (@optic _.w0);
         jacobian=jac, record_from_solution=record_period, plot_solution=plot_solution)
 
     roots = Vector{Vector{Float64}}()
@@ -133,13 +133,13 @@ function main()
             power=avg_power(o[2], pv, setup), cres=cycle_res(o[2]), tag=k))
     end
     sort!(rows, by=r -> r.tf)
-    @printf("\nv_ref=%.4f : %d distinct prograde BVP cycle(s) (%d beyond the seeds)\n", VREF, length(rows), found)
+    @printf("\nw0=%.4f : %d distinct prograde BVP cycle(s) (%d beyond the seeds)\n", VREF, length(rows), found)
     @printf("%-4s %-10s %-10s %-10s %-11s %-10s\n", "#", "tf (s)", "α0 (rad)", "|μ|max", "power (W)", "cycle res")
     for r in rows
         @printf("%-4d %-10.4f %-+10.5f %-10.3e %-11.1f %-10.2e\n", r.tag, r.tf, r.α0, r.mu, r.power, r.cres)
     end
     serialize(joinpath(@__DIR__, "deflated_cycles_V$(VREF)_M$(MSTAR).jls"),
-        (v_ref=VREF, rows=rows, n_extra=found))
+        (w0=VREF, rows=rows, n_extra=found))
 end
 
 main()

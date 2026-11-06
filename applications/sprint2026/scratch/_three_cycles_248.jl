@@ -1,4 +1,4 @@
-# Three coexisting prograde limit cycles at v_ref = 2.48 (inside the window
+# Three coexisting prograde limit cycles at w0 = 2.48 (inside the window
 # between the two folds), for the comparison figures.
 #
 # The three cycles are three crossings of ONE continuation path (short branch ->
@@ -8,7 +8,7 @@
 # sampler never reaches and there is no intermediate archive to seed Newton.
 #
 # Serializes scratch/three_cycles_shooting.jls in the SAME layout as
-# scratch/two_cycles_shooting.jls: (; short, long, longlong, v_ref), each
+# scratch/two_cycles_shooting.jls: (; short, long, longlong, w0), each
 #   (; x, t, u, p, tf)  with x = shooting unknown, t = PHYSICAL time (s),
 #   u = 5×N BVP orbit.
 #
@@ -17,7 +17,7 @@ using Serialization, Printf, LinearAlgebra, StaticArrays
 include(joinpath(@__DIR__, "..", "BK_tests_0910.jl"))
 
 const OPT = (
-    params_opt=(r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744),
+    params_opt=(l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744),
     shooting=[-1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815],
 )
 const VREF = parse(Float64, get(ENV, "VREF", "2.48"))
@@ -32,7 +32,7 @@ function main()
     method = BVP.Shooting(MSTAR, ODE_ALG, true)
     bvp = make_bvp(make_model(method, setup), method)
     x0 = shooting_warm_start(bvp, method, setup)
-    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.v_ref);
+    prob = BVP.BVPBifProblem(bvp, x0, setup.nt_p0, (@optic _.w0);
         jacobian=make_jac(method), record_from_solution=record_period, plot_solution=plot_solution)
     x0, res_pre = damped_newton(prob, x0, setup.nt_p0; make_presolve(method)...)
     prob = BifurcationKit.re_make(prob; u0=x0)
@@ -49,9 +49,9 @@ function main()
         length(p), length(ss), minimum(p), maximum(p), minimum(tf), maximum(tf), time() - t0)
     @assert length(ss) == length(p) "sol/branch length mismatch: $(length(ss)) vs $(length(p))"
 
-    pv = merge(setup.nt_p0, (v_ref=VREF,))
+    pv = merge(setup.nt_p0, (w0=VREF,))
     jac = make_jac(method)
-    mkprob(x) = BVP.BVPBifProblem(bvp, x, pv, (@optic _.v_ref);
+    mkprob(x) = BVP.BVPBifProblem(bvp, x, pv, (@optic _.w0);
         jacobian=jac, record_from_solution=record_period, plot_solution=plot_solution)
     bands = ((0.0, 20.0, :short), (20.0, 75.0, :long), (75.0, Inf, :longlong))
     out = Dict{Symbol,NamedTuple}()
@@ -81,8 +81,8 @@ function main()
     end
     @assert length(out) == 3 "expected 3 cycles, got $(length(out))"
     serialize(joinpath(@__DIR__, "three_cycles_shooting.jls"),
-        (; short=out[:short], long=out[:long], longlong=out[:longlong], v_ref=VREF, M=MSTAR))
-    @printf("saved three_cycles_shooting.jls (v_ref=%.2f, M=%d)\n", VREF, MSTAR)
+        (; short=out[:short], long=out[:long], longlong=out[:longlong], w0=VREF, M=MSTAR))
+    @printf("saved three_cycles_shooting.jls (w0=%.2f, M=%d)\n", VREF, MSTAR)
 end
 
 main()

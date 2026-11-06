@@ -100,9 +100,9 @@ plot!(v1, tc, dist(p10cb_t, p4_t), label="10D + callback vs 4D")
 plot!(v1, tc, dist(p10_t, p10cb_t), label="10D vs 10D + callback")
 plot!(v1, tc, floor_d, label="Numerical floor", ls=:dash, c=:black)
 
-# Common significant digits of the kite position, relative to the line length r
+# Common significant digits of the kite position, relative to the line length l
 names = ["10D", "10D + callback", "4D"]
-digits(a, b) = -log10(maximum(dist(a, b)) / p.r)
+digits(a, b) = -log10(maximum(dist(a, b)) / p.l)
 D = [a === b ? NaN : digits(a, b) for a in (p10_t, p10cb_t, p4_t), b in (p10_t, p10cb_t, p4_t)]
 v3 = heatmap(D, xticks=(1:3, names), yticks=(1:3, names), xmirror=true, yflip=true,
     color=:Purples, aspect_ratio=1, title="Common significant digits",

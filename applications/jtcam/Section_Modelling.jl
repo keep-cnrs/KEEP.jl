@@ -1,10 +1,10 @@
 # Spindle torus: set of possible kite positions
 #
-#   arm tip  A(α) = l * (cos α, sin α, 0)
-#   kite     K(α, β) = A(α) + r * (cos β * (cos α, sin α, 0) + sin β * ẑ)
+#   arm tip  A(α) = a * (cos α, sin α, 0)
+#   kite     K(α, β) = A(α) + l * (cos β * (cos α, sin α, 0) + sin β * ẑ)
 #
-# The line of length r points anywhere in the radial-vertical plane. Revolving
-# the sphere of radius r about the arm axis gives a torus; r > l => spindle.
+# The line of length l points anywhere in the radial-vertical plane. Revolving
+# the sphere of radius l about the arm axis gives a torus; l > a => spindle.
 using Pkg
 Pkg.activate(@__DIR__)
 
@@ -14,12 +14,12 @@ using LinearAlgebra: norm
 include(joinpath(@__DIR__, "jtcam_theme.jl"))
 
 ## Spindle torus
-l, r = 2, 3
+a, l = 2, 3
 
-# sanity check: a sampled point is exactly r from its arm tip
+# sanity check: a sampled point is exactly l from its arm tip
 β0 = deg2rad(30)  # line elevation
-kite_pos = [l + r * cos(β0), 0, r * sin(β0)]
-@assert isapprox(norm(kite_pos - [l, 0, 0]), r; atol=1e-8)
+kite_pos = [a + l * cos(β0), 0, l * sin(β0)]
+@assert isapprox(norm(kite_pos - [a, 0, 0]), l; atol=1e-8)
 
 # mesh as flat line segments (GR's wireframe chokes on matrix grids); a mesh
 # rather than a surface so the self-intersecting interior stays visible
@@ -30,9 +30,9 @@ ys = Float64[];
 zs = Float64[]
 for βj in lk
     for αi in lg
-        push!(xs, (l + r * cos(βj)) * cos(αi))
-        push!(ys, (l + r * cos(βj)) * sin(αi))
-        push!(zs, r * sin(βj))
+        push!(xs, (a + l * cos(βj)) * cos(αi))
+        push!(ys, (a + l * cos(βj)) * sin(αi))
+        push!(zs, l * sin(βj))
     end
     push!(xs, NaN)
     push!(ys, NaN)
@@ -40,9 +40,9 @@ for βj in lk
 end
 for αj in lk
     for βi in lg
-        push!(xs, (l + r * cos(βi)) * cos(αj))
-        push!(ys, (l + r * cos(βi)) * sin(αj))
-        push!(zs, r * sin(βi))
+        push!(xs, (a + l * cos(βi)) * cos(αj))
+        push!(ys, (a + l * cos(βi)) * sin(αj))
+        push!(zs, l * sin(βi))
     end
     push!(xs, NaN)
     push!(ys, NaN)
@@ -53,21 +53,21 @@ fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
     xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
     title="Spindle torus, not to scale", label="", legend=:outerright)
 
-# set of possible arm-tip positions: circle of radius l in the xy-plane
+# set of possible arm-tip positions: circle of radius a in the xy-plane
 θc = range(0, 2π, length=200)
 arm_tip_pars = (; c=:blue, lw=3, label="Arm-tip locus")
-plot!(fig, l * cos.(θc), l * sin.(θc), zero(θc); arm_tip_pars..., label="")
+plot!(fig, a * cos.(θc), a * sin.(θc), zero(θc); arm_tip_pars..., label="")
 
 # example arm and kite at α = 0, β = 30°
 arm_and_lines_pars = (; c=:black, lw=3, label="Arm and lines")
-plot!(fig, [0, l], [0, 0], [0, 0]; arm_and_lines_pars..., label="")
-plot!(fig, [l, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., label="")
+plot!(fig, [0, a], [0, 0], [0, 0]; arm_and_lines_pars..., label="")
+plot!(fig, [a, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., label="")
 
 # COMMENT/UNCOMMENT to identify easily those lines
 longitude_pars = (; c=:orange, lw=2, label="Kite longitude")
 latitude_pars = (; c=:green, lw=2, label="Kite latitude")
-plot!(fig, l .+ r .* cos.(θc), zero(θc), r .* sin.(θc); longitude_pars..., label="")
-plot!(fig, (l + r * cos(β0)) .* cos.(θc), (l + r * cos(β0)) .* sin.(θc), fill(r * sin(β0), length(θc)); latitude_pars..., label="")
+plot!(fig, a .+ l .* cos.(θc), zero(θc), l .* sin.(θc); longitude_pars..., label="")
+plot!(fig, (a + l * cos(β0)) .* cos.(θc), (a + l * cos(β0)) .* sin.(θc), fill(l * sin(β0), length(θc)); latitude_pars..., label="")
 
 kite_pars = (; c=:red, ms=7, label="Kite")
 scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")

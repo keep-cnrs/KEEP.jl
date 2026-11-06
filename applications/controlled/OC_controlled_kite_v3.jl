@@ -512,11 +512,11 @@ fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
 fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
 
 fpos(t) = begin
-    LU = vbp.l
-    a, θl, φl = fα(t), fθ(t), fφ(t)
-    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
-        sin(a) + vbp.r * sin(θl) * sin(φl),
-        vbp.r * cos(θl)]
+    LU = vbp.a
+    α, θl, φl = fα(t), fθ(t), fφ(t)
+    LU .* [cos(α) + vbp.l * sin(θl) * cos(φl),
+        sin(α) + vbp.l * sin(θl) * sin(φl),
+        vbp.l * cos(θl)]
 end
 
 fβ(t) = begin

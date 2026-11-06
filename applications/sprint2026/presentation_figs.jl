@@ -9,13 +9,13 @@
 #
 # Produces (applications/sprint2026/):
 #   fig_fold_zoom.png      two-fold branch (overview + fold-1 + fold-2 zooms)
-#   fig_full_scale.png     the same branch at full scale, v_ref ∈ [0, 25]
+#   fig_full_scale.png     the same branch at full scale, w0 ∈ [0, 25]
 #   fig_phase_planes.png   6 pairwise phase-space projections, the 3 cycles
 #   fig_timeseries.png     4 state components vs physical time, the 3 cycles
 #
 # Dotted convention: a curve is dotted where it leaves the "solid window" set
 # for its panel (see dot_end). Windows are chosen so the short branch is dotted
-# for v_ref > 2.53 (zoom) / > 24 (full scale), the long branch for tf > 27 s on
+# for w0 > 2.53 (zoom) / > 24 (full scale), the long branch for tf > 27 s on
 # the fold-1 zoom, and the long-long branch for tf > 105 s — i.e. where the curve
 # continues past the point we chose to show.
 #
@@ -69,9 +69,9 @@ function load_cycles()
     f = joinpath(SCRATCH, isfile(joinpath(SCRATCH, "three_cycles_shooting.jls")) ?
         "three_cycles_shooting.jls" : "two_cycles_shooting.jls")
     cyc = deserialize(f)
-    vr = hasproperty(cyc, :v_ref) ? cyc.v_ref : 2.47
+    vr = hasproperty(cyc, :w0) ? cyc.w0 : 2.47
     ll = hasproperty(cyc, :longlong) ? cyc.longlong : nothing
-    println("cycles: ", f, "  (v_ref = ", vr, ", ", ll === nothing ? 2 : 3, " cycles)")
+    println("cycles: ", f, "  (w0 = ", vr, ", ", ll === nothing ? 2 : 3, " cycles)")
     return cyc.short, cyc.long, ll, vr
 end
 
@@ -171,7 +171,7 @@ end
 
 # NB on units: the branch's `tf` is PHYSICAL (SI) seconds and the state's dα, dτ in
 # rad/s. The LimitCycle/Poincaré helpers work in NORMALIZED units (L=2 m, M=6 kg,
-# time T0 = l/v_ref s): tf_SI = T_norm * T0, dα_SI = dα_norm / T0.
+# time T0 = a/w0 s): tf_SI = T_norm * T0, dα_SI = dα_norm / T0.
 const X_SHORT_ZOOM = 2.53      # short branch dotted beyond this on the zoom panels
 const X_SHORT_FULL = 24.0      # short branch dotted beyond this on the full-scale panel
 const TF_LONG_DOT = 27.0      # long branch dotted above this on the fold-1 zoom
@@ -183,12 +183,12 @@ function fig_fold_zoom(M=M_FIG)
     p2f, tf2f = p[i2], tf[i2]
 
     plt = plot(layout=(3, 1), size=(900, 1420), legend=:topright,
-        plot_title="Limit-cycle branch: two folds ⇒ three periods in (v_ref*₁, v_ref*₂)")
+        plot_title="Limit-cycle branch: two folds ⇒ three periods in (w0*₁, w0*₂)")
 
     ## panel 1 — overview ---------------------------------------------------
     sp = plt[1]
     xl, yl = (2.44, 2.54), (0.0, 120.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
         title="Overview: S-curve with both folds", left_margin=11Plots.mm)
     plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
         color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
@@ -196,13 +196,13 @@ function fig_fold_zoom(M=M_FIG)
     plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
         color=C_LL, lw=2.5, label="long-long, saddle")
     vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5,
-        label="fold 1  v_ref*₁ = $(round(p1f, digits=4))")
+        label="fold 1  w0*₁ = $(round(p1f, digits=4))")
     vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5,
-        label="fold 2  v_ref*₂ = $(round(p2f, digits=4))")
+        label="fold 2  w0*₂ = $(round(p2f, digits=4))")
     scatter!(sp, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
         markerstrokecolor=:white, label="")
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  v_ref = %.4f", TWO_P))
+        label=@sprintf("anchor  w0 = %.4f", TWO_P))
     annotate!(sp, p1f + 0.0035, 0.40 * yl[2],
         text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
     annotate!(sp, p2f + 0.0010, 0.66 * yl[2],
@@ -214,8 +214,8 @@ function fig_fold_zoom(M=M_FIG)
     ## panel 2 — fold 1 zoom -------------------------------------------------
     sp = plt[2]
     xl, yl = (2.44, 2.54), (0.0, 30.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title=@sprintf("fold 1 — stable + saddle  (v_ref = %.3f, tf = %.1f s)", p1f, tf1f),
+    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        title=@sprintf("fold 1 — stable + saddle  (w0 = %.3f, tf = %.1f s)", p1f, tf1f),
         left_margin=11Plots.mm)
     plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
         color=C_SHORT, lw=2.5)
@@ -228,8 +228,8 @@ function fig_fold_zoom(M=M_FIG)
     ## panel 3 — fold 2 zoom -------------------------------------------------
     sp = plt[3]
     xl, yl = (2.4755, 2.4835), (40.0, 120.0)
-    plot!(sp; xlabel="v_ref (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title=@sprintf("fold 2 — saddle + saddle  (v_ref = %.3f, tf = %.1f s)", p2f, tf2f),
+    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        title=@sprintf("fold 2 — saddle + saddle  (w0 = %.3f, tf = %.1f s)", p2f, tf2f),
         left_margin=11Plots.mm)
     plot!(sp, p[i0:end], tf[i0:end]; color=C_SHORT, lw=2.5, label="")
     plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="")
@@ -243,7 +243,7 @@ function fig_fold_zoom(M=M_FIG)
 end
 
 ## ===================================================================== ##
-## Fig 1b — full-scale branch, v_ref ∈ [0, 25]                              ##
+## Fig 1b — full-scale branch, w0 ∈ [0, 25]                              ##
 ## ===================================================================== ##
 function fig_full_scale(M=M_FIG)
     p, tf, i0, i2 = branch_layout(M)
@@ -252,8 +252,8 @@ function fig_full_scale(M=M_FIG)
     xl, yl = (0.0, 25.0), (0.0, 120.0)
     plt = plot(size=(1050, 600), legend=:topright,
         xlims=xl, ylims=yl,
-        xlabel="v_ref (m/s)", ylabel="Period (s)",
-        title="Full-scale limit-cycle branch  (v_ref in [0, 25])", titlelocation=:center,
+        xlabel="w0 (m/s)", ylabel="Period (s)",
+        title="Full-scale limit-cycle branch  (w0 in [0, 25])", titlelocation=:center,
         left_margin=12Plots.mm, bottom_margin=7Plots.mm)
     plot_end!(plt, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_FULL, yl[2]);
         color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
@@ -263,11 +263,11 @@ function fig_full_scale(M=M_FIG)
     vline!(plt, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="fold 1")
     vline!(plt, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="fold 2")
     vline!(plt, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  v_ref = %.4f", TWO_P))
+        label=@sprintf("anchor  w0 = %.4f", TWO_P))
     scatter!(plt, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
         markerstrokecolor=:white, label="")
     annotate!(plt, 8.0, 0.80 * yl[2],
-        text("no prograde cycle\nfor v_ref below fold 1", :left, 9, :gray30))
+        text("no prograde cycle\nfor w0 below fold 1", :left, 9, :gray30))
     return plt
 end
 
@@ -280,7 +280,7 @@ const PAIRS = [(1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
 function fig_phase_planes()
     ncyc = longlong === nothing ? 2 : 3
     plt = plot(layout=(2, 3), size=(1250, 760), legend=:topright,
-        plot_title="$(ncyc) prograde limit cycles at v_ref = $TWO_P — phase projections")
+        plot_title="$(ncyc) prograde limit cycles at w0 = $TWO_P — phase projections")
     for (k, (i, j)) in enumerate(PAIRS)
         plot!(plt[k], Ushort[i, :], Ushort[j, :];
             xlabel=LABELS[i], ylabel=LABELS[j],
@@ -301,7 +301,7 @@ end
 function fig_timeseries()
     ncyc = longlong === nothing ? 2 : 3
     plt = plot(layout=(2, 2), size=(1150, 700), legend=:topright,
-        plot_title="Prograde BVP solutions vs physical time at v_ref = $TWO_P ($ncyc cycles)")
+        plot_title="Prograde BVP solutions vs physical time at w0 = $TWO_P ($ncyc cycles)")
     for i in 1:4
         plot!(plt[i], tshort, Ushort[i, :];
             xlabel="t (s)", ylabel=LABELS[i], title=LABELS[i],

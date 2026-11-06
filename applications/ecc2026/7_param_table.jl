@@ -35,11 +35,11 @@ function main()
 
     # symbol, descr, unit, optional value
     params = [
-        Parameter(:l, "a", "Arm length", raw"\meter", nothing),
-        Parameter(:r, raw"\ell", "Line length", raw"\meter", nothing),
+        Parameter(:a, "a", "Arm length", raw"\meter", nothing),
+        Parameter(:l, raw"\ell", "Line length", raw"\meter", nothing),
         Parameter(:m, "m", "Kite mass", raw"\kg", nothing),
-        Parameter(:I_eq, "I", "Arm inertia", raw"\kg\square\meter", nothing),
-        Parameter(:ρ_air, raw"\rho_a", "Air density", raw"\kg\per\cubic\meter", nothing),
+        Parameter(:I, "I", "Arm inertia", raw"\kg\square\meter", nothing),
+        Parameter(:ρ_a, raw"\rho_a", "Air density", raw"\kg\per\cubic\meter", nothing),
         Parameter(:d_l, raw"d_\ell", "Line diameter", raw"\meter", nothing),
         Parameter(:S, "S", "Kite surface", raw"\square\meter", nothing),
         Parameter(:C_L, "C_L", "Kite lift coefficient", "", nothing),
@@ -47,9 +47,9 @@ function main()
         Parameter(:C_D_l, raw"C_{D,\ell}", "Line drag coefficient", "", nothing),
         Parameter(:ρ_l, raw"\rho_\ell", "Line density", raw"\kg\per\cubic\meter", nothing),
         Parameter(:g, "g", "Gravity", raw"\meter\per\square\second", nothing),
-        Parameter(:h_ref, "z_0", "Wind reference altitude", raw"\meter", nothing),
-        Parameter(:v_ref, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
-        Parameter(:torque_slope, "b", "Arm braking coefficient", raw"\newton\meter\second\per\radian", nothing),
+        Parameter(:z0, "z_0", "Wind reference altitude", raw"\meter", nothing),
+        Parameter(:w0, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
+        Parameter(:b, "b", "Arm braking coefficient", raw"\newton\meter\second\per\radian", nothing),
         Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle", raw"\radian", f"{p.θ0 * 180/π:.0f}" * raw"\pi / 180"),
         Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height", raw"\radian", f"{p.Δθ * 180/π:.0f}" * raw"\pi / 180"),
         Parameter(:Δφ, raw"\Delta\phi", "Lemniscate azimuthal half-width", raw"\radian", f"{p.Δφ * 180/π:.0f}" * raw"\pi / 180"),

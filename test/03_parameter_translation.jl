@@ -6,8 +6,8 @@ using KEEP.PointMassPara
 
 
 # Test creation
-p = build_para(I_eq=π)
-@test p.I_eq ≈ π
+p = build_para(I=π)
+@test p.I ≈ π
 
 
 # Build a random Para
@@ -19,8 +19,8 @@ para[keys(para)] .= rand(1)
 para_to_vbpara = build_vbpara(para)
 @test :S ∉ keys(para_to_vbpara)
 
-# Convert it back to Para, specifying the S, ρ_air, d_l (which is lost information in para_to_vbpara)
-para_to_vbpara_to_para = build_para(para_to_vbpara; S=para.S, ρ_air=para.ρ_air, d_l=para.d_l)
+# Convert it back to Para, specifying the S, ρ_a, d_l (which is lost information in para_to_vbpara)
+para_to_vbpara_to_para = build_para(para_to_vbpara; S=para.S, ρ_a=para.ρ_a, d_l=para.d_l)
 @test :S ∈ keys(para_to_vbpara_to_para)
 
 # Check equality between para and para_to_vbpara_to_para
@@ -29,7 +29,7 @@ para_to_vbpara_to_para = build_para(para_to_vbpara; S=para.S, ρ_air=para.ρ_air
 
 # test lmt
 L, M, T = rand(3)
-p_lmt = build_para(l=L, m=M, v_ref=L / T)
+p_lmt = build_para(a=L, m=M, w0=L / T)
 @test all(lmt(p_lmt) .≈ (L, M, T))
 @test all(lmt(build_vbpara(p_lmt)) .≈ (L, M, T))
 
@@ -40,17 +40,17 @@ normalized_vbpara = normalize_vbpara(para_to_vbpara)
 
 # Create a new `VBPara` with a modified value
 vbpara_bis = copy(para_to_vbpara)
-vbpara_bis.r = 55
-@test vbpara_bis.r === 55.
+vbpara_bis.l = 55
+@test vbpara_bis.l === 55.
 
 # Use the `vbpara_set_params` function
 p = build_para()
 vbp = build_vbpara(p)
-r, I_eq = rand(2)
+l, I = rand(2)
 
-p_updated = build_para(r=r, I_eq=I_eq)
-vbp_updated_nt = vbpara_set_params(vbp, (; r=r, I_eq=I_eq))
-vbp_updated_ca = vbpara_set_params(vbp, CA(r=r, I_eq=I_eq))
+p_updated = build_para(l=l, I=I)
+vbp_updated_nt = vbpara_set_params(vbp, (; l=l, I=I))
+vbp_updated_ca = vbpara_set_params(vbp, CA(l=l, I=I))
 
 @test all(build_para(vbp_updated_nt) .≈ p_updated)
 @test all(build_para(vbp_updated_ca) .≈ p_updated)
@@ -60,9 +60,9 @@ S = rand()
 p_kw = build_para(S=S)
 vbp_kw = build_vbpara(p_kw)
 
-p_kw_updated = build_para(S=S, r=r, I_eq=I_eq)
-vbp_updated_nt_kw = vbpara_set_params(vbp, (; r=r, I_eq=I_eq); S=S)
-vbp_updated_ca_kw = vbpara_set_params(vbp, CA(r=r, I_eq=I_eq); S=S)
+p_kw_updated = build_para(S=S, l=l, I=I)
+vbp_updated_nt_kw = vbpara_set_params(vbp, (; l=l, I=I); S=S)
+vbp_updated_ca_kw = vbpara_set_params(vbp, CA(l=l, I=I); S=S)
 
 # C_L and C_D
 @test all(build_para(vbp_updated_nt_kw, S=S) .≈ p_kw_updated)

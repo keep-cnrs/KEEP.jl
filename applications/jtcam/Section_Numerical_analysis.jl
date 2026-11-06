@@ -28,11 +28,11 @@ include(joinpath(@__DIR__, "time_series.jl"))
 
 ## Determine optimal parameters using kinetic model
 p0 = PMP.build_para()
-p0.torque_slope = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
+p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
 vbp = PMP.build_vbpara(p0)
 
 @info f"Optimal torque slope value
-b = I ω ≈ {p0.torque_slope:.2f} kg m² s⁻¹ rad⁻¹, with ω = 2π/period read from a simulation of the limit cycle (fixed point of b = I ω)."
+b = I ω ≈ {p0.b:.2f} kg m² s⁻¹ rad⁻¹, with ω = 2π/period read from a simulation of the limit cycle (fixed point of b = I ω)."
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
