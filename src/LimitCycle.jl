@@ -84,8 +84,8 @@ end
 
 """
 Return a callback that saves the states when passing through section = 0. If two subsequent states are within `tol` of each other, terminate the integration."""
-function build_poincare_callback(tol=DEFAULT_TOLERANCE; section=poincare_section)
-    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=tol / 10)
+function build_poincare_callback(stop_integrator_tol=DEFAULT_TOLERANCE; section=poincare_section)
+    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(stop_integrator_tol); save_positions=(true, false), idxs=2)
 end
 
 

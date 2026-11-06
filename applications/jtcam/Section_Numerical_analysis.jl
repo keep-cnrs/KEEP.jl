@@ -381,6 +381,12 @@ savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
 ## Convergence rate of the two cycles, side by side
 # Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
+function get_slope(distances; tol_start, tol_end)
+    i1 = findfirst(<(tol_start), distances)
+    i2 = findlast(>(tol_end), distances)
+    return -(log10(distances[i2]) - log10(distances[i1])) / (i2 - i1)
+end
+
 function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol=LC_CONV_TOL)
     sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=cb, save_end=false, tol)
     u_infty = sol.u[end]
