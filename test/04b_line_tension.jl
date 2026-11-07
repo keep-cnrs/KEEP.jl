@@ -9,15 +9,15 @@ using KEEP.LimitCycle
 using KEEP.TorqueFunction
 using KEEP.Visualization: plot_trajectory_4D
 
-# v_ref = 11.6896, que se passe-t-il ?
+# w0 = 11.6896, que se passe-t-il ?
 # le bras va plus loin
 # la génératrice ne résiste pas assez ?
 
-# v_ref = 11.6897: le bras a une très grande amplitude
-# v_ref = 11.6896: le bras a une petite amplitude
+# w0 = 11.6897: le bras a une très grande amplitude
+# w0 = 11.6896: le bras a une petite amplitude
 
-v_ref = 11.6897
-p = build_vbpara(build_para(v_ref=v_ref))
+w0 = 11.6897
+p = build_vbpara(build_para(w0=w0))
 
 lc = compute_limit_cycle(SA[0, TAU0, 0, 0, 0], p)
 

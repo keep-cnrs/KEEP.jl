@@ -95,7 +95,7 @@ function optimize(N, vbp, optim_para_syms, optim_para_lower, optim_para_upper)
 end
 
 vbp = build_vbpara()
-optim_para_syms = [:r, :I_eq]
+optim_para_syms = [:l, :I]
 optim_para_lower = Float64[10, 100]
 optim_para_upper = Float64[100, 10000]
 

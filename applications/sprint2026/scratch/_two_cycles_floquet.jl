@@ -13,14 +13,14 @@ const NT_P0 = NamedTuple(build_para(build_vbpara()))
 const PARA_CACHE = Ref{Union{Nothing, Tuple{Float64, typeof(NamedTuple(build_vbpara(build_para(build_vbpara()))))}}}(nothing)
 function get_fast_para(p)
     c = PARA_CACHE[]
-    if c === nothing || c[1] != p.v_ref
-        c = (p.v_ref, NamedTuple(build_vbpara(p))); PARA_CACHE[] = c
+    if c === nothing || c[1] != p.w0
+        c = (p.w0, NamedTuple(build_vbpara(p))); PARA_CACHE[] = c
     end
     return c[2]
 end
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref
+    T = params.a / params.w0
     _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T*dα, T*dτ, 0], get_fast_para(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
     return u isa SVector ? out : Vector(out)
@@ -60,11 +60,11 @@ function monodromy(u, t, p)
     return M
 end
 function report(tag, d)
-    p = merge(NT_P0, (v_ref=d.p,))
+    p = merge(NT_P0, (w0=d.p,))
     mu = eigvals(monodromy(d.u, d.t, p))
     j = argmin(abs.(mu .- 1))
     nontriv = [abs(mu[k]) for k in eachindex(mu) if k != j]
-    @printf("%-7s v_ref=%.4f tf=%.3fs  |mu| = %s\n", tag, d.p, d.tf,
+    @printf("%-7s w0=%.4f tf=%.3fs  |mu| = %s\n", tag, d.p, d.tf,
             join([@sprintf("%.4g", abs(m)) for m in mu], ", "))
     @printf("        max non-trivial |mu| = %.4g\n", maximum(nontriv))
     return mu
@@ -83,7 +83,7 @@ for f in files
         haskey(d, Symbol(tag)) || continue
         dd = getfield(d, Symbol(tag))
         mu = report(tag, dd)
-        p = merge(NT_P0, (v_ref=dd.p,))
+        p = merge(NT_P0, (w0=dd.p,))
         vbp = build_vbpara(p)
         X = reduce(hcat, [compute_OK(compute_Rτ([dd.u[1, k], dd.u[2, k]], vbp), vbp) for k in axes(dd.u, 2)])
         lbl = "$mode $tag (tf=$(round(dd.tf, digits=1))s)"

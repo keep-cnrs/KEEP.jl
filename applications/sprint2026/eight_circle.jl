@@ -10,11 +10,11 @@
 # so in a y/z plot altitude DECREASES with θ and the lemniscate's vertical
 # modulation is the negative of the naive (φ,θ) one:
 #     eight_x(τ) = Δφh·sin(τ)
-#     eight_y(τ) = (l + r) − Δθv·sin(2τ)      centre = l + r
-# with Δφh = (l+r)·Δφ, Δθv = (l+r)·Δθ.
+#     eight_y(τ) = (a + l) − Δθv·sin(2τ)      centre = a + l
+# with Δφh = (a+l)·Δφ, Δθv = (a+l)·Δθ.
 #
 # Modes:
-#   :src       true scale (above), arm circle radius arm_scaling·l at the origin.
+#   :src       true scale (above), arm circle radius arm_scaling·a at the origin.
 #   :rescaled  shape normalized to half-width 1, centred at y8 — SCHEMATIC,
 #              relative arm/eight scale not preserved.
 #
@@ -34,8 +34,8 @@ export Geometry, eight_circle_geometry, draw_background!, add_state!, add_trail!
 struct Geometry
     mode::Symbol
     arm_scaling::Float64
-    l::Float64
-    θ0::Float64          # = l + r_phys = l·(1 + vbp.r) : eight vertical centre and radial scale
+    a::Float64
+    θ0::Float64          # = a + l_phys = a·(1 + vbp.l) : eight vertical centre and radial scale
     Δφh::Float64         # cross-range half-amplitude
     Δθv::Float64         # vertical half-amplitude
     y8::Float64          # vertical placement of the (:rescaled) eight
@@ -48,12 +48,12 @@ end
 function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
         y8::Real=2.1, n::Int=400)
     mode in (:src, :rescaled) || error("mode must be :src or :rescaled")
-    l, r = vbp.l, vbp.r
-    θ0 = l * (1 + r)  # vbp.r is normalized by the arm length: l + r is the physical sum
+    a, l = vbp.a, vbp.l
+    θ0 = a * (1 + l)  # vbp.l is normalized by the arm length: a + l is the physical sum
     Δφh = θ0 * vbp.Δφ
     Δθv = vbp.Δθ * θ0
 
-    ls = arm_scaling * (mode === :src ? l : 1.0)
+    ls = arm_scaling * (mode === :src ? a : 1.0)
     αs = range(-π, π, length=n)
     circle_x = ls .* sin.(αs)
     circle_y = ls .* cos.(αs)
@@ -66,15 +66,15 @@ function eight_circle_geometry(vbp; mode::Symbol=:src, arm_scaling::Real=1.0,
         eight_x = sin.(τs)
         eight_y = y8 .- (Δθv / Δφh) .* sin.(2 .* τs)
     end
-    return Geometry(mode, Float64(arm_scaling), l, θ0, Δφh, Δθv, Float64(y8),
+    return Geometry(mode, Float64(arm_scaling), a, θ0, Δφh, Δθv, Float64(y8),
         circle_x, circle_y, eight_x, eight_y)
 end
 
 "Kite plot point (xdata, ydata) for arm angle α."
 function kite_xy(g::Geometry, α)
     a = PM4.compute_αhat(α)              # SA[cos α, sin α, 0]
-    s = g.arm_scaling * (g.mode === :src ? g.l : 1.0)
-    return (s * a[2], s * a[1])          # (l sinα, l cosα)
+    s = g.arm_scaling * (g.mode === :src ? g.a : 1.0)
+    return (s * a[2], s * a[1])          # (s sinα, s cosα)
 end
 
 "Eight plot point (xdata, ydata) for phase τ."

@@ -4,14 +4,14 @@
 #
 # 1. PHYSICAL-TIME BVP (the wind was rescaled in Vaschy-Buckingham space).
 #    The original `F` called `dynamics(u_dyn, build_vbpara(params))` with state
-#    rates in normalized units 1/T, T = l/v_ref. Since `build_vbpara` renormalizes
-#    with T(v_ref), continuing in `v_ref` changed the UNITS of the state and of
+#    rates in normalized units 1/T, T = a/w0. Since `build_vbpara` renormalizes
+#    with T(w0), continuing in `w0` changed the UNITS of the state and of
 #    `tf` along the branch: the parameter acted through renormalization instead of
 #    pure physics. Here the state is (α, τ, dα, dτ, tf) in physical units
 #    (rad, rad/s, s); `F` converts to/from the internal normalization using the
 #    characteristic time of the current parameter set. Consequence: gravity,
-#    inertia and torque keep their physical values along the branch and `v_ref`
-#    changes ONLY the wind magnitude v(z) = v_ref (z/h_ref)^(1/n_wind).
+#    inertia and torque keep their physical values along the branch and `w0`
+#    changes ONLY the wind magnitude v(z) = w0 (z/z0)^(1/n_wind).
 #
 # 2. MULTIPLE-SHOOTING DETERMINISM (upstream bug in BifurcationKit 0.8.2,
 #    src/bvp/shooting/residual.jl): `out = similar(X)` leaves the last entry of
@@ -26,14 +26,14 @@
 #    `bothside=true`). `bothside=true` looks equivalent to running ds>0 and
 #    ds<0, but is not — see the continuation section below. Findings:
 #
-#    * Family topology (physical units): main branch tf(v_ref) ≈ 0.63 s at
-#      v_ref = 9 m/s falling monotonically to ≈ 0.12 s at 20 m/s; below 9 m/s
-#      the period grows without bound (tf ≈ 47.7 s at v_ref = 2.4585, still
+#    * Family topology (physical units): main branch tf(w0) ≈ 0.63 s at
+#      w0 = 9 m/s falling monotonically to ≈ 0.12 s at 20 m/s; below 9 m/s
+#      the period grows without bound (tf ≈ 47.7 s at w0 = 2.4585, still
 #      growing at continuation budget — no true low-wind endpoint found); a
-#      fold tangle (detected folds at v_ref ≈ 9.31, 9.30, 9.46, 9.54, 9.72)
+#      fold tangle (detected folds at w0 ≈ 9.31, 9.30, 9.46, 9.54, 9.72)
 #      crowds branches just above 9 m/s.
 #    * Collocation and multiple shooting agree on the period to ~1e-6 s
-#      wherever both track the same branch (checked at v_ref = 8, 9, 10 m/s).
+#      wherever both track the same branch (checked at w0 = 8, 9, 10 m/s).
 
 using Pkg
 Pkg.activate("applications/sprint2026")
@@ -57,7 +57,7 @@ const BVP = BifurcationKit.BVP
 const vbp0 = build_vbpara()
 const p0 = build_para(vbp0)
 const nt_p0 = (; zip(keys(p0), p0)...)
-const syms = (:r, :I_eq, :torque_slope)
+const syms = (:l, :I, :b)
 
 factor = 5
 lb = p0[syms] ./ factor
@@ -73,7 +73,7 @@ x_optimization = t -> solution_sim(t, idxs=1:4)  # normalized time
 tf_optimization = solution_sim.t[end]            # normalized period
 
 ## Conversion to physical time
-const T0 = p0.l / p0.v_ref        # characteristic time (s) at reference wind
+const T0 = p0.a / p0.w0        # characteristic time (s) at reference wind
 tf_physical = tf_optimization * T0
 
 "Sample the optimized cycle at physical time `t`: (α, τ, dα, dτ) in rad, rad/s."
@@ -89,7 +89,7 @@ end
 # the ~6.4 μs total). Kept only for validation of `F_fast`.
 function F_reference(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref  # characteristic time of the CURRENT parameters
+    T = params.a / params.w0  # characteristic time of the CURRENT parameters
     u_dyn = SA[α, τ, T*dα, T*dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, build_vbpara(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
@@ -106,22 +106,22 @@ so a plain struct drops the ComponentArray machinery entirely).
 Values are bit-identical to `build_vbpara`.
 """
 Base.@kwdef struct FastPara{T}
-    l::T
+    a::T
     m::T
-    v_ref::T
+    w0::T
     g::T
-    h_ref::T
-    r::T
+    z0::T
+    l::T
     c_L::T
     f::T
     c_D_l::T
     m_l::T
-    I_eq::T
+    I::T
     Cmax::T
     Ωmin::T
     Ωmax::T
     Ωlim::T
-    torque_slope::T
+    b::T
     n_wind::T
     θ0::T
     φ0::T
@@ -130,20 +130,20 @@ Base.@kwdef struct FastPara{T}
 end
 
 FastPara(vbp) = FastPara{Float64}(
-    vbp.l, vbp.m, vbp.v_ref, vbp.g, vbp.h_ref, vbp.r, vbp.c_L, vbp.f, vbp.c_D_l,
-    vbp.m_l, vbp.I_eq, vbp.Cmax, vbp.Ωmin, vbp.Ωmax, vbp.Ωlim, vbp.torque_slope,
+    vbp.a, vbp.m, vbp.w0, vbp.g, vbp.z0, vbp.l, vbp.c_L, vbp.f, vbp.c_D_l,
+    vbp.m_l, vbp.I, vbp.Cmax, vbp.Ωmin, vbp.Ωmax, vbp.Ωlim, vbp.b,
     vbp.n_wind, vbp.θ0, vbp.φ0, vbp.Δθ, vbp.Δφ,
 )
 
-# ponytail: single-entry cache keyed on v_ref; continuation evaluates many RHS
-# at one parameter value, so we rebuild only when v_ref actually changes.
-const FASTPARA_CACHE = Ref{Union{Nothing,Tuple{Float64,FastPara{Float64}}}}(nothing)  # (vref, FastPara)
+# ponytail: single-entry cache keyed on w0; continuation evaluates many RHS
+# at one parameter value, so we rebuild only when w0 actually changes.
+const FASTPARA_CACHE = Ref{Union{Nothing,Tuple{Float64,FastPara{Float64}}}}(nothing)  # (w0, FastPara)
 
 @inline function get_fast_para(params)
-    vref = params.v_ref
+    w0 = params.w0
     c = FASTPARA_CACHE[]
-    if c === nothing || c[1] != vref
-        c = (vref, FastPara(build_vbpara(params)))
+    if c === nothing || c[1] != w0
+        c = (w0, FastPara(build_vbpara(params)))
         FASTPARA_CACHE[] = c
     end
     return c[2]
@@ -151,7 +151,7 @@ end
 
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref
+    T = params.a / params.w0
     u_dyn = SA[α, τ, T*dα, T*dτ, 0]
     _, _, ddα, ddτ, _ = dynamics(u_dyn, get_fast_para(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0]
@@ -226,7 +226,7 @@ bvp = BVP.discretize(model, disc)
 params = nt_p0
 x0 = BVP.generate_solution(bvp, s -> vcat(x_optimization_phys(tf_physical * s), tf_physical))
 
-prob = BVP.BVPBifProblem(bvp, x0, params, (@optic _.v_ref);
+prob = BVP.BVPBifProblem(bvp, x0, params, (@optic _.w0);
     jacobian=BifurcationKit.DenseAnalytical(),
     record_from_solution=record_period,
 )
@@ -260,9 +260,9 @@ optc = ContinuationPar(
 # * BifurcationKit merges the legs as `_cat!(_reverse(backward), forward)`
 #   (Results.jl:464): the stored branch BEGINS at the backward leg's endpoint.
 #   Plotted, that reversed leg is indistinguishable from a second physical
-#   family — this produced the "both branches go right from v_ref = 9" artifact.
+#   family — this produced the "both branches go right from w0 = 9" artifact.
 # * The merged branch gives each leg neither its own budget nor a direction
-#   label; near the fold tangle at v_ref ≈ 8.7–9.7 the corrector can land on a
+#   label; near the fold tangle at w0 ≈ 8.7–9.7 the corrector can land on a
 #   different branch (observed: a single recorded step moved Δp = 0.27 with
 #   dsmax = 0.1 — impossible for a true PALC step, whose tangent is a unit
 #   vector, so the Newton correction left the branch) and then silently spend
@@ -316,7 +316,7 @@ function plot_solution_ms(x, p; iter, state, k...)
 
     tf_physical = x[5]
 
-    plot!(sol.t .* tf_physical, sol.u[4, :]; ylabel="dτ", title="Multiple shooting (v_ref=)", k...)
+    plot!(sol.t .* tf_physical, sol.u[4, :]; ylabel="dτ", title="Multiple shooting (w0=)", k...)
 end
 
 odeprob = ODE.ODEProblem(F_fast, u0_bif, (0, 1), nt_p0)
@@ -341,7 +341,7 @@ for i in 1:disc2.M
 end
 x0_ms[end] = sol.u[5]  # period (tf), constant along the collocation solution
 
-prob_ms = BVP.BVPBifProblem(bvp_ms, x0_ms, params, (@optic _.v_ref);
+prob_ms = BVP.BVPBifProblem(bvp_ms, x0_ms, params, (@optic _.w0);
     record_from_solution=record_period,
     plot_solution=plot_solution_ms,
 )
@@ -378,9 +378,9 @@ println("shooting sheet-jumps: ds>0 at indices ", sheet_jumps(br_ms_fwd),
 plot(br_ms_bwd)
 
 #=
-pourquoi tf@v_ref=9 != tf_optimization ? tf_physical vs tf_optimization vs T0? -> Mettre ça au clair
+pourquoi tf@w0=9 != tf_optimization ? tf_physical vs tf_optimization vs T0? -> Mettre ça au clair
 
-Fold at v_ref = +2.45866014, step index 5->6, continue it ? Log plot ? What does the solution look like, is it an unstable limit cycle ?!
+Fold at w0 = +2.45866014, step index 5->6, continue it ? Log plot ? What does the solution look like, is it an unstable limit cycle ?!
 
 what are pink points?
 

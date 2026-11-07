@@ -102,14 +102,14 @@ VIS.plot_trajectory_4D(sol4; tspan=tf)
 plot!(size=(400, 300))
 # savefig("docs/media/trajectory_4D.pdf")
 
-plot!(xlim=(-vbp.l, 3vbp.l), ylim=(-2vbp.l, 2vbp.l), camera=(30, 45))
+plot!(xlim=(-vbp.a, 3vbp.a), ylim=(-2vbp.a, 2vbp.a), camera=(30, 45))
 # savefig("docs/media/trajectory_4D_arm_zoom.pdf")
 
 
 
 if false
     fps = 30
-    anim = VIS.animate_trajectory_4D(@set sol4.prob.p.r = 6; tspan=(0, tf_small), fps=fps, end_camera=(30, 30), figsize=(400, 400))
+    anim = VIS.animate_trajectory_4D(@set sol4.prob.p.l = 6; tspan=(0, tf_small), fps=fps, end_camera=(30, 30), figsize=(400, 400))
     display(gif(anim; fps=fps))
     # gif(anim, "docs/media/trajectory_animated.gif"; fps=fps)
 end

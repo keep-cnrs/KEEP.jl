@@ -28,7 +28,7 @@ end
 function main()
     outpath = mkpath("out/2026_07_ECC")
 
-    syms = [:r, :I_eq, :torque_slope]
+    syms = [:l, :I, :b]
     p0 = PMP.build_para()
     lower, upper = OPT.make_bounds(p0, syms)
     tol = 1e-6

@@ -1,10 +1,10 @@
 # Confirm the lower terminus is a fold (saddle-node of cycles) by marching
-# v_ref downward with a damped 4-D shooting Newton, and watching the
+# w0 downward with a damped 4-D shooting Newton, and watching the
 # multipliers. At a fold, ∂R/∂s becomes singular ⇔ a nontrivial multiplier
-# → +1, and Newton eventually fails (can't pass a limit point in v_ref).
+# → +1, and Newton eventually fails (can't pass a limit point in w0).
 #
 # Shooting unknowns s = [α0, dα0, dτ0, T] (T = normalized period);
-# R(s; v_ref) = endpoint_residuals(flow) ∈ R^4 (sense = +, dτ > 0).
+# R(s; w0) = endpoint_residuals(flow) ∈ R^4 (sense = +, dτ > 0).
 using Pkg
 Pkg.activate(@__DIR__)
 
@@ -23,7 +23,7 @@ fd_jac(f, x; h=1e-6) = (n = length(x); J = Matrix{Float64}(undef, n, n);
         @views J[:, i] .= (f(x .+ e) .- f(x .- e)) ./ (2h)
     end; J)
 
-vbp_at(vr) = build_vbpara(merge(NT_P0, (v_ref=vr,)))
+vbp_at(vr) = build_vbpara(merge(NT_P0, (w0=vr,)))
 
 function resid(s, vbp)
     u0, T = unpack_shooting(SA[s[1], s[2], s[3], s[4]])
@@ -60,20 +60,20 @@ function newton(s0, vbp)
 end
 
 function main()
-    # Warm-start down to v_ref = 2.5 (compute_limit_cycle tracks reliably).
+    # Warm-start down to w0 = 2.5 (compute_limit_cycle tracks reliably).
     s = [-0.7771, 1.3899, 1.8811, 2.82632]
     for vr in (6.0, 4.0, 3.0, 2.75, 2.6, 2.55, 2.52, 2.5)
         s = build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tol=1e-11))
     end
-    println("start (v_ref=2.5): T=", round(s[4], digits=5))
+    println("start (w0=2.5): T=", round(s[4], digits=5))
 
-    println("\n v_ref      T        tf (s)     |mu| (sorted)                     res")
+    println("\n w0      T        tf (s)     |mu| (sorted)                     res")
     vr = 2.5
     while vr > 2.44
         vbp = vbp_at(vr)
         s, res = newton(s, vbp)
         mu = multipliers(s, vbp)
-        @printf("%7.4f  %9.5f  %8.4f  %s  %.1e%s\n", vr, s[4], s[4] * (NT_P0.l / vr),
+        @printf("%7.4f  %9.5f  %8.4f  %s  %.1e%s\n", vr, s[4], s[4] * (NT_P0.a / vr),
             join([@sprintf("%.5f", m) for m in mu], "  "), res, res < 1e-8 ? "" : "  <-- FAIL")
         flush(stdout)
         res < 1e-8 || break

@@ -25,14 +25,14 @@ function dynamics(x, u, p, t=0)
 
     # # Compute unit vectors
     # αhat = compute_αhat(α)
-    # OA = p.l * αhat
+    # OA = p.a * αhat
     # rhat = normalize(OK - OA)
 
     # # Compute gravity force
-    # Fgrav = SA[0, 0, -p.g - p.m_l * p.r] * M * L * T^-2
+    # Fgrav = SA[0, 0, -p.g - p.m_l * p.l] * M * L * T^-2
 
     # # Compute aerodynamical force
-    # wind = SA[abs(OK[3] / (p.h_ref * L))^p.n_wind, 0, 0] * L * T^-1
+    # wind = SA[abs(OK[3] / (p.z0 * L))^p.n_wind, 0, 0] * L * T^-1
     # kite_speed = dOK
     # app_wind = wind - kite_speed  # apparent wind, We
 
@@ -46,7 +46,7 @@ function dynamics(x, u, p, t=0)
 
     # lift_k = norm(app_wind)^2 * (p.c_L * M * L^-1)
     # drag_k = lift_k / p.f
-    # drag_l = (p.c_D_l * M * L^-2) * (p.r * L) * norm(app_wind_perp_to_lines)^2
+    # drag_l = (p.c_D_l * M * L^-2) * (p.l * L) * norm(app_wind_perp_to_lines)^2
     # Faero_on_kite = -drag_k * xw - lift_k * zw
     # Faero_on_lines = drag_l .* ew
     # Faero = Faero_on_kite + Faero_on_lines
@@ -54,7 +54,7 @@ function dynamics(x, u, p, t=0)
     # # torque with same sign as dα, the torque applied by the arm on the generator
     # torque = torque_function(dα * T, p) * M * L^2 * T^-2
     # l_tension = rhat ⋅ (SA[0, 0, 1] × OA)
-    # A_tension = -(p.I_eq * M * L^2) / l_tension * rhat * SA[1, 0]'
+    # A_tension = -(p.I * M * L^2) / l_tension * rhat * SA[1, 0]'
     # b_tension = -torque / l_tension * rhat
 
     # D_OK_D_Rτ = D_OK * D_Rτ

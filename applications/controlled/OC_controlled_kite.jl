@@ -432,11 +432,11 @@ fθ(t) = τ_to_θφ(lc(t)[2], vbp)[1]
 fφ(t) = τ_to_θφ(lc(t)[2], vbp)[2]
 
 fpos(t) = begin
-    LU = vbp.l
-    a, θl, φl = fα(t), fθ(t), fφ(t)
-    LU .* [cos(a) + vbp.r * sin(θl) * cos(φl),
-        sin(a) + vbp.r * sin(θl) * sin(φl),
-        vbp.r * cos(θl)]
+    LU = vbp.a
+    α, θl, φl = fα(t), fθ(t), fφ(t)
+    LU .* [cos(α) + vbp.l * sin(θl) * cos(φl),
+        sin(α) + vbp.l * sin(θl) * sin(φl),
+        vbp.l * cos(θl)]
 end
 
 fβ(t) = begin
@@ -483,13 +483,13 @@ end
 Compute system position relative to origin given arm angle α and path coordinate τ.
 """
 function position_from_α_τ(α, τ, vbp)
-    LU = vbp.l
-    r = vbp.r
+    LU = vbp.a
+    l = vbp.l
     θ, φ = τ_to_θφ(τ, vbp)
     return LU .* SVector(
-        cos(α) + r * sin(θ) * cos(φ),
-        sin(α) + r * sin(θ) * sin(φ),
-        r * cos(θ)
+        cos(α) + l * sin(θ) * cos(φ),
+        sin(α) + l * sin(θ) * sin(φ),
+        l * cos(θ)
     )
 end
 

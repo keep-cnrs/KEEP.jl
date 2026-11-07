@@ -29,12 +29,12 @@ limit cycle (`PointMass4.kite_acceleration`).
 The optimization variables are
 
 ```
-Θ = (ℓ, I, b, Δφ) = (r, I_eq, torque_slope, Δφ).
+Θ = (ℓ, I, b, Δφ) = (l, I, b, Δφ).
 ```
 
-Here `ℓ` (`p.r`) is the **tether length**, `I` is the **inertia of the rotating
+Here `ℓ` (`p.l`) is the **tether length**, `I` is the **inertia of the rotating
 arm** about its pivot, `b` is the generator braking slope and `Δφ` is the
-lemniscate half-width. The arm length itself is fixed at `p.l = 2 m`. The
+lemniscate half-width. The arm length itself is fixed at `p.a = 2 m`. The
 lemniscate half-height Δθ is held at its nominal 6° (0.10472 rad) and is never
 optimized.
 
@@ -47,12 +47,12 @@ The boxes are
 | b (kg m² s⁻¹ rad⁻¹) | 1 | 1e6 |
 | Δφ (°) | 10 | 90 |
 
-The inertia floor is a structural one. The 2 m aluminium arm (`p.l` is the
+The inertia floor is a structural one. The 2 m aluminium arm (`p.a` is the
 lever arm) sees the worst line tension in the study, `T ≈ 34 kN` at 15 m/s, so
-the root bending moment is `M = T p.l ≈ 68 kN m`. For 6061-T6
+the root bending moment is `M = T p.a ≈ 68 kN m`. For 6061-T6
 (`σy ≈ 276 MPa`) with a safety factor of 2, the required section modulus is
 `W = M/σallow ≈ 491 cm³`, met by a Ø250 mm tube with an 11.5 mm wall (47 kg).
-Its inertia about the pivot is `I = m p.l²/3 ≈ 62 kg m²` (a solid bar would be
+Its inertia about the pivot is `I = m p.a²/3 ≈ 62 kg m²` (a solid bar would be
 165 kg m²). There is deliberately no structural upper bound: extra mass is
 allowed if it buys power.
 

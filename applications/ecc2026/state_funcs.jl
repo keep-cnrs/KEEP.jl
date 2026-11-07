@@ -2,7 +2,7 @@
 τ = (t, sol) -> sol(t, idxs=2)
 a_vec = (t, sol) -> begin
     α_ = α(t, sol)
-    a = sol.prob.p.l
+    a = sol.prob.p.a
     a * SA[cos(α_), sin(α_), 0]
 end
 θ = (t, sol) -> begin
@@ -24,8 +24,8 @@ r = (t, sol) -> begin
     r_hat_ = r_hat(t, sol)
     a_hat_ = a_vec(t, sol)
     dotprod = r_hat_' * a_hat_
-    l = sol.prob.p.r * sol.prob.p.l   # p.r is arm-normalized (build_vbpara): physical tether = p.r * p.l
-    a = sol.prob.p.l
+    l = sol.prob.p.l * sol.prob.p.a   # p.l is arm-normalized (build_vbpara): physical tether = p.l * p.a
+    a = sol.prob.p.a
     dotprod + sqrt(dotprod^2 + l^2 - a^2)
 end
 r_vec = (t, sol) -> begin
@@ -44,7 +44,7 @@ F_l_vec = (t, sol) -> begin
     r_hat_ = r_hat(t, sol)
     a_vec_ = a_vec(t, sol)
     l_tension = r_hat_ ⋅ (SA[0, 0, 1] × a_vec_)
-    A_tension = -p.I_eq / l_tension * r_hat_ * SA[1, 0]'
+    A_tension = -p.I / l_tension * r_hat_ * SA[1, 0]'
     b_tension = -T(t, sol) / l_tension * r_hat_
     F_tension = A_tension[:, 1] * ddα(t, sol) + b_tension
 end

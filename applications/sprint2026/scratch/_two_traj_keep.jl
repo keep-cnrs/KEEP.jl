@@ -1,10 +1,10 @@
-# Two limit-cycle trajectories at the SAME v_ref, one on each side of the fold:
-#   * "short" branch: the strongly stable cycle (tf ~ 13 s at v_ref = 2.47),
+# Two limit-cycle trajectories at the SAME w0, one on each side of the fold:
+#   * "short" branch: the strongly stable cycle (tf ~ 13 s at w0 = 2.47),
 #     easily obtained by integrating / Newton from above;
 #   * "long" branch: the saddle cycle past the fold (tf ~ 28 s), reachable only
 #     by pseudo-arclength continuation THROUGH the limit point.
 # We continue the 4-D shooting map in arclength past the fold, then refine each
-# branch at v_ref = 2.47 and integrate one period.
+# branch at w0 = 2.47 and integrate one period.
 #
 # Run under the memory guard: runwatch -l 1500 -t 280 -- julia ...
 using Pkg
@@ -20,8 +20,8 @@ using Plots
 Logging.disable_logging(Logging.Warn)
 
 const NT_P0 = NamedTuple(build_para(build_vbpara()))
-vbp_at(vr) = build_vbpara(merge(NT_P0, (v_ref=vr,)))
-T0(vr) = NT_P0.l / vr
+vbp_at(vr) = build_vbpara(merge(NT_P0, (w0=vr,)))
+T0(vr) = NT_P0.a / vr
 
 function R4(z, vr=z[5]; tol=1e-10)
     u0, T = unpack_shooting(SA[z[1], z[2], z[3], z[4]])
@@ -40,7 +40,7 @@ function tangent(z, τprev)
     return τ ./ norm(τ)
 end
 
-"FD multipliers of the cycle at shooting s with v_ref = vr."
+"FD multipliers of the cycle at shooting s with w0 = vr."
 function multipliers(s, vr)
     u0, T = unpack_shooting(SA[s[1], s[2], s[3], s[4]])
     vbp = vbp_at(vr); v0 = collect(Array(u0)[1:4])
@@ -53,7 +53,7 @@ function multipliers(s, vr)
     return sort(abs.(eigvals(J)), rev=true)
 end
 
-"Refine the cycle at fixed v_ref (4 unknowns: α0,dα0,dτ0,T)."
+"Refine the cycle at fixed w0 (4 unknowns: α0,dα0,dτ0,T)."
 function solve_fixed(z0, vr)
     s = Vector{Float64}(z0[1:4]); vbp = vbp_at(vr)
     F = s -> begin
@@ -90,14 +90,14 @@ function traj(s, vr)
 end
 
 function main()
-    # seed on the stable branch at v_ref = 3
+    # seed on the stable branch at w0 = 3
     s = [-0.7771, 1.3899, 1.8811, 2.82632]
     for vr in (6.0, 4.0, 3.0)
         s = build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp_at(vr); tf=120, tol=1e-10))
     end
     z = [s[1], s[2], s[3], s[4], 3.0]
     τ = tangent(z, ones(5))
-    τ[5] > 0 && (τ = -τ)                 # decrease v_ref first
+    τ[5] > 0 && (τ = -τ)                 # decrease w0 first
 
     path = [copy(z)]
     ds = 0.05
@@ -124,7 +124,7 @@ function main()
         ok || (println("corrector failed at step ", step); break)
         z = zc; τ = tangent(z, τ); push!(path, z)
         ds = min(ds * 1.3, 0.1)
-        @printf("step %3d  v_ref=%.5f  T=%.4f  tf=%.3f s  (ds=%.3f)\n", step, z[5], z[4], z[4] * T0(z[5]), ds)
+        @printf("step %3d  w0=%.5f  T=%.4f  tf=%.3f s  (ds=%.3f)\n", step, z[5], z[4], z[4] * T0(z[5]), ds)
         flush(stdout)
         z[4] * T0(z[5]) > 36 && break
     end
@@ -136,7 +136,7 @@ function main()
     zlong = path[leg2[argmin([abs(path[i][5] - vrt) for i in leg2])]]
     sshort, rshort = solve_fixed(zshort, vrt)
     slong, rlong = solve_fixed(zlong, vrt)
-    @printf("\nv_ref = %.3f\n  short: tf = %.4f s  res=%.1e  |mu| = %s\n", vrt,
+    @printf("\nw0 = %.3f\n  short: tf = %.4f s  res=%.1e  |mu| = %s\n", vrt,
         sshort[4] * T0(vrt), rshort, join([@sprintf("%.4f", m) for m in multipliers(sshort, vrt)], "  "))
     @printf("  long : tf = %.4f s  res=%.1e  |mu| = %s\n",
         slong[4] * T0(vrt), rlong, join([@sprintf("%.4f", m) for m in multipliers(slong, vrt)], "  "))

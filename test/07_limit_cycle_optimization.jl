@@ -21,12 +21,12 @@ default(lw=3, formatter=:plain, label="")
 set_torque_function!(LINEAR_TORQUE)
 
 # set_torque_function!(RATIONAL_TORQUE)
-# syms = [:r, :I_eq, :Cmax, :Ωmax]
+# syms = [:l, :I, :Cmax, :Ωmax]
 
 p0 = build_para()
 
 ## Step 1
-syms0 = [:r, :I_eq, :torque_slope]
+syms0 = [:l, :I, :b]
 lower0, upper0 = make_bounds(p0, syms0)
 lower0[3] = 1
 upper0[3] = 1e6
@@ -41,7 +41,7 @@ p = p1
 
 ## Step 2
 if false
-    syms1 = [:r, :I_eq, :torque_slope, :Δθ, :Δφ]
+    syms1 = [:l, :I, :b, :Δθ, :Δφ]
     lower1, upper1 = make_bounds(p0, syms1)
     lower1[3] = 1
     upper1[3] = 1e6

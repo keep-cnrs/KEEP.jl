@@ -9,19 +9,19 @@ using Serialization
 import BifurcationKit                                  # resolve RecursiveArrayTools on deserialize
 import KEEP.PointMassPara: build_para, build_vbpara
 
-const OPT = (r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744)
+const OPT = (l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744)
 const HERE = @__DIR__
 
 include(joinpath(HERE, "eight_circle.jl"))
 using .EightCircle
 
-vbp = build_vbpara(build_para(r=OPT.r, I_eq=OPT.I_eq, torque_slope=OPT.torque_slope))
+vbp = build_vbpara(build_para(l=OPT.l, I=OPT.I, b=OPT.b))
 cyc = deserialize(joinpath(HERE, "scratch", "three_cycles_shooting.jls"))
 U = Array(cyc.short.u)
 Qs = [(U[1, i], U[2, i]) for i in 1:size(U, 2)]
 nh = round(Int, 0.45 * length(Qs))
 
-plt = plot(layout=(1, 2), size=(1500, 780), plot_title="eight-circle layout — short cycle @ v_ref=2.48")
+plt = plot(layout=(1, 2), size=(1500, 780), plot_title="eight-circle layout — short cycle @ w0=2.48")
 for (k, mode) in enumerate((:src, :rescaled))
     g = eight_circle_geometry(vbp; mode=mode)
     sp = plt[k]

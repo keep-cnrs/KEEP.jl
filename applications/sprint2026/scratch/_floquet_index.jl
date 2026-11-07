@@ -2,7 +2,7 @@
 # orbits, by a reorthonormalised (QR) product of per-arc flow Jacobians.
 #
 # A raw product of the per-arc Jacobians is dominated by the unstable branches'
-# growth (|mu| ~ 1e34 for long, 1e75 for long-long at v_ref=2.48), so the
+# growth (|mu| ~ 1e34 for long, 1e75 for long-long at w0=2.48), so the
 # tangent map Phi is re-QR'd after EVERY arc and log|diag(R)| accumulated over
 # `nper` periods -> Lyapunov exponents, whose signs give the number of stable
 # directions (trivial exponent ~ 0). Per-arc renormalisation keeps every factor
@@ -19,14 +19,14 @@ const NT_P0 = NamedTuple(build_para(build_vbpara()))
 const CACHE = Ref{Union{Nothing,Tuple{Float64,Any}}}(nothing)
 function fp(p)
     c = CACHE[]
-    (c === nothing || c[1] != p.v_ref) && (c = (p.v_ref, NamedTuple(build_vbpara(p))); CACHE[] = c)
+    (c === nothing || c[1] != p.w0) && (c = (p.w0, NamedTuple(build_vbpara(p))); CACHE[] = c)
     return c[2]
 end
 
 "Normalised BVP RHS on the 5-state (α, τ, dα, dτ, tf); tf held fixed."
 function F_fast(u, params, t=0)
     α, τ, dα, dτ, tf = u
-    T = params.l / params.v_ref
+    T = params.a / params.w0
     _, _, ddα, ddτ, _ = dynamics(SA[α, τ, T*dα, T*dτ, 0.0], fp(params))
     out = tf .* SA[dα, dτ, ddα/T^2, ddτ/T^2, 0.0]
     return u isa SVector ? out : Vector(out)
@@ -83,7 +83,7 @@ function report_file(f, mstar)
     for tag in (:short, :long, :longlong)
         hasproperty(cy, tag) || continue
         d = getfield(cy, tag)
-        pp = merge(NT_P0, (v_ref=d.p, tf=d.tf))
+        pp = merge(NT_P0, (w0=d.p, tf=d.tf))
         e, narcs = floquet_exponents(d, pp)
         e = sort(e, rev=true)
         triv = e[argmin(abs.(e))]                  # trivial (≈0) direction

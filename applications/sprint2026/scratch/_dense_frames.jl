@@ -11,7 +11,7 @@
 # tf× too long and its POInterpolation walks an EnsembleSolution as a matrix.
 #
 # Serializes scratch/three_cycles_frames.jls:
-#   (; short=(;frames, trail, tf), long=..., longlong=..., v_ref, SNAPS, M)
+#   (; short=(;frames, trail, tf), long=..., longlong=..., w0, SNAPS, M)
 # frames = 2×SNAPS (α, τ) at s = (i-1)/SNAPS (normalized, [0,1));
 # trail  = Vector of (α,τ) mesh points for the faint background.
 #
@@ -21,7 +21,7 @@ import BifurcationKit
 include(joinpath(@__DIR__, "..", "BK_tests_0910.jl"))
 
 const OPT = (
-    params_opt=(r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744),
+    params_opt=(l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744),
     shooting=[-1.2304408672910867, 1.3582650527729334, 1.3900409853869808, 3.8474750196009815],
 )
 const SNAPS = 300
@@ -67,7 +67,7 @@ function main()
     method = BVP.Shooting(cy.M, ODE_ALG, true)
     bvp = make_bvp(make_model(method, setup), method)
     sh = bvp.cache
-    p = merge(setup.nt_p0, (v_ref=cy.v_ref,))
+    p = merge(setup.nt_p0, (w0=cy.w0,))
     out = Dict{Symbol,NamedTuple}()
     for (name, c) in ((:short, cy.short), (:long, cy.long), (:longlong, cy.longlong))
         @printf("  %-8s ", name)
@@ -75,7 +75,7 @@ function main()
     end
     serialize(joinpath(@__DIR__, "three_cycles_frames.jls"),
         (; short=out[:short], long=out[:long], longlong=out[:longlong],
-            v_ref=cy.v_ref, SNAPS=SNAPS, M=cy.M))
+            w0=cy.w0, SNAPS=SNAPS, M=cy.M))
     @printf("saved three_cycles_frames.jls (SNAPS=%d, M=%d)\n", SNAPS, cy.M)
 end
 

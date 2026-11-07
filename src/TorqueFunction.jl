@@ -69,7 +69,7 @@ A simplified version of `torque_function_rational` where `dα` stays in the line
 Can be used to determine `Ωmax` in post-processing.
 """
 function torque_function_linear(dα, p)
-    return p.torque_slope * dα
+    return p.b * dα
 end
 
 @enum TorqueFunctionChoice begin

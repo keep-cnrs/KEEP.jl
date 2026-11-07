@@ -4,7 +4,7 @@ using Serialization
 import KEEP.PointMassPara: build_para, build_vbpara
 
 const HERE = @__DIR__
-const OPT = (r=47.44987027243979, I_eq=3541.2653832051565, torque_slope=3862.561181135744)
+const OPT = (l=47.44987027243979, I=3541.2653832051565, b=3862.561181135744)
 const EC_MODE = Symbol(get(ENV, "EC_MODE", "src"))            # :src (true scale) | :rescaled
 const ARM_SCALING = parse(Float64, get(ENV, "ARM_SCALING", "2"))
 const FPS = 30
@@ -16,7 +16,7 @@ const SPOKE_LW = 5.0
 include(joinpath(HERE, "eight_circle.jl"))
 using .EightCircle
 
-vbp = build_vbpara(build_para(r=OPT.r, I_eq=OPT.I_eq, torque_slope=OPT.torque_slope))
+vbp = build_vbpara(build_para(l=OPT.l, I=OPT.I, b=OPT.b))
 geom = eight_circle_geometry(vbp; mode=EC_MODE, arm_scaling=ARM_SCALING)
 cyc = deserialize(joinpath(HERE, "scratch", "three_cycles_frames.jls"))
 @assert cyc.SNAPS == NFRAMES "frames file has $(cyc.SNAPS) phases, need $NFRAMES"
@@ -29,7 +29,7 @@ cycles = [
 
 function build_frame(i)
     plt = plot(layout=(1, 3), size=SIZE,
-        plot_title="Three prograde limit cycles — each time-scaled to 10 s (v_ref = 2.48)")
+        plot_title="Three prograde limit cycles — each time-scaled to 10 s (w0 = 2.48)")
     for k in 1:3
         cy = cycles[k].c
         sp = plt[k]

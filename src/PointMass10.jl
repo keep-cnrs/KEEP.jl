@@ -44,9 +44,9 @@ Compute the Cartesian coordinates using α, θ2 and φ2.
 """
 function αθ2φ2_to_xyz(α, θ2, φ2, p)
     SA[
-        p.l * cos(α) + p.r * sin(θ2) * cos(φ2 + α)
-        p.l * sin(α) + p.r * sin(θ2) * sin(φ2 + α)
-        p.r * cos(θ2)
+        p.a * cos(α) + p.l * sin(θ2) * cos(φ2 + α)
+        p.a * sin(α) + p.l * sin(θ2) * sin(φ2 + α)
+        p.l * cos(θ2)
     ]
 end
 
@@ -72,7 +72,7 @@ function Ftension_r(q, dq, ddq, p)
     _, _, _, θ2, φ2 = q
     _, _, dα, _, _ = dq
     _, _, ddα, _, _ = ddq
-    return (p.I_eq * ddα - torque_function(dα, p)) / (p.l * sin(θ2) * sin(φ2))
+    return (p.I * ddα - torque_function(dα, p)) / (p.a * sin(θ2) * sin(φ2))
 end
 
 """
@@ -80,7 +80,7 @@ Compute the force of gravity on the solid kite + lines
 """
 function Fgrav_func(q, p)
     linear_density_l = p.ρ_l * π * (p.d_l^2) / 4
-    m_l = NB_LINES * linear_density_l * p.r / 2
+    m_l = NB_LINES * linear_density_l * p.l / 2
     return SA[0, 0, -p.g*(p.m+m_l)]
 end
 
@@ -90,7 +90,7 @@ Compute the aerodynamical force on the solid kite + lines
 function Faero_func(q, dq, p)
     # test OK with compute_pos2 & compute_speed2 to compute z (height of kite) and app_wind (apparent wind)
     z = compute_pos1(q, p)[3]
-    wind = SA[p.v_ref*abs(z/p.h_ref)^(1/p.n_wind), 0, 0]
+    wind = SA[p.w0*abs(z/p.z0)^(1/p.n_wind), 0, 0]
     kite_speed = compute_speed1(q, dq, p)
     app_wind = wind - kite_speed  # We
     r_hat = rot2(q)[:, 1]  # er
@@ -103,9 +103,9 @@ function Faero_func(q, dq, p)
     yw = r_hat × ew
     zw = xw × yw
 
-    lift_k = 1 // 2 * p.S * p.ρ_air * norm(app_wind)^2 * p.C_L
+    lift_k = 1 // 2 * p.S * p.ρ_a * norm(app_wind)^2 * p.C_L
     drag_k = lift_k * p.C_D / p.C_L
-    drag_l = 1 // 6 * NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
+    drag_l = 1 // 6 * NB_LINES * p.ρ_a * p.d_l * p.C_D_l * p.l * norm(app_wind_perp_to_lines)^2
     Faero_on_kite = -drag_k * xw - lift_k * zw
     Faero_on_lines = drag_l .* ew
     return Faero_on_kite + Faero_on_lines
@@ -135,7 +135,7 @@ compute_accel_diff(q, ddq, p) = Jv(dq_ -> compute_speed_diff(q, dq_, p), q, ddq)
 
 function compute_posA(q, p)
     α = q[3]
-    return SA[p.l*cos(α), p.l*sin(α), 0]
+    return SA[p.a*cos(α), p.a*sin(α), 0]
 end
 compute_speedA(q, dq, p) = Jv(q_ -> compute_posA(q_, p), q, dq)
 compute_accelA(q, ddq, p) = Jv(dq_ -> compute_speedA(q, dq_, p), q, ddq)
@@ -172,7 +172,7 @@ function residuals(q, dq, ddq, p; Fgrav, Faero, torque)
         Jv(q_ -> compute_speed2(q_, dq, p), q, dq) +
             Jv(q_ -> compute_pos2(q_, p), q, ddq)
     )
-    Ftension_kite = SA[(p.I_eq*ddα+torque)/(p.l*sin(θ2)*sin(φ2)), 0, 0]
+    Ftension_kite = SA[(p.I*ddα+torque)/(p.a*sin(θ2)*sin(φ2)), 0, 0]
     Fres = Fapp - Fgrav - Faero + rot2(q) * Ftension_kite
 
     ∂OK∂R = ForwardDiff.derivative(R_ -> compute_pos1(SA[R_, τ, α, θ2, φ2], p), R)
@@ -252,22 +252,22 @@ We set ``α = 0`` to make the problem easier.
 ```math
 \{R (\sin(θ) \cos(φ), \sin(θ) \sin(φ), \cos(θ)), R \in \mathbb{R}^+\}
 ```
-and the sphere of radius ``r`` centered in ``(l, 0, 0)``.
+and the sphere of radius ``l`` centered in ``(a, 0, 0)``.
 Substitute the coordinates of the point on the line into the following expression of the sphere
 ```math
-\{(x, y, z) | (x-l)^2 + y^2 + z^2 = r^2\}
+\{(x, y, z) | (x-a)^2 + y^2 + z^2 = l^2\}
 ```
 and solve the second order polynomial in ``R`` using the positive root, because we want the kite to be below the wind.
 
-There will be a solution if ``r`` is big enough.
- 2. find θ2 using ``R \cos(θ) = r \cos(θ2)``
- 3. find φ2 using ``r \sin(θ2) \sin(φ2) = R \sin(θ) \sin(φ)``
+There will be a solution if ``l`` is big enough.
+ 2. find θ2 using ``R \cos(θ) = l \cos(θ2)``
+ 3. find φ2 using ``l \sin(θ2) \sin(φ2) = R \sin(θ) \sin(φ)``
 """
 function init_q(τ, p)
     θ, φ = τ_to_θφ(τ, p)
-    R = p.l * sin(θ) * cos(φ) + sqrt((p.l * sin(θ) * cos(φ))^2 + (p.r^2 - p.l^2))
-    θ2 = acos(R * cos(θ) / p.r)
-    φ2 = asin(R * sin(θ) * sin(φ) / (p.r * sin(θ2)))
+    R = p.a * sin(θ) * cos(φ) + sqrt((p.a * sin(θ) * cos(φ))^2 + (p.l^2 - p.a^2))
+    θ2 = acos(R * cos(θ) / p.l)
+    φ2 = asin(R * sin(θ) * sin(φ) / (p.l * sin(θ2)))
     α = 0.
     return SA[R, τ, α, θ2, φ2]
 end

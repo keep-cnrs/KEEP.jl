@@ -1,11 +1,11 @@
 # _fold_tangle_probe.jl  —  TEMPORARY exploration (not part of the deliverable)
 #
 # QUESTION
-#   `BK_tests_0910.jl` / REPORT.md report a "fold tangle" near v_ref ≈ 9.2–9.8 m/s
+#   `BK_tests_0910.jl` / REPORT.md report a "fold tangle" near w0 ≈ 9.2–9.8 m/s
 #   (several :fold special points crowding branches, plus corrector sheet-jumps).
 #   Is anything genuinely new there — real saddle-nodes / extra periodic orbits —
 #   or is it a continuation artifact (BK's `detect_fold` firing on a nearly flat
-#   tf(v_ref) plus the corrector hopping between symmetry-related cycles)?
+#   tf(w0) plus the corrector hopping between symmetry-related cycles)?
 #
 # TESTS (all independent of the BK continuation that produced the tangle)
 #   A. Ground-truth Floquet multipliers of the tracked stable cycle over
@@ -28,8 +28,8 @@ using KEEP.LimitCycle: compute_limit_cycle, build_shooting, unpack_shooting,
 using StaticArrays, LinearAlgebra, Printf, Serialization
 
 const NT_P0 = NamedTuple(build_para(build_vbpara()))
-const T0 = vr -> NT_P0.l / vr            # normalized period -> physical seconds
-const S9 = [-0.7771, 1.3899, 1.8811, 2.82632]   # stable operating cycle @ v_ref = 9
+const T0 = vr -> NT_P0.a / vr            # normalized period -> physical seconds
+const S9 = [-0.7771, 1.3899, 1.8811, 2.82632]   # stable operating cycle @ w0 = 9
 
 fd_jac(f, x; h=1e-7) = (n = length(x); J = Matrix{Float64}(undef, n, n);
     for i in 1:n
@@ -53,12 +53,12 @@ function mmax(mu)
     return maximum(abs(mu[k]) for k in eachindex(mu) if k != j)
 end
 
-"Warm-started continuation of the cycle in v_ref, returning rows."
+"Warm-started continuation of the cycle in w0, returning rows."
 function sweep(s0, vrefs)
     rows = NamedTuple[]
     s = s0
     for vr in vrefs
-        vbp = build_vbpara(merge(NT_P0, (v_ref=vr,)))
+        vbp = build_vbpara(merge(NT_P0, (w0=vr,)))
         s = build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=1e-11))
         mu = sort(abs.(multipliers(s, vbp)), rev=true)
         push!(rows, (vr=vr, tf=s[4] * T0(vr), mmax=mmax(multipliers(s, vbp))))
@@ -68,27 +68,27 @@ function sweep(s0, vrefs)
 end
 
 ## ---------------------------------------------------------------- A ---------
-println("=== A. ground-truth |mu| of the tracked stable branch, v_ref ∈ [8.8, 10.2] ===")
+println("=== A. ground-truth |mu| of the tracked stable branch, w0 ∈ [8.8, 10.2] ===")
 println("     (a genuine fold of this branch needs max nontrivial |mu| -> 1)")
 rows_up = sweep(S9, collect(9.0:0.02:10.2))
 rows_dn = sweep(S9, collect(9.0:-0.02:8.8))
-@printf("  v_ref     tf (s)     max|mu|!=1\n")
+@printf("  w0     tf (s)     max|mu|!=1\n")
 for r in vcat(reverse(rows_dn[2:end]), rows_up)
     @printf("  %6.2f   %9.5f   %.3e\n", r.vr, r.tf, r.mmax)
 end
-tf_up = [r.tf for r in rows_up]          # v_ref increasing 9 -> 10.2
-tf_dn = [r.tf for r in rows_dn]          # v_ref decreasing 9 -> 8.8
+tf_up = [r.tf for r in rows_up]          # w0 increasing 9 -> 10.2
+tf_dn = [r.tf for r in rows_dn]          # w0 decreasing 9 -> 8.8
 println("  tf monotone-decreasing over [8.8, 10.2] ? ",
     issorted(tf_up, rev=true) && issorted(tf_dn))
 println("  max nontrivial |mu| over the band = ",
     maximum(r.mmax for r in vcat(rows_dn, rows_up)))
 
 ## ---------------------------------------------------------------- B ---------
-println("\n=== B. independent orbit census (Poincaré sampling), v_ref ∈ [9.0, 10.0] ===")
+println("\n=== B. independent orbit census (Poincaré sampling), w0 ∈ [9.0, 10.0] ===")
 for vr in 9.0:0.25:10.0
-    vbp = build_vbpara(merge(NT_P0, (v_ref=vr,)))
+    vbp = build_vbpara(merge(NT_P0, (w0=vr,)))
     lcs = all_limit_cycles(vbp; αmin=-π, αmax=π, vmax=12, N=40)
-    println("v_ref = ", vr, " : ", length(lcs), " cycle(s)")
+    println("w0 = ", vr, " : ", length(lcs), " cycle(s)")
     for lc in lcs
         s = build_shooting(lc)
         mus = multipliers(s, vbp)
@@ -116,15 +116,15 @@ println("  min |ds| in band = ", minimum(abs.(dd)),
 println("  p monotone across band ? ", all(Δp .>= -1e-9) || all(Δp .<= 1e-9))
 
 ## ------------------------------------------------------------- REPORT -------
-# VERDICT: the "fold tangle" near v_ref ≈ 9.2–9.8 m/s is a CONTINUATION
+# VERDICT: the "fold tangle" near w0 ≈ 9.2–9.8 m/s is a CONTINUATION
 # ARTIFACT, not a physical saddle-node, and it hides no new orbits.
 #
 # Evidence (all at default params, the setting the tangle was reported for):
 #   A. Ground-truth Floquet multipliers of the tracked stable branch are
-#      ≤ 4.8e-3 across v_ref ∈ [8.8, 10.2] (rising smoothly with v_ref) —
-#      nowhere near the +1 a genuine fold requires. tf(v_ref) is smooth and
+#      ≤ 4.8e-3 across w0 ∈ [8.8, 10.2] (rising smoothly with w0) —
+#      nowhere near the +1 a genuine fold requires. tf(w0) is smooth and
 #      monotone decreasing (0.657 s @ 8.8 → 0.489 s @ 10.2): no turnaround.
-#   B. Independent Poincaré census finds exactly 2 cycles at every v_ref in
+#   B. Independent Poincaré census finds exactly 2 cycles at every w0 in
 #      [9.0, 10.0]: the known α ↔ −α mirror pair, both stable. No subharmonics,
 #      no extra branches.
 #   C. The archived BK collocation trace in the band shows parameter reversals

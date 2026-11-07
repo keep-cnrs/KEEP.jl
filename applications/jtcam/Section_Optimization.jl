@@ -48,14 +48,14 @@ const MAX_WALL_TIME = 120.0
 const SWEEP_WALL_TIME = 30.0  # a converged wind-sweep solve takes about a second
 const WIND_REF = 9.0
 const SENSE = +
-const SYMS = [:r, :I_eq, :torque_slope, :Δφ]  # ℓ, I, b and the half-width
-const R_BOUNDS = (15.0, 200.0)               # tether length ℓ (m)
+const SYMS = [:l, :I, :b, :Δφ]  # ℓ, I, b and the half-width
+const L_BOUNDS = (15.0, 200.0)               # tether length ℓ (m)
 const B_BOUNDS = (1.0, 1.0e6)                # braking slope b
 # Assumptions for I lower bound :
-# Maximum line tension T ≈ 34 kN at v_ref = 15 m/s
-# Moment is then M = T l = 68 kN m. For 6061-T6 (σy ≈ 276 MPa) with a safety factor 2,
+# Maximum line tension T ≈ 34 kN at w0 = 15 m/s
+# Moment is then M = T a = 68 kN m. For 6061-T6 (σy ≈ 276 MPa) with a safety factor 2,
 # W = M/σallow ≈ 491 cm³, met by a Ø250 mm tube with an 11.5 mm wall (47 kg).
-# Its inertia about the pivot is I = m p.l²/3 ≈ 62 kg m² (solid bar: 165 kg m²).
+# Its inertia about the pivot is I = m p.a²/3 ≈ 62 kg m² (solid bar: 165 kg m²).
 # No upper bound: extra mass is allowed if it buys power.
 const I_BOUNDS = (62.0, 1.0e6)               # arm inertia I (kg m²)
 const DPHI_BOUNDS = deg2rad.((10.0, 90.0))   # fixed shape box, in radians
@@ -64,9 +64,9 @@ const SHAPE_WINDOW = 0.2                      # ±20 % for the shape map
 const GRID_N = 10
 
 # Parameter names and units for the axis titles and the legends
-const LABELS = Dict(:r => "ℓ", :I_eq => "I", :torque_slope => "b",
+const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b",
     :Δθ => "Δθ", :Δφ => "Δφ")
-const UNITS = Dict(:r => "m", :I_eq => "kg m²", :torque_slope => "kg m² s⁻¹ rad⁻¹",
+const UNITS = Dict(:l => "m", :I => "kg m²", :b => "kg m² s⁻¹ rad⁻¹",
     :Δθ => "rad", :Δφ => "rad")
 
 ## Helpers
@@ -132,7 +132,7 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
     ok = falses(n)
     from_theta(θ) = (p=copy(p_ref); p[syms].=θ; p)
     function run!(i, p0)
-        r = compute_results(:v_ref, winds[i];
+        r = compute_results(:w0, winds[i];
             syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
             wall=SWEEP_WALL_TIME)
         no_opt[i], opt[i], theta[i] = r[1], r[2], r[3]
@@ -247,10 +247,10 @@ function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
 end
 
 ## Numerical: 9 m/s reference, one optimization over Θ
-p_start = PMP.build_para(v_ref=WIND_REF)
-p_start.torque_slope = PMP.optimal_torque_slope(p_start)  # b = I ω
-lower = [first(R_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
-upper = [last(R_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
+p_start = PMP.build_para(w0=WIND_REF)
+p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
+lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
+upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
 
 opt_ref = opt_step(p_start, SYMS, lower, upper)
 p_ref = opt_ref.p  # the Θ optimum at the reference wind speed

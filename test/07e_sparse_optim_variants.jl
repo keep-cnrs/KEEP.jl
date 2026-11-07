@@ -140,11 +140,11 @@ end
 N = 30
 p = build_para()
 vbp = build_vbpara(p)
-syms = [:r, :I_eq]
+syms = [:l, :I]
 mult = 3
 lb_vbp = @set vbp[syms] = vbp[syms] / mult
 ub_vbp = @set vbp[syms] = vbp[syms] * mult
-stats = optimize(vbp, N, [:r, :I_eq], lb_vbp, ub_vbp)
+stats = optimize(vbp, N, [:l, :I], lb_vbp, ub_vbp)
 
 build_para(@set vbp[syms] = stats.solution[(end-length(syms)+1):end])[syms]
 

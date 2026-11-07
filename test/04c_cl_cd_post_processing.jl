@@ -49,16 +49,16 @@ function coeff_aero(u, p)
 
         # Compute unit vectors
         αhat = compute_αhat(α)
-        OA = p.l * αhat
+        OA = p.a * αhat
         rhat = normalize(OK - OA)
 
         # Compute gravity force
         linear_density_l = π * p.ρ_l * (p.d_l^2) / 4
-        m_l = PMP.NB_LINES * linear_density_l * p.r / 2
+        m_l = PMP.NB_LINES * linear_density_l * p.l / 2
         Fgrav = SA[0, 0, -p.g*(p.m+m_l)]
 
         # Compute aerodynamical force
-        wind = SA[p.v_ref*abs(OK[3]/p.h_ref)^p.n_wind, 0, 0]
+        wind = SA[p.w0*abs(OK[3]/p.z0)^p.n_wind, 0, 0]
         kite_speed = D_OK * D_Rτ * dq
         app_wind = wind - kite_speed  # apparent wind, We
 
@@ -70,9 +70,9 @@ function coeff_aero(u, p)
         yw = rhat × ew
         zw = xw × yw
 
-        lift_k = 1 // 2 * p.S * p.ρ_air * norm(app_wind)^2 * p.C_L
+        lift_k = 1 // 2 * p.S * p.ρ_a * norm(app_wind)^2 * p.C_L
         drag_k = lift_k * p.C_D / p.C_L
-        drag_l = 1 // 6 * PMP.NB_LINES * p.ρ_air * p.d_l * p.C_D_l * p.r * norm(app_wind_perp_to_lines)^2
+        drag_l = 1 // 6 * PMP.NB_LINES * p.ρ_a * p.d_l * p.C_D_l * p.l * norm(app_wind_perp_to_lines)^2
         Faero_on_kite = -drag_k * xw - lift_k * zw
         Faero_on_lines = drag_l .* ew
         Faero = Faero_on_kite + Faero_on_lines
@@ -80,7 +80,7 @@ function coeff_aero(u, p)
         # torque with same sign as dα, the torque applied by the arm on the generator
         torque = torque_function(dα, p)
         l_tension = rhat ⋅ (SA[0, 0, 1] × OA)
-        A_tension = -p.I_eq / l_tension * rhat * SA[1, 0]'
+        A_tension = -p.I / l_tension * rhat * SA[1, 0]'
         b_tension = -torque / l_tension * rhat
 
         A = p.m * D_OK * D_Rτ - A_tension
@@ -103,9 +103,9 @@ function coeff_aero(u, p)
     Fy = Faero_k_eq ⋅ yw
     Fz = Faero_k_eq ⋅ zw
 
-    Cx = -Fx / (1 // 2 * p.S * p.ρ_air * norm(app_wind)^2)
-    Cy = -Fy / (1 // 2 * p.S * p.ρ_air * norm(app_wind)^2)
-    Cz = -Fz / (1 // 2 * p.S * p.ρ_air * norm(app_wind)^2)
+    Cx = -Fx / (1 // 2 * p.S * p.ρ_a * norm(app_wind)^2)
+    Cy = -Fy / (1 // 2 * p.S * p.ρ_a * norm(app_wind)^2)
+    Cz = -Fz / (1 // 2 * p.S * p.ρ_a * norm(app_wind)^2)
     return [Fx, Fy, Fz, Cx, Cy, Cz]
 end
 

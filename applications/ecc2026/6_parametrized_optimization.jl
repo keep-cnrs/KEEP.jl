@@ -44,7 +44,7 @@ function trajectory_stats(sol)
 end
 
 # function compute_results(wind; syms, p0, sense, tol)
-#     p0_wind = CA(p0; v_ref=wind)
+#     p0_wind = CA(p0; w0=wind)
 #     lower, upper = OPT.make_bounds(p0_wind, syms)
 #     stats, model = with_logger(NullLogger()) do
 #         OPT.optimize(p0_wind, syms, lower, upper; sense=sense, tol=tol)
@@ -120,16 +120,16 @@ function main()
     outpath = mkpath("out/2026_07_ECC")
 
     sense = +
-    syms = [:r, :I_eq, :torque_slope]  # \ell, I, b
+    syms = [:l, :I, :b]  # \ell, I, b
     wind_range = range(5, 15, length=11)
     i_ref = findfirst(x -> x >= 10, wind_range)
     wind_ref = wind_range[i_ref]
-    p0 = PMP.build_para(v_ref=wind_ref)  # Reference parameters at 10 m/s
+    p0 = PMP.build_para(w0=wind_ref)  # Reference parameters at 10 m/s
     tol = 1e-7
-    _, _, theta0 = compute_results(:v_ref, wind_ref; syms=syms, p0=p0, sense=sense, tol=tol)
+    _, _, theta0 = compute_results(:w0, wind_ref; syms=syms, p0=p0, sense=sense, tol=tol)
     p_ref = CA(p0; (syms .=> theta0)...)
 
-    stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:v_ref, wind_range; syms=syms, p_ref=p_ref, sense=sense, tol=tol)
+    stats_no_opt_vec, stats_opt_vec, theta_vec = range_optim(:w0, wind_range; syms=syms, p_ref=p_ref, sense=sense, tol=tol)
 
     ## Plot
     my_defaults()
@@ -228,16 +228,16 @@ function main()
     plot!([0], [0])
 
     #=
-    ## Optimize I for range of r
+    ## Optimize I for range of l
 
-    r_range = 10:5:100
-    _, _, theta_vec_ = range_optim(:r, r_range; syms=[:I_eq], p_ref=p_ref, sense=sense, tol=tol)
+    l_range = 10:5:100
+    _, _, theta_vec_ = range_optim(:l, l_range; syms=[:I], p_ref=p_ref, sense=sense, tol=tol)
 
     Is = [theta[1] for theta in theta_vec_]
-    inds = 30 .< r_range .< 80
+    inds = 30 .< l_range .< 80
     my_defaults()
     ##
-    plot(r_range[inds], @. (Is[inds] / 8000 + 0.3))
+    plot(l_range[inds], @. (Is[inds] / 8000 + 0.3))
     plot!([0], [0])
     =#
 end
@@ -247,10 +247,10 @@ main()
 #=
 Report — wind sweep methodology (see also `6_fixed_parametrized_optimization_rescaling.jl`):
 
-This script sweeps wind with `CA(p0; v_ref => value)`, i.e. it changes ONLY `v_ref`
-on a fixed kite. Since the characteristic time is T = l/v_ref, every T-normalized
+This script sweeps wind with `CA(p0; w0 => value)`, i.e. it changes ONLY `w0`
+on a fixed kite. Since the characteristic time is T = a/w0, every T-normalized
 Vaschy-Buckingham group then shifts (g_n, Cmax_n, m_l_n ∝ 1/k², Ω_n, torque_slope_n ∝ 1/k
-for wind ratio k), while r_n, c_L, f, c_D_l, I_eq_n stay put. Each wind speed is
+for wind ratio k), while l_n, c_L, f, c_D_l, I_n stay put. Each wind speed is
 therefore a genuinely DIFFERENT normalized problem (the Froude number changes), and
 the per-wind optima found above are genuinely different in normalized space.
 This is correct and intended for a fixed-kite study: the observed near power laws
@@ -258,7 +258,7 @@ This is correct and intended for a fixed-kite study: the observed near power law
 gravity becomes relatively weaker against aerodynamics — they are NOT a similarity law.
 
 An EXACT rescaling exists only along the fibers of `build_vbpara`: rescaling the whole
-system with l, r, h_ref ∝ k², I_eq ∝ k⁴, Cmax ∝ k², Ω ∝ 1/k, torque_slope ∝ k³,
+system with a, l, z0 ∝ k², I ∝ k⁴, Cmax ∝ k², Ω ∝ 1/k, b ∝ k³,
 S ∝ 1/k², d_l ∝ 1/k⁴, ρ_l ∝ k⁶, m = const (gravity is not a free gauge: g' = k²g/λ,
 so λ = k² is forced for real gravity). There the normalized trajectory maps onto
 itself (rates ∝ 1/k, energy ∝ k²) and the optimum is wind-invariant in normalized
