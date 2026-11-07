@@ -362,12 +362,14 @@ function plot_wind_sweep(winds, sweep, i_ref)
     ref_style = (; ls=:dot, c=:black)
 
     # Average power
-    f1 = plot(ylabel="Power (kW)", legend=:topleft)
+    f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain,
+        xlabel="Wind speed (m/s)")
     plot!(f1, winds, power0 ./ 1000; ref_style..., label=ref)
     plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1, label="Re-optimized")
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
-    f2 = plot(ylabel="Line tension (kN)", legend=:topleft)
+    f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain,
+        xlabel="Wind speed (m/s)")
     plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style..., label=[ref ""])
     plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1, label="Re-optimized")
     plot!(f2, winds, min_tension_vec ./ 1000; c=1)
@@ -385,6 +387,8 @@ function plot_wind_sweep(winds, sweep, i_ref)
     # leave room for the axis labels (the theme sets margin = 0)
     fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
         leftmargin=8Plots.mm, bottommargin=4Plots.mm)
+    # the three panels share one x axis: only the bottom panel labels it
+    foreach(i -> plot!(fig, subplot=i, xformatter=x -> "", xlabel=""), (1, 2))
     return (; fig, panels=(f1, f2, f3))
 end
 
@@ -498,7 +502,7 @@ end
 
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
 my_defaults()
-default(xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
+default(xticks=4:2:16, xlim=(4, 16))
 
 (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
 display(fig)

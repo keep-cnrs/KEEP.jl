@@ -126,6 +126,41 @@
     The trajectory gets closer to the limit cycle as the number of lemniscate revolutions (a revolution is defined as a sweep over the interval $[0,2\pi]$ for the angle $\tau$) increases.
     The linear trend in log-linear plot indicates exponential convergence; after each revolution, the distance to the limit decreases by a factor of $10^{2.64}$, until it stalls near the tolerance of the integration scheme.</p>
 
+    <h1>Optimization over Θ = (ℓ, I, b, Δφ)</h1>
+
+    <p>The optimization variables are $\Theta = (\ell, I, b, \Delta\phi)$: the tether length $\ell$, the inertia $I$ of the rotating arm about its pivot, the generator braking slope $b$ and the lemniscate half-width $\Delta\phi$. The arm length stays fixed at $a = 2$ m and the half-height $\Delta\theta$ stays at its nominal 6°. The boxes are $\ell \in [15, 200]$ m, $I \in [62, 10^6]$ kg m², $b \in [1, 10^6]$ kg m² s⁻¹ rad⁻¹ and $\Delta\phi \in [10°, 90°]$; the inertia floor is structural, set by a strength-sized 2 m aluminium arm under the worst line tension of the study ($T \approx 34$ kN at 15 m/s, $I = m a^2/3 \approx 62$ kg m²). The objective is the average mechanical power over one limit cycle of the 4D model, at the reference wind of 9 m/s, starting from the default parameters with $b = I\omega$ (kinetic criterion).</p>
+
+    <pre>
+      ┌ Θ optimum at 9 m/s (interior in all four variables)
+      │ tether length ℓ          = 26.97 m      (init 31.0)
+      │ arm inertia I            = 351.6 kg m²  (init 1300)
+      │ braking coefficient b    = 737.1        (init 2888.3)
+      │ half-width Δφ            = 16.62°       (init 50°)
+      │ half-height Δθ           = 6° (fixed)
+      │
+      │ period                   = 0.949 s      (init 2.828)
+      │ average power            = 12.253 kW    (init 9.639, +27.1 %)
+      │ line tension min–max     = 5.748–10.827 kN (init 3.356–8.856)
+      └ max kite acceleration    = 938.6 m/s²  (init 517.1)</pre>
+    <p>No box constraint is active: Δφ sits at 16.6° between 10° and 90°, and I at 352 kg m² is 5.7 times the structural floor, so a power optimum prefers an arm heavier than strength requires. The tether shortens, the inertia and the period fall by factors of 3.7 and 3.0, and the faster cycle extracts 27 % more power from the same wind. This is a stationary optimum of a multimodal objective, not a global optimum.</p>
+
+    <object data="figs/optimization_wind_sweep_theta.pdf" type="application/pdf"></object>
+    <p>Power, line tension and re-optimized parameters over the wind range, each parameter normalized by its maximum over the sweep. The dotted black curve is the 9 m/s optimum held fixed, the blue curve re-optimizes Θ inside the same boxes, and the grey dashed line marks the 9 m/s reference. Re-optimizing gains up to +13.5 % at 5 m/s and +8.6 % at 15 m/s, and nothing at 9 m/s by construction. The re-optimization adapts the device to the wind: ℓ shortens from 30.3 to 26.1 m and I falls from 451 to 326 kg m² as the wind rises, while b rises from 498 to 1151 and Δφ closes slightly from 17.6° to 16.3°. At 15 m/s the re-optimized cycle carries a 10 % lower maximum tension (33.2 → 29.7 kN) and a 33 % higher minimum (12.2 → 16.1 kN); at 5 m/s the maximum rises by 4.5 % (3.34 → 3.49 kN) and the minimum falls from 1.99 to 1.72 kN. Because the boxes are wide the objective is multimodal: the sweep is a stationary solution path, solved from the 9 m/s optimum with a retry from the neighbouring wind where that fails (7 m/s; a continuation from 11 m/s alone would stall on a 3.3 kW non-pumping branch at 12 m/s).</p>
+
+    <object data="figs/optimization_landscape.pdf" type="application/pdf"></object>
+    <p>One parameter at a time around the optimum, the others fixed; the power is normalized by its value at the optimum and the black double lines are the box bounds. ℓ is by far the stiffest direction (−11.5 % power at −10 %, −8.1 % at +10 %); I is about four times flatter (−2.6 % at −10 %) and b more than twenty times flatter (−0.4 %); the Δφ pane loses 5.4 % at 15.0° and 2.9 % at 18.3°. No box constraint enters the ±10 % window, so none of them is visible: the optimum is interior in all four variables.</p>
+
+    <object data="figs/optimization_dtheta.pdf" type="application/pdf"></object>
+    <p>Δθ swept ±10 % around its nominal value with Θ held at the optimum. Power is flat (the whole window spans 3.4 % of power, the maximum being 12.279 kW at −4 %, only 0.2 % above nominal), so Δθ is not a power variable and optimizing it would buy nothing. It is a load and trajectory variable: at −10 % the minimum tension falls 5.4 % (5.75 → 5.44 kN), the maximum rises 3.8 % (11.24 vs 10.83 kN) and the tension spread widens 14 %, while the peak acceleration is U-shaped in Δθ (1035 m/s² at −10 %, a 926 m/s² minimum at +2 %, 1128 m/s² at +10 %). The nominal 6° is within 1.4 % of the acceleration minimum and within 0.2 % of the power maximum, which is why it is held fixed; choosing it for loads or handling qualities would require a multi-objective criterion.</p>
+
+    <object data="figs/optimization_shape_grid.pdf" type="application/pdf"></object>
+    <p>10×10 limit cycles over Δθ ∈ [−20 %, +20 %] of nominal and Δφ ∈ [10°, 90°], with ℓ, I and b held at the optimum and nothing re-optimized. The white dashed lines mark the nominal Δθ and the optimal Δφ. Of the 100 cells, 90 converge: the whole Δφ = 90° row has no $\dot\tau > 0$ pumping cycle at these fixed parameters. Power is a Δφ effect with a sharp band near 19°, peaking at 12.46 kW (Δθ = −20 %, Δφ = 18.9°) and collapsing away from it to 1.2–6.4 kW at Δφ = 10° and 2–3 kW for Δφ ≥ 36.7°; within the band Δθ matters, the power falling from 12.46 to 9.90 kW as Δθ goes from −20 % to +20 %. The maximum tension peaks at 14.96 kN at the narrowest shape and is mildest along Δφ = 18.9° (10.1–10.6 kN). The peak acceleration is largest at narrow shapes, 3.5–4.7 km s⁻² at Δφ = 10°, and falls to 0.13–0.3 km s⁻² at Δφ = 81°, so the power-optimal band sits on the mild side of that ridge. The minimum tension is a large-Δφ effect: 6–10.5 kN near the power optimum, 1–2 kN at Δφ ≈ 72°, down to 0.13 kN at Δφ = 81°. A power-only optimum would therefore not be enough to choose the shape: the same power can be reached with very different tension and acceleration levels, and at Δφ = 90° no cycle exists at all.</p>
+
+    <object data="figs/optimization_timeseries_all.pdf" type="application/pdf"></object>
+    <p>Time series at the initial parameters and at the Θ optimum. The optimal cycle is three times faster (period 2.83 → 0.95 s) and extracts more power (9.64 → 12.25 kW) over the whole cycle, including at the minimum of the tension envelope, which nearly doubles (3.36 → 5.75 kN); the maximum kite acceleration rises from 517 to 939 m/s², the price of the tighter turns.</p>
+
+    <p>Caveats: the reported gains are stationary-solution gains of a multimodal objective, not global optima; the inertia floor is inactive at the optimum, so a mass-limited design would need a real mass or stress constraint; the shape map is a local sensitivity, since another shape could be paired with another optimal tether and inertia; only the $\dot\tau > 0$ cycle is considered, though a $\dot\tau < 0$ cycle exists at the same parameters; the quasi-steady 4D model has no line dynamics, structural flexibility or unsteady aerodynamics, so the acceleration is a diagnostic, not a measured load; and the objective ignores loads entirely.</p>
+
     <h1>Bifurcation Kit (not for JTCAM)</h1>
     <img src="../sprint2026/fig_fold_zoom.png">
 
