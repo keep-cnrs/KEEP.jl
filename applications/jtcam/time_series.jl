@@ -38,14 +38,14 @@ end
 Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W. Returns the
 panel and the y data range, so several simulations can share one power axis.
 """
-function plot_avg_power_kW(sol)
-    t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
+function plot_avg_power_kW(sol, ts)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
+    t0, tf = first(ts), last(ts)
+    dα = sol.(ts, idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
     avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plt = plot(t, power; c=:black, label="", legend=false, ylabel="Power (kW)")
+    plt = plot(ts, power; c=:black, label="", legend=false, ylabel="Power (kW)")
     plot!([t0, tf], [avg_power, avg_power]; c=:red, label="")
     plot!(xlabel="t (s)")
     return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
@@ -63,14 +63,15 @@ function time_series_panels(sol; N=500)
     τm = mod.(q_ts[:, 2], 2π) .- π
     @assert all(-π .<= τm .< π)
     @assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
+    one_period = abs(abs(q_ts[end, 2] - q_ts[1, 2]) - 2π) <= 1e-3
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
     p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="", legend=false,
         ylabel="x (rad, rad/s)", xlabel="", xformatter=x -> "")
     plot!(t_main, y_main; c=2, label="")
-    plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
+    one_period || plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
 
-    pw_stats = plot_avg_power_kW(sol)
+    pw_stats = plot_avg_power_kW(sol, ts)
     pw = pw_stats.plt
     plot!(pw, xlabel="", xformatter=x -> "")
 
@@ -86,7 +87,7 @@ function time_series_panels(sol; N=500)
         ylim=(0, tmax), widen=true)
 
     y_wts = vcat(vec(q_ts[:, [1, 3, 4]]), filter(isfinite, y_main),
-        filter(isfinite, y_jump))
+        one_period ? Float64[] : filter(isfinite, y_jump))
     return (; wts=p_wts, pw, tension=p_t,
         ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
             tension=(0.0, tmax)))
@@ -116,7 +117,7 @@ end
 "One hand-drawn legend per row: states, power, tension."
 function time_series_legends()
     return (states=time_series_legend(("α", "τ mod 2π", "D(α)", "D(τ)"),
-                ((; c=1), (; c=2), (; c=3), (; c=4))),
+        ((; c=1), (; c=2), (; c=3), (; c=4))),
         power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red))),
         tension=time_series_legend(("T",), ((; c=5),)))
 end
