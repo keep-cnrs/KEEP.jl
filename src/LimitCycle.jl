@@ -85,7 +85,10 @@ end
 """
 Return a callback that saves the states when passing through section = 0. If two subsequent states are within `tol` of each other, terminate the integration."""
 function build_poincare_callback(tol=DEFAULT_TOLERANCE; section=poincare_section)
-    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2)
+    # `abstol` is not a root-find tolerance: it is the re-trigger guard of
+    # DiffEqBase.nudge_tprev. Below ~eps(t) the guard stops working, the same crossing
+    # is saved twice, and the shooting then has T = 0.
+    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=max(tol / 10, 1e-12))
 end
 
 
@@ -107,10 +110,14 @@ end
 """
 sol contains only states that are on the Poincaré section, eg. with `build_poincare_callback()`.
 
-sol -> u0, t0, t1 -> shooting = [α0, dα0, dτ0, T]"""
+sol -> u0, t0, t1 -> shooting = [α0, dα0, dτ0, T]
+
+Return `nothing` when the integration saved less than two distinct crossings (diverging seed, or a trajectory that does not cross the section)."""
 function build_shooting(sol)
+    length(sol.t) < 2 && return nothing
     u0 = sol.u[end]
     t0, t1 = sol.t[[end - 1, end]]
+    t1 > t0 || return nothing
     return build_shooting(u0, t0, t1)
 end
 
@@ -153,7 +160,9 @@ Return its shooting parameters [α0, dα0, dτ0, T]."""
 function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, kwargs...)
     cb = build_poincare_callback(10tol)
     sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
-    return shoot(build_shooting(sol), vbp; tol=tol, kwargs...)
+    shooting = build_shooting(sol)
+    shooting === nothing && return nothing
+    return shoot(shooting, vbp; tol=tol, kwargs...)
 end
 function compute_limit_cycle(vbp; sense, tol=DEFAULT_TOLERANCE, kwargs...)
     all_lcs = all_limit_cycles(vbp; tol=tol, kwargs...)
@@ -178,22 +187,16 @@ function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=5, N=100, tol=DEFAULT_T
 
     samples = sample(N, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
     u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
-    # A diverging seed can stop after one saved state, and `build_shooting` then
-    # has no pair to work with; skipping it is what the clustering expects.
-    rough_shootings = filter(!isnothing, map(u0s) do u0
-        try
-            build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol)))
-        catch
-            nothing
-        end
-    end)
+    # `build_shooting` returns `nothing` for a seed that diverges, and the clustering cannot use it.
+    rough_shootings = filter(!isnothing,
+        [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s])
     isempty(rough_shootings) && error("no limit cycle seed converged")
 
     clusters = dbscan(reduce(hcat, rough_shootings), 100sqrt(tol))
     rough_centroids = [mean(rough_shootings[c.core_indices]) for c in clusters.clusters]
 
-    limit_cycles = [compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for s in rough_centroids]
-    return limit_cycles
+    return filter(!isnothing,
+        [compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for s in rough_centroids])
 end
 
 end  # module

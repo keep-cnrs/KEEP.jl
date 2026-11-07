@@ -93,7 +93,7 @@ dαmin, dαmax = dτmin, dτmax = -vmax, vmax
 
 samples = sample(100, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
 u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
-shootings = [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s]
+shootings = filter(!isnothing, [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s])
 
 # Number of clusters wrt. clustering parameter
 data = reduce(hcat, shootings)
@@ -121,7 +121,7 @@ annotate!(i, prop / 2 .+ 0.1, [f"P = {Pavg:.0f} W" for Pavg in Pavg])
 display(plot!())
 
 # Recomputing the limit cycles with high precision
-refined_shootings = [build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol)) for s in centroids]
+refined_shootings = filter(!isnothing, [build_shooting(compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol)) for s in centroids])
 
 err_before = maximum(maximum.(abs, shooting_residuals.(centroids, Ref(vbp); tol=sqrt(tol))))
 err_after = maximum(maximum.(abs, shooting_residuals.(refined_shootings, Ref(vbp); tol=tol / 10)))
