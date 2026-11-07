@@ -1,5 +1,5 @@
 # jtcam_theme.jl
-import Plots
+using Plots: Plots
 using Plots.PlotMeasures
 
 Plots.gr()
@@ -9,7 +9,7 @@ function setup_font(font_filename="LinLibertine_R.ttf")
     paths = [
         joinpath(@__DIR__, font_filename),
         joinpath(expanduser("~/Library/Fonts"), font_filename),
-        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename)
+        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename),
     ]
 
     idx = findfirst(isfile, paths)
@@ -47,7 +47,7 @@ const ANNOTATIONFONTSIZE = 10
 
 # --- Sizing Functions & Global Objects ---
 """By default, width is 1 * WIDTH_PT and height is 3/8 * WIDTH_PT (for two 4/3 plots)"""
-function plot_size(width=1; height=3/8, dpi=DPI)
+function plot_size(width=1; height=3 / 8, dpi=DPI)
     width_in = width * WIDTH_PT / PT_PER_INCH
     height_in = height * WIDTH_PT / PT_PER_INCH
     width_px = round(Int, width_in * dpi)
@@ -95,11 +95,10 @@ const PALETTE = Plots.palette(:auto)
 #     RGB(90/255, 110/255, 195/255),  # 8. Cornflower Indigo
 # ]
 
-
 # --- Publication Defaults ---
 function my_defaults()
     Plots.default()
-    Plots.default(
+    return Plots.default(;
         thickness_scaling=0.5,
         dpi=DPI,
         fontfamily=FONT,
@@ -131,7 +130,7 @@ function my_defaults()
         # Margins & Legends
         margin=0Plots.mm, # 4Plots.mm,
         legend=:topright,
-        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85)
+        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85),
     )
 end
 

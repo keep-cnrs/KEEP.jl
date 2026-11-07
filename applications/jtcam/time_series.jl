@@ -21,8 +21,9 @@ time twice, values π and -π) to be drawn dashed.
 """
 function tau_wrap(ts, τm)
     Δt = Base.step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
+    tcross = [
+        ts[i] + Δt * (π - τm[i]) / (τm[i + 1] + 2π - τm[i]) for i in findall(diff(τm) .< -π)
+    ]
     t_jump, y_jump = Float64[], Float64[]
     for tc in tcross
         append!(t_jump, (tc, tc, NaN))
@@ -42,12 +43,12 @@ function plot_avg_power_kW(sol)
     t, (t0, tf) = VIZ.build_t(extrema(sol.t), VIZ.DEFAULT_PPS)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
-    dα = sol.(t, idxs=3)
+    dα = sol.(t; idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    avg_power = sol(tf; idxs=5) / (tf - t0) / 1000
     plt = plot(t, power; c=:black, label="", legend=false, ylabel="Power (kW)")
     plot!([t0, tf], [avg_power, avg_power]; c=:red, label="")
-    plot!(xlabel="t (s)")
+    plot!(; xlabel="t (s)")
     return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
 end
 
@@ -65,14 +66,22 @@ function time_series_panels(sol; N=500)
     @assert all(diff(τm) .< π)  # τ is monotonically increasing through the wraps
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-    p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="", legend=false,
-        ylabel="x (rad, rad/s)", xlabel="", xformatter=x -> "")
+    p_wts = plot(
+        ts,
+        q_ts[:, [1, 3, 4]];
+        c=[1 3 4],
+        label="",
+        legend=false,
+        ylabel="x (rad, rad/s)",
+        xlabel="",
+        xformatter=x -> "",
+    )
     plot!(t_main, y_main; c=2, label="")
     plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
 
     pw_stats = plot_avg_power_kW(sol)
     pw = pw_stats.plt
-    plot!(pw, xlabel="", xformatter=x -> "")
+    plot!(pw; xlabel="", xformatter=x -> "")
 
     # Line tension; the ticks are the two extrema and zero. Skip samples where
     # the geometry degenerates (aligned arm and kite), which give a NaN tension
@@ -80,16 +89,30 @@ function time_series_panels(sol; N=500)
     tension = PM4.compute_line_tension.(sol.(ts), Ref(sol.prob.p)) ./ 1000
     ok = isfinite.(tension)
     tmin, tmax = extrema(tension[ok])
-    p_t = plot(ts[ok], tension[ok]; c=5, label="", legend=false,
-        ylabel="Tension (kN)", xlabel="t (s)",
+    p_t = plot(
+        ts[ok],
+        tension[ok];
+        c=5,
+        label="",
+        legend=false,
+        ylabel="Tension (kN)",
+        xlabel="t (s)",
         yticks=([0, tmin, tmax], ["0", f"{tmin:.1f}", f"{tmax:.1f}"]),
-        ylim=(0, tmax), widen=true)
+        ylim=(0, tmax),
+        widen=true,
+    )
 
-    y_wts = vcat(vec(q_ts[:, [1, 3, 4]]), filter(isfinite, y_main),
-        filter(isfinite, y_jump))
-    return (; wts=p_wts, pw, tension=p_t,
-        ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
-            tension=(0.0, tmax)))
+    y_wts = vcat(
+        vec(q_ts[:, [1, 3, 4]]), filter(isfinite, y_main), filter(isfinite, y_jump)
+    )
+    return (;
+        wts=p_wts,
+        pw,
+        tension=p_t,
+        ylims=(
+            states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi), tension=(0.0, tmax)
+        ),
+    )
 end
 
 """
@@ -100,25 +123,49 @@ padding Plots reserves between a plot and a legend column; revisit if the layout
 code changes.
 """
 function time_series_legend(names, styles)
-    p = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
-        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], leftmargin=-2Plots.mm)
+    p = plot(;
+        framestyle=:none,
+        showaxis=false,
+        grid=false,
+        legend=false,
+        xlims=(0, 1),
+        ylims=(0, 1),
+        xticks=[],
+        yticks=[],
+        leftmargin=-2Plots.mm,
+    )
     n = length(names)
     ys = 0.5 .+ 0.065 .* ((n + 1) / 2 .- (1:n))
-    plot!(p, Shape([(0.0, last(ys) - 0.05), (0.97, last(ys) - 0.05),
-        (0.97, first(ys) + 0.035), (0.0, first(ys) + 0.035)]); c=:black, lw=1, fillcolor=:white)
+    plot!(
+        p,
+        Shape([
+            (0.0, last(ys) - 0.05),
+            (0.97, last(ys) - 0.05),
+            (0.97, first(ys) + 0.035),
+            (0.0, first(ys) + 0.035),
+        ]);
+        c=:black,
+        lw=1,
+        fillcolor=:white,
+    )
     for (y, style, name) in zip(ys, styles, names)
         plot!(p, [0.05, 0.18], [y, y]; style...)
-        annotate!(p, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+        annotate!(
+            p, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left)
+        )
     end
     return p
 end
 
 "One hand-drawn legend per row: states, power, tension."
 function time_series_legends()
-    return (states=time_series_legend(("α", "τ mod 2π", "D(α)", "D(τ)"),
-                ((; c=1), (; c=2), (; c=3), (; c=4))),
+    return (
+        states=time_series_legend(
+            ("α", "τ mod 2π", "D(α)", "D(τ)"), ((; c=1), (; c=2), (; c=3), (; c=4))
+        ),
         power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red))),
-        tension=time_series_legend(("T",), ((; c=5),)))
+        tension=time_series_legend(("T",), ((; c=5),)),
+    )
 end
 
 "Time series of one simulation `sol`, one hand-drawn legend per row."
@@ -138,30 +185,38 @@ function plot_time_series_grid(sols; N=500)
     panels = [time_series_panels(sol; N) for sol in sols]
 
     # one y range per row, common to every column
-    states_lims = (minimum(first(q.ylims.states) for q in panels),
-        maximum(last(q.ylims.states) for q in panels))
+    states_lims = (
+        minimum(first(q.ylims.states) for q in panels),
+        maximum(last(q.ylims.states) for q in panels),
+    )
     power_lims = (0.0, maximum(last(q.ylims.power) for q in panels))
     tension_lims = (0.0, maximum(last(q.ylims.tension) for q in panels))
     for q in panels
-        plot!(q.wts, ylims=states_lims, widen=true)
-        plot!(q.pw, ylims=power_lims, widen=true)
-        plot!(q.tension, ylims=tension_lims, widen=true)
+        plot!(q.wts; ylims=states_lims, widen=true)
+        plot!(q.pw; ylims=power_lims, widen=true)
+        plot!(q.tension; ylims=tension_lims, widen=true)
     end
 
     for q in panels[2:end], p in (q.wts, q.pw, q.tension)
-        plot!(p, ylabel="")
+        plot!(p; ylabel="")
     end
     for q in panels
         for p in (q.wts, q.pw, q.tension)
-            plot!(p, leftmargin=12Plots.mm)
+            plot!(p; leftmargin=12Plots.mm)
         end
-        plot!(q.tension, bottommargin=4Plots.mm)
+        plot!(q.tension; bottommargin=4Plots.mm)
     end
 
     leg = time_series_legends()
-    return plot([q.wts for q in panels]..., leg.states,
-        [q.pw for q in panels]..., leg.power,
-        [q.tension for q in panels]..., leg.tension;
+    return plot(
+        [q.wts for q in panels]...,
+        leg.states,
+        [q.pw for q in panels]...,
+        leg.power,
+        [q.tension for q in panels]...,
+        leg.tension;
         layout=grid(3, n + 1; widths=vcat(fill(0.84 / n, n), 0.16)),
-        link=:x, size=plot_size(1; height=1.5))
+        link=:x,
+        size=plot_size(1; height=1.5),
+    )
 end

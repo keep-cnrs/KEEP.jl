@@ -1,4 +1,4 @@
-import Plots
+using Plots: Plots
 
 const WIDTH_PT = 245.71811
 const PT_PER_INCH = 72.27  # DPI of Latex
@@ -20,7 +20,7 @@ end
 
 function my_defaults()
     Plots.default()
-    Plots.default(
+    return Plots.default(;
         dpi=DPI,
         fontfamily=FONT,
         size=plot_size(),

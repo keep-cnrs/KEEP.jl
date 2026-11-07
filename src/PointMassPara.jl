@@ -21,7 +21,7 @@ Dimensionful parameters.
  - 10d: used for simulation
  - other: used for translation only.
 """
-DEFAULT_PARA = ComponentArray(
+DEFAULT_PARA = ComponentArray(;
     a=2.0, # m
     m=6.0, # kg
     w0=9.0, # m s^-1
@@ -57,16 +57,28 @@ function build_para(; kwargs...)::Para
 end
 
 function awebox_para()::Para
-    p = build_para(a=2.0, l=50.0, m=36.8, S=3.0, I=2000, b=1500, C_D_l=1.2, ρ_l=1464, d_l=2e-3, z0=10.0, w0=9.0, n=1 / 0.15)
+    return p = build_para(;
+        a=2.0,
+        l=50.0,
+        m=36.8,
+        S=3.0,
+        I=2000,
+        b=1500,
+        C_D_l=1.2,
+        ρ_l=1464,
+        d_l=2e-3,
+        z0=10.0,
+        w0=9.0,
+        n=1 / 0.15,
+    )
 end
-
 
 function build_vbpara(p::Para=DEFAULT_PARA)::VBPara
     L, M, T = lmt(p)
-    return ComponentArray(
+    return ComponentArray(;
         a=p.a,
         m=p.m,
-        w0=p.w0;
+        w0=p.w0,
         g=p.g * T^2 / L,
         z0=p.z0 / L,
         l=p.l / L,
@@ -84,11 +96,13 @@ function build_vbpara(p::Para=DEFAULT_PARA)::VBPara
         θ0=p.θ0,
         φ0=p.φ0,
         Δθ=p.Δθ,
-        Δφ=p.Δφ
+        Δφ=p.Δφ,
     )
 end
 
-function build_para(p::VBPara; S=DEFAULT_PARA.S, ρ_a=DEFAULT_PARA.ρ_a, d_l=DEFAULT_PARA.d_l)::Para
+function build_para(
+    p::VBPara; S=DEFAULT_PARA.S, ρ_a=DEFAULT_PARA.ρ_a, d_l=DEFAULT_PARA.d_l
+)::Para
     L, M, T = lmt(p)
 
     S_normalized = S / L^2
@@ -123,10 +137,9 @@ function build_para(p::VBPara; S=DEFAULT_PARA.S, ρ_a=DEFAULT_PARA.ρ_a, d_l=DEF
         θ0=p.θ0,
         φ0=p.φ0,
         Δθ=p.Δθ,
-        Δφ=p.Δφ
+        Δφ=p.Δφ,
     )
 end
-
 
 """
 Compute the characteristic length, mass and time for the set of parameters `p`.
@@ -172,7 +185,7 @@ vbp = build_vbpara(p0)
 The limit cycle solver lives in `KEEP.LimitCycle`, which is included after this
 module, hence the runtime lookup.
 """
-function optimal_torque_slope(p=build_para(); sense=+, tol=1e-3, maxiter=5, rtol=1e-4)
+function optimal_torque_slope(p=build_para(); sense=(+), tol=1e-3, maxiter=5, rtol=1e-4)
     vbp = build_vbpara(p)
     L, M, T = lmt(vbp)
     b = p.b
@@ -200,12 +213,13 @@ function normalize_vbpara(p::VBPara)::VBPara
     return p
 end
 
-
 """
 vbp : VBPara -> Para -> set new values -> VBPara
 
 kwargs: kwargs to build_para (parameters that are lost when building VBPara, eg. S, ρ_a, d_l)"""
-function vbpara_set_params(vbp::VBPara, new_params::ComponentArray=ComponentArray(); kwargs...)::VBPara
+function vbpara_set_params(
+    vbp::VBPara, new_params::ComponentArray=ComponentArray(); kwargs...
+)::VBPara
     # p = build_para(vbp; kwargs...)
     # p[keys(new_params)] = new_params
 
@@ -217,6 +231,8 @@ function vbpara_set_params(vbp::VBPara, new_params::ComponentArray=ComponentArra
     return vbp
 end
 
-vbpara_set_params(vbp, new_params::NamedTuple; kwargs...) = vbpara_set_params(vbp, ComponentArray(new_params); kwargs...)
+function vbpara_set_params(vbp, new_params::NamedTuple; kwargs...)
+    return vbpara_set_params(vbp, ComponentArray(new_params); kwargs...)
+end
 
 end  # module
