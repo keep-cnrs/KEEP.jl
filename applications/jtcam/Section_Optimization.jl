@@ -64,10 +64,10 @@ const SHAPE_WINDOW = 0.2                      # ±20 % for the shape map
 const GRID_N = 10
 
 # Parameter names and units for the axis titles and the legends
-const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b",
-    :Δθ => "Δθ", :Δφ => "Δφ")
-const UNITS = Dict(:l => "m", :I => "kg m²", :b => "kg m² s⁻¹ rad⁻¹",
-    :Δθ => "rad", :Δφ => "rad")
+const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b", :Δθ => "Δθ", :Δφ => "Δφ")
+const UNITS = Dict(
+    :l => "m", :I => "kg m²", :b => "kg m² s⁻¹ rad⁻¹", :Δθ => "rad", :Δφ => "rad"
+)
 
 ## Helpers
 "Average power, line-tension extrema, peak kite acceleration and period of a cycle."
@@ -78,9 +78,13 @@ function cycle_stats(sol; n=2001)
     tension = PM4.compute_line_tension.(us, Ref(p))
     ok = isfinite.(tension)
     acceleration = norm.(PM4.kite_acceleration.(us, Ref(p)))
-    return (; P=sol.u[end][5] / sol.t[end],
-        Tmin=minimum(tension[ok]), Tmax=maximum(tension[ok]),
-        amax=maximum(acceleration), period=sol.t[end])
+    return (;
+        P=sol.u[end][5] / sol.t[end],
+        Tmin=minimum(tension[ok]),
+        Tmax=maximum(tension[ok]),
+        amax=maximum(acceleration),
+        period=sol.t[end],
+    )
 end
 
 # Limit cycle, optimization, and limit cycle of the optimized system, for one
@@ -88,8 +92,9 @@ end
 # `p_fixed` is the parameter set the no-optimization cycle is taken at, so a
 # continuation can start from a neighbour's optimum `p0` without moving the
 # reference curve.
-function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense, tol,
-    wall=MAX_WALL_TIME)
+function compute_results(
+    param, value; syms, p0, p_fixed=p0, lower, upper, sense, tol, wall=MAX_WALL_TIME
+)
     p_fixed = copy(p_fixed)
     p_fixed[param] = value
 
@@ -102,7 +107,7 @@ function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense
     p0 = copy(p0)
     p0[param] = value
     solution, stats, _ = with_logger(NullLogger()) do
-        OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=wall)
+        return OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=wall)
     end
     p_opt = copy(p0)
     p_opt[syms] .= solution.params[syms]  # physical units
@@ -132,19 +137,28 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
     ok = falses(n)
     from_theta(θ) = (p=copy(p_ref); p[syms].=θ; p)
     function run!(i, p0)
-        r = compute_results(:w0, winds[i];
-            syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
-            wall=SWEEP_WALL_TIME)
+        r = compute_results(
+            :w0,
+            winds[i];
+            syms,
+            p0,
+            p_fixed=p_ref,
+            lower,
+            upper,
+            sense=SENSE,
+            tol=TOL,
+            wall=SWEEP_WALL_TIME,
+        )
         no_opt[i], opt[i], theta[i] = r[1], r[2], r[3]
-        ok[i] = r[4].status == :first_order
+        return ok[i] = r[4].status == :first_order
     end
     for i in i_ref:-1:1
         run!(i, p_ref)
-        !ok[i] && i < i_ref && run!(i, from_theta(theta[i+1]))
+        !ok[i] && i < i_ref && run!(i, from_theta(theta[i + 1]))
     end
-    for i in (i_ref+1):n
+    for i in (i_ref + 1):n
         run!(i, p_ref)
-        !ok[i] && run!(i, from_theta(theta[i-1]))
+        !ok[i] && run!(i, from_theta(theta[i - 1]))
     end
     for i in eachindex(winds)
         ok[i] || @warn "re-optimization at $(winds[i]) m/s did not converge"
@@ -162,12 +176,15 @@ Warm the layout up and keep the second run.
 """
 function opt_step(p, syms, lower, upper)
     solve() = with_logger(NullLogger()) do
-        OPT.optimize(p, syms, lower, upper; sense=SENSE, tol=TOL, max_wall_time=MAX_WALL_TIME)
+        return OPT.optimize(
+            p, syms, lower, upper; sense=SENSE, tol=TOL, max_wall_time=MAX_WALL_TIME
+        )
     end
     solve()
     t_wall = time()
     solution, stats, _ = solve()
-    stats.status == :first_order || @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
+    stats.status == :first_order ||
+        @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
     p_next = copy(p)
     p_next[syms] .= solution.params[syms]  # physical units
     return (; p=p_next, P=solution.P, iter=stats.iter, t_wall=time() - t_wall)
@@ -184,9 +201,10 @@ function dtheta_study(p, factors; n=2001)
     return map(factors) do f
         q = copy(p)
         q.Δθ = f * p.Δθ
-        sol = LC.compute_limit_cycle(u0, PMP.build_vbpara(q);
-            tol=TOL, save_everystep=true, tf=100.0)
-        (; f, cycle_stats(sol; n)...)
+        sol = LC.compute_limit_cycle(
+            u0, PMP.build_vbpara(q); tol=TOL, save_everystep=true, tf=100.0
+        )
+        return (; f, cycle_stats(sol; n)...)
     end
 end
 
@@ -215,8 +233,9 @@ function shape_grid(p, factors, dphi_deg; n=401)
         # reject a trajectory that did not close
         norm(LC.endpoint_residuals(sol; sense=SENSE)) < 1e-3 || continue
         s = cycle_stats(sol; n)
-        P[j, i], Tmin[j, i], Tmax[j, i], amax[j, i] =
-            s.P / 1000, s.Tmin / 1000, s.Tmax / 1000, s.amax
+        P[j, i], Tmin[j, i], Tmax[j, i], amax[j, i] = s.P / 1000,
+        s.Tmin / 1000, s.Tmax / 1000,
+        s.amax
     end
     return (; P, Tmin, Tmax, amax, factors, dphi_deg)
 end
@@ -231,7 +250,7 @@ plots at `(1, 1)`. `lower` and `upper` are the box constraints of `syms`
 (physical units), returned as normalized factors so the caller can mark them.
 """
 function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
-    xs = range(1 - window, 1 + window, length=npoints)
+    xs = range(1 - window, 1 + window; length=npoints)
     power(sym, x) = begin
         q = copy(p)
         q[sym] = x * p[sym]
@@ -240,14 +259,18 @@ function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
     end
     vals = [power(sym, x) for sym in syms, x in xs]
     k0 = findmin(abs.(xs .- 1))[2]  # the optimum, where the landscape is normalized
-    return (; xs=collect(xs), syms=collect(syms), window,
+    return (;
+        xs=collect(xs),
+        syms=collect(syms),
+        window,
         ys=[row ./ row[k0] for row in eachrow(vals)],
         center=collect(p[syms]),  # the optimum in physical units, for the x axis
-        box=[(lo / p[sym], up / p[sym]) for (sym, lo, up) in zip(syms, lower, upper)])
+        box=[(lo / p[sym], up / p[sym]) for (sym, lo, up) in zip(syms, lower, upper)],
+    )
 end
 
 ## Numerical: 9 m/s reference, one optimization over Θ
-p_start = PMP.build_para(w0=WIND_REF)
+p_start = PMP.build_para(; w0=WIND_REF)
 p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
 lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
 upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
@@ -256,27 +279,37 @@ opt_ref = opt_step(p_start, SYMS, lower, upper)
 p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
 
 ## Numerical: wind sweep over Θ, from the 9 m/s optimum
-winds = range(5, 15, length=11)
+winds = range(5, 15; length=11)
 i_ref = findfirst(x -> x >= WIND_REF, winds)
 sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref)
 
 ## Numerical: Δθ sensitivity at the optimum
-dtheta = dtheta_study(p_ref, range(1 - DTHETA_WINDOW, 1 + DTHETA_WINDOW, length=11))
+dtheta = dtheta_study(p_ref, range(1 - DTHETA_WINDOW, 1 + DTHETA_WINDOW; length=11))
 
 ## Numerical: 10×10 shape map at the optimal ℓ, I, b
-shape = shape_grid(p_ref,
-    range(1 - SHAPE_WINDOW, 1 + SHAPE_WINDOW, length=GRID_N),
-    range(rad2deg.(DPHI_BOUNDS)..., length=GRID_N))  # shape_grid takes degrees
+shape = shape_grid(
+    p_ref,
+    range(1 - SHAPE_WINDOW, 1 + SHAPE_WINDOW; length=GRID_N),
+    range(rad2deg.(DPHI_BOUNDS)...; length=GRID_N),
+)  # shape_grid takes degrees
 
 ## Numerical: objective landscape around the Θ optimum
 LANDSCAPE = landscape(p_ref, SYMS; lower, upper)
 
 ## Numerical: report
 function print_final_table()
-    stats = (init=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_start);
-        sense=SENSE, tol=TOL, save_everystep=true)),
-        opt=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_ref);
-            sense=SENSE, tol=TOL, save_everystep=true)))
+    stats = (
+        init=cycle_stats(
+            LC.compute_limit_cycle(
+                PMP.build_vbpara(p_start); sense=SENSE, tol=TOL, save_everystep=true
+            ),
+        ),
+        opt=cycle_stats(
+            LC.compute_limit_cycle(
+                PMP.build_vbpara(p_ref); sense=SENSE, tol=TOL, save_everystep=true
+            ),
+        ),
+    )
     cols = ((p_start, stats.init), (p_ref, stats.opt))
     fmt(x) = string(round(x; sigdigits=6))
     row(name, f) = println(rpad(name, 30), join([lpad(f(c), 14) for c in cols]))
@@ -296,49 +329,88 @@ function print_final_table()
     println()
 
     println("wind sweep over Θ (reference at $(round(Int, WIND_REF)) m/s)")
-    println(rpad("v (m/s)", 8), rpad("fixed P", 10), rpad("opt P", 10), rpad("gain", 8),
-        rpad("Tmax opt", 10), rpad("ℓ (m)", 9), rpad("I", 9), rpad("b", 9), "Δφ (°)")
+    println(
+        rpad("v (m/s)", 8),
+        rpad("fixed P", 10),
+        rpad("opt P", 10),
+        rpad("gain", 8),
+        rpad("Tmax opt", 10),
+        rpad("ℓ (m)", 9),
+        rpad("I", 9),
+        rpad("b", 9),
+        "Δφ (°)",
+    )
     for k in eachindex(winds)
         P0, P = sweep.no_opt[k].P / 1000, sweep.opt[k].P / 1000
         θ = sweep.theta[k]
-        println(rpad(round(Int, winds[k]), 8), rpad(round(P0; digits=3), 10),
-            rpad(round(P; digits=3), 10), rpad(f"{(P / P0 - 1) * 100:+.1f} %", 8),
+        println(
+            rpad(round(Int, winds[k]), 8),
+            rpad(round(P0; digits=3), 10),
+            rpad(round(P; digits=3), 10),
+            rpad(f"{(P / P0 - 1) * 100:+.1f} %", 8),
             rpad(round(sweep.opt[k].Tmax / 1000; digits=2), 10),
-            rpad(round(θ[1]; digits=2), 9), rpad(round(θ[2]; digits=1), 9),
-            rpad(round(θ[3]; digits=1), 9), round(rad2deg(θ[4]); digits=2))
+            rpad(round(θ[1]; digits=2), 9),
+            rpad(round(θ[2]; digits=1), 9),
+            rpad(round(θ[3]; digits=1), 9),
+            round(rad2deg(θ[4]); digits=2),
+        )
     end
     println()
 
-    println("Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1))°)")
-    println(rpad("Δθ (%)", 8), rpad("P (kW)", 10), rpad("Tmin (kN)", 11),
-        rpad("Tmax (kN)", 11), rpad("spread (kN)", 12), "max a (m/s²)")
+    println(
+        "Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1))°)",
+    )
+    println(
+        rpad("Δθ (%)", 8),
+        rpad("P (kW)", 10),
+        rpad("Tmin (kN)", 11),
+        rpad("Tmax (kN)", 11),
+        rpad("spread (kN)", 12),
+        "max a (m/s²)",
+    )
     for d in dtheta
-        println(rpad(f"{(d.f - 1) * 100:+.0f}", 8), rpad(round(d.P / 1000; digits=3), 10),
-            rpad(round(d.Tmin / 1000; digits=3), 11), rpad(round(d.Tmax / 1000; digits=3), 11),
-            rpad(round((d.Tmax - d.Tmin) / 1000; digits=3), 12), round(d.amax; digits=1))
+        println(
+            rpad(f"{(d.f - 1) * 100:+.0f}", 8),
+            rpad(round(d.P / 1000; digits=3), 10),
+            rpad(round(d.Tmin / 1000; digits=3), 11),
+            rpad(round(d.Tmax / 1000; digits=3), 11),
+            rpad(round((d.Tmax - d.Tmin) / 1000; digits=3), 12),
+            round(d.amax; digits=1),
+        )
     end
     println()
 
     println("shape map (no re-optimization, $(GRID_N)×$(GRID_N) limit cycles)")
     finite(Z) = filter(isfinite, Z)
     println("  valid: ", count(isfinite, shape.P), " of ", length(shape.P), " cells")
-    for (name, Z, unit) in (("P", shape.P, "kW"), ("Tmax", shape.Tmax, "kN"),
-        ("Tmin", shape.Tmin, "kN"))
+    for (name, Z, unit) in
+        (("P", shape.P, "kW"), ("Tmax", shape.Tmax, "kN"), ("Tmin", shape.Tmin, "kN"))
         lo, hi = extrema(finite(Z))
-        println("  ", rpad(name, 5), round(lo; digits=2), " … ", round(hi; digits=2), " ", unit)
+        println(
+            "  ", rpad(name, 5), round(lo; digits=2), " … ", round(hi; digits=2), " ", unit
+        )
     end
     k = argmax(ifelse.(isfinite.(shape.amax), shape.amax, -Inf))
-    println("  max a: ", round(shape.amax[k]; digits=0), " m/s² at Δθ = ",
-        round((shape.factors[k[2]] - 1) * 100; digits=0), " %, Δφ = ",
-        round(shape.dphi_deg[k[1]]; digits=1), "°")
+    println(
+        "  max a: ",
+        round(shape.amax[k]; digits=0),
+        " m/s² at Δθ = ",
+        round((shape.factors[k[2]] - 1) * 100; digits=0),
+        " %, Δφ = ",
+        round(shape.dphi_deg[k[1]]; digits=1),
+        "°",
+    )
     println()
 
     println("landscape at the Θ optimum (power relative to the optimum)")
     println(rpad("parameter", 12), rpad("at -10 %", 12), rpad("at +10 %", 12), "box (÷/×)")
     for (i, sym) in enumerate(SYMS)
-        println(rpad(LABELS[sym], 12), rpad(round(LANDSCAPE.ys[i][1]; digits=4), 12),
+        println(
+            rpad(LABELS[sym], 12),
+            rpad(round(LANDSCAPE.ys[i][1]; digits=4), 12),
             rpad(round(LANDSCAPE.ys[i][end]; digits=4), 12),
-            round.(LANDSCAPE.box[i]; digits=3))
+            round.(LANDSCAPE.box[i]; digits=3),
+        )
     end
 end
 
@@ -362,29 +434,63 @@ function plot_wind_sweep(winds, sweep, i_ref)
     ref_style = (; ls=:dot, c=:black)
 
     # Average power
-    f1 = plot(ylabel="Power (kW)", legend=:topleft)
+    f1 = plot(; ylabel="Power (kW)", legend=:topleft)
     plot!(f1, winds, power0 ./ 1000; ref_style..., label=ref)
     plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1, label="Re-optimized")
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
-    f2 = plot(ylabel="Line tension (kN)", legend=:topleft)
-    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style..., label=[ref ""])
-    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1, label="Re-optimized")
+    f2 = plot(; ylabel="Line tension (kN)", legend=:topleft)
+    plot!(
+        f2,
+        winds,
+        [max_tension0 ./ 1000, min_tension0 ./ 1000];
+        ref_style...,
+        label=[ref ""],
+    )
+    plot!(
+        f2,
+        winds,
+        max_tension_vec ./ 1000;
+        fillrange=min_tension_vec ./ 1000,
+        c=1,
+        fillalpha=0.1,
+        label="Re-optimized",
+    )
     plot!(f2, winds, min_tension_vec ./ 1000; c=1)
 
     # Optimized parameters, normalized by their maximum over the wind range
     n = length(syms)
-    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(-0.1, 1.1), ylabel="Parameters", xformatter=:plain, xlabel="Wind speed (m/s)", legend=:bottomright)
+    f3 = plot(;
+        yticks=((0, 1), ("0", "max")),
+        ylim=(-0.1, 1.1),
+        ylabel="Parameters",
+        xformatter=:plain,
+        xlabel="Wind speed (m/s)",
+        legend=:bottomright,
+    )
     # plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
-    plot!(f3, winds, theta_norm; c=permutedims(collect(1:n)), label=permutedims([LABELS[s] for s in syms]))
+    plot!(
+        f3,
+        winds,
+        theta_norm;
+        c=permutedims(collect(1:n)),
+        label=permutedims([LABELS[s] for s in syms]),
+    )
 
     # mark the wind speed the reference parameters were optimized at
     foreach(f -> vline!(f, [WIND_REF]; c=:gray50, ls=:dash, label=""), (f1, f2, f3))
 
     # three panels of a third of the text height, full text width; the margins
     # leave room for the axis labels (the theme sets margin = 0)
-    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
-        leftmargin=8Plots.mm, bottommargin=4Plots.mm)
+    fig = plot(
+        f1,
+        f2,
+        f3;
+        layout=(3, 1),
+        size=plot_size(1; height=3 * 0.375),
+        leftmargin=8Plots.mm,
+        bottommargin=4Plots.mm,
+    )
     return (; fig, panels=(f1, f2, f3))
 end
 
@@ -404,17 +510,37 @@ function plot_dtheta(dtheta)
     vline_style = (; c=:gray50, ls=:dash, label="")
 
     f1 = plot(x, P; style..., label="", ylabel="Power (kW)")
-    f2 = plot(x, Tmax; style..., label="max", ylabel="Line tension (kN)",
-        fillrange=Tmin, fillalpha=0.1)
+    f2 = plot(
+        x,
+        Tmax;
+        style...,
+        label="max",
+        ylabel="Line tension (kN)",
+        fillrange=Tmin,
+        fillalpha=0.1,
+    )
     plot!(f2, x, Tmin; style..., label="min")
-    f3 = plot(x, amax; style..., label="", ylabel="Max acceleration (m/s²)",
-        xlabel="Δθ deviation from nominal (%)")
+    f3 = plot(
+        x,
+        amax;
+        style...,
+        label="",
+        ylabel="Max acceleration (m/s²)",
+        xlabel="Δθ deviation from nominal (%)",
+    )
     foreach(f -> vline!(f, [0]; vline_style...), (f1, f2, f3))
-    foreach(f -> plot!(f, xticks=-10:5:10, xlim=(-11, 11)), (f1, f2, f3))
-    foreach(f -> plot!(f, xformatter=x -> ""), (f1, f2))
+    foreach(f -> plot!(f; xticks=-10:5:10, xlim=(-11, 11)), (f1, f2, f3))
+    foreach(f -> plot!(f; xformatter=x -> ""), (f1, f2))
 
-    return plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
-        leftmargin=9Plots.mm, bottommargin=4Plots.mm)
+    return plot(
+        f1,
+        f2,
+        f3;
+        layout=(3, 1),
+        size=plot_size(1; height=3 * 0.375),
+        leftmargin=9Plots.mm,
+        bottommargin=4Plots.mm,
+    )
 end
 
 ## Plot: shape map over Δθ and Δφ
@@ -427,9 +553,20 @@ function plot_shape_grid(g, dphi_opt)
     x = 100 .* (g.factors .- 1)
     y = g.dphi_deg
     function pane(Z, title)
-        plt = heatmap(x, y, Z; c=:viridis, title=title, titlefontsize=TICKFONTSIZE,
-            xticks=-20:10:20, yticks=10:10:90, xlim=extrema(x), ylim=extrema(y),
-            xlabel="Δθ deviation (%)", ylabel="Δφ (°)")
+        plt = heatmap(
+            x,
+            y,
+            Z;
+            c=:viridis,
+            title=title,
+            titlefontsize=TICKFONTSIZE,
+            xticks=-20:10:20,
+            yticks=10:10:90,
+            xlim=extrema(x),
+            ylim=extrema(y),
+            xlabel="Δθ deviation (%)",
+            ylabel="Δφ (°)",
+        )
         vline!(plt, [0]; c=:white, ls=:dash, lw=1)
         hline!(plt, [dphi_opt]; c=:white, ls=:dash, lw=1)
         scatter!(plt, [0], [dphi_opt]; c=:white, markerstrokecolor=:black, ms=5)
@@ -439,10 +576,18 @@ function plot_shape_grid(g, dphi_opt)
     p1 = pane(g.P, "P (kW)")
     p2 = pane(g.Tmax, "Tmax (kN)")
     p3 = pane(g.amax, "max a (m/s²)")
-    plot!(p2, ylabel="")
-    plot!(p3, ylabel="")
-    return plot(p1, p2, p3; layout=(1, 3), size=plot_size(1; height=0.5),
-        leftmargin=6Plots.mm, bottommargin=5Plots.mm, topmargin=4Plots.mm)
+    plot!(p2; ylabel="")
+    plot!(p3; ylabel="")
+    return plot(
+        p1,
+        p2,
+        p3;
+        layout=(1, 3),
+        size=plot_size(1; height=0.5),
+        leftmargin=6Plots.mm,
+        bottommargin=5Plots.mm,
+        topmargin=4Plots.mm,
+    )
 end
 
 ## Plot: objective landscape around the Θ optimum
@@ -466,23 +611,32 @@ function plot_landscape(land)
     panels = [
         begin
             x0 = center[i]  # the optimum, in physical units
-            ticks = ([x0 * lo, x0, x0 * hi],
-                [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
-            plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
+            ticks = (
+                [x0 * lo, x0, x0 * hi],
+                [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"],
+            )
+            plt = plot(;
+                xlims=(x0 * lo, x0 * hi),
+                widen=true,
+                xticks=ticks,
                 title="$(LABELS[sym])\n($(UNITS[sym]))",
                 ylabel=(isodd(i) ? "P / P*" : ""),
-                leftmargin=(isodd(i) ? 9 : 5)Plots.mm, rightmargin=5Plots.mm,
-                bottommargin=7Plots.mm, topmargin=4Plots.mm)
+                leftmargin=(isodd(i) ? 9 : 5)Plots.mm,
+                rightmargin=5Plots.mm,
+                bottommargin=7Plots.mm,
+                topmargin=4Plots.mm,
+            )
             # value of the sampled curve at a factor x, linearly interpolated
-            interp(x) = begin
+            function interp(x)
                 k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1)
-                ys[i][k] + (x - xs[k]) / (xs[k+1] - xs[k]) * (ys[i][k+1] - ys[i][k])
+                return ys[i][k] +
+                       (x - xs[k]) / (xs[k + 1] - xs[k]) * (ys[i][k + 1] - ys[i][k])
             end
             # factors from a to b, with the ends inserted (they need not be samples)
             piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b)
             xa, xb = max(box[i][1], lo), min(box[i][2], hi)  # box ∩ window
-            xa < xb && plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb));
-                c=1, ls=:solid)
+            xa < xb &&
+                plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb)); c=1, ls=:solid)
             for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi))
                 a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=1, ls=:dot)
             end
@@ -498,13 +652,13 @@ end
 
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
 my_defaults()
-default(xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
+default(; xticks=4:2:16, xlim=(4, 16), xformatter=x -> "")
 
 (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
 display(fig)
 savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_theta.pdf"))
 for (f, panel) in zip(panels, ("power", "tension", "params"))
-    plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
+    plot!(f; size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
     display(f)
     savefig(f, joinpath(OUTPATH, "optimization_$(panel)_theta.pdf"))
 end
@@ -562,7 +716,9 @@ of them binds.
 my_defaults()
 names = (:init, :opt)
 sols = map((p_start, p_ref)) do p
-    LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
+    return LC.compute_limit_cycle(
+        PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true
+    )
 end
 # savefig only: a second render of the same figure fails Plots' layout pass
 for (name, sol) in zip(names, sols)
