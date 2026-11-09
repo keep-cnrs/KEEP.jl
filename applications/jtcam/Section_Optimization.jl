@@ -63,11 +63,19 @@ const DTHETA_WINDOW = 0.1                     # ±10 % around the nominal Δθ
 const SHAPE_WINDOW = 0.2                      # ±20 % for the shape map
 const GRID_N = 10
 
+# Parameter names, units and scales from the stored value to the displayed one.
+# An angle is rad2deg; a per-angle unit is the inverse, so that b·dα stays a
+# torque when dα is read in deg/s.
+const TEX = Dict(:l => (raw"$\ell$", raw"\si{\meter}", identity),
+    :I => (raw"$I$", raw"\si{\kilogram\meter\squared}", identity),
+    :b => (raw"$b$", raw"\si{\newton\meter\second\per\degree}", x -> x / rad2deg(1)),
+    :Δφ => (raw"$\Delta\varphi$", raw"\si{\degree}", rad2deg))
+
 # Parameter names and units for the axis titles and the legends
 const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b",
     :Δθ => "Δθ", :Δφ => "Δφ")
-const UNITS = Dict(:l => "m", :I => "kg m²", :b => "kg m² s⁻¹ rad⁻¹",
-    :Δθ => "rad", :Δφ => "rad")
+const UNITS = Dict(:l => "m", :I => "kg m²", :b => "kg m² s⁻¹ deg⁻¹",
+    :Δθ => "deg", :Δφ => "deg")
 
 ## Helpers
 "Average power, line-tension extrema, peak kite acceleration and period of a cycle."
@@ -284,9 +292,9 @@ function print_final_table()
     println("\nfinal parameters")
     println(rpad("", 30), join(lpad.(["init", "Θ"], 14)))
     for sym in SYMS
-        row("$(LABELS[sym]) ($(UNITS[sym]))", c -> fmt(c[1][sym]))
+        row("$(LABELS[sym]) ($(UNITS[sym]))", c -> fmt(TEX[sym][3](c[1][sym])))
     end
-    row("Δθ (rad, fixed)", c -> fmt(c[1].Δθ))
+    row("Δθ (deg, fixed)", c -> fmt(rad2deg(c[1].Δθ)))
     println()
     row("period (s)", c -> fmt(c[2].period))
     row("objective P (kW)", c -> fmt(c[2].P / 1000))
@@ -297,7 +305,7 @@ function print_final_table()
 
     println("wind sweep over Θ (reference at $(round(Int, WIND_REF)) m/s)")
     println(rpad("v (m/s)", 8), rpad("fixed P", 10), rpad("opt P", 10), rpad("gain", 8),
-        rpad("Tmax opt", 10), rpad("ℓ (m)", 9), rpad("I", 9), rpad("b", 9), "Δφ (°)")
+        rpad("Tmax opt", 10), rpad("ℓ (m)", 9), rpad("I", 9), rpad("b", 9), "Δφ (deg)")
     for k in eachindex(winds)
         P0, P = sweep.no_opt[k].P / 1000, sweep.opt[k].P / 1000
         θ = sweep.theta[k]
@@ -305,11 +313,11 @@ function print_final_table()
             rpad(round(P; digits=3), 10), rpad(f"{(P / P0 - 1) * 100:+.1f} %", 8),
             rpad(round(sweep.opt[k].Tmax / 1000; digits=2), 10),
             rpad(round(θ[1]; digits=2), 9), rpad(round(θ[2]; digits=1), 9),
-            rpad(round(θ[3]; digits=1), 9), round(rad2deg(θ[4]); digits=2))
+            rpad(round(TEX[:b][3](θ[3]); digits=1), 9), round(rad2deg(θ[4]); digits=2))
     end
     println()
 
-    println("Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1))°)")
+    println("Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
     println(rpad("Δθ (%)", 8), rpad("P (kW)", 10), rpad("Tmin (kN)", 11),
         rpad("Tmax (kN)", 11), rpad("spread (kN)", 12), "max a (m/s²)")
     for d in dtheta
@@ -330,7 +338,7 @@ function print_final_table()
     k = argmax(ifelse.(isfinite.(shape.amax), shape.amax, -Inf))
     println("  max a: ", round(shape.amax[k]; digits=0), " m/s² at Δθ = ",
         round((shape.factors[k[2]] - 1) * 100; digits=0), " %, Δφ = ",
-        round(shape.dphi_deg[k[1]]; digits=1), "°")
+        round(shape.dphi_deg[k[1]]; digits=1), " deg")
     println()
 
     println("landscape at the Θ optimum (power relative to the optimum)")
@@ -340,6 +348,92 @@ function print_final_table()
             rpad(round(LANDSCAPE.ys[i][end]; digits=4), 12),
             round.(LANDSCAPE.box[i]; digits=3))
     end
+end
+
+## Numerical: LaTeX tables for the paper
+"One optimized parameter, in the units shown in the table."
+struct OptVar
+    sym::String
+    unit::String
+    low::Float64
+    up::Float64
+    guess::Float64
+    sol::Float64
+end
+
+"Limit-cycle statistics of one parameter set, plus the norm of its endpoint residual."
+function cycle_report(p)
+    sol = LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL,
+        save_everystep=true)
+    return (; cycle_stats(sol)..., residual=norm(LC.endpoint_residuals(sol; sense=SENSE)))
+end
+
+"Math-mode scientific notation, e.g. `\$3.7\\times10^{-9}\$`."
+function latex_sci(x)
+    x == 0 && return raw"$0$"
+    e = floor(Int, log10(abs(x)))
+    return raw"$" * string(round(x / exp10(e); digits=1)) * raw"\times10^{" *
+           string(e) * raw"}$"
+end
+
+"""
+The two siunitx tables of the optimization section: the boxes of Θ = (ℓ, I, b,
+Δφ) and the optimization results at `WIND_REF`, initial guess against solution.
+Every number comes from `p_init`, `p_opt` and their limit cycles; Δφ is shown in
+degrees and b per degree. Δθ is held fixed, so it only enters the first caption.
+"""
+function print_latex_tables(p_init, p_opt, lower, upper)
+    s0, s1 = cycle_report(p_init), cycle_report(p_opt)
+    data = [let (sym, unit, scale) = TEX[k]
+        OptVar(sym, unit, scale(lower[i]), scale(upper[i]),
+            scale(p_init[k]), scale(p_opt[k]))
+    end for (i, k) in enumerate(SYMS)]
+
+    # b per degree has a small lower bound (1 N m s/rad -> 0.0175)
+    num(x) = abs(x) < 0.1 ? f"{x:.4f}" : f"{x:.1f}"
+    bounds_rows = [f"    {v.sym} ({v.unit}) & {num(v.low)} & {num(v.up)} \\\\ " for v in data]
+    results_rows = [f"    {v.sym} ({v.unit}) & {v.guess:.1f} & {v.sol:.1f} \\\\ " for v in data]
+    push!(results_rows, raw"    \midrule")
+    push!(results_rows, f"    Average power (\\si{{\\kilo\\watt}}) & {s0.P / 1000:.2f} & {s1.P / 1000:.2f} \\\\ ")
+    push!(results_rows, f"    Period (\\si{{\\second}}) & {s0.period:.2f} & {s1.period:.2f} \\\\ ")
+    push!(results_rows, f"    Min line tension (\\si{{\\kilo\\newton}}) & {s0.Tmin / 1000:.2f} & {s1.Tmin / 1000:.2f} \\\\ ")
+    push!(results_rows, f"    Max line tension (\\si{{\\kilo\\newton}}) & {s0.Tmax / 1000:.2f} & {s1.Tmax / 1000:.2f} \\\\ ")
+    push!(results_rows, "    Norm of residual & {" * latex_sci(s0.residual) * "} & {" *
+                        latex_sci(s1.residual) * "} \\\\ ")
+
+    table_descr = join([
+        raw"\begin{table}[thpb]",
+        raw"\centering",
+        raw"\caption{Description of the optimized parameters ($\Delta\theta = \SI{" *
+        string(round(rad2deg(p_init.Δθ); digits=2)) * raw"}{\degree}$ fixed).}",
+        raw"\begin{tabular}{l S S}",
+        raw"    \toprule",
+        "    {Symbol (Unit)} & {Lower} & {Upper} \\\\",
+        raw"    \midrule",
+        bounds_rows...,
+        raw"    \bottomrule",
+        raw"\end{tabular}",
+        raw"\label{tab:opt_descr}",
+        raw"\end{table}",
+    ], "\n")
+
+    table_opt = join([
+        raw"\begin{table}[thpb]",
+        raw"\centering",
+        raw"\caption{Optimization results at $w_0 = \SI{" *
+        string(round(Int, WIND_REF)) * raw"}{\meter\per\second}$.}",
+        raw"\begin{tabular}{l S S}",
+        raw"    \toprule",
+        "    {Symbol (Unit)} & {Initial Guess} & {Solution} \\\\",
+        raw"    \midrule",
+        results_rows...,
+        raw"    \bottomrule",
+        raw"\end{tabular}",
+        raw"\label{tab:opt_results}",
+        raw"\end{table}",
+    ], "\n")
+
+    println(join(["%% BEGIN TABLE 2", table_descr, table_opt, "%% END TABLE 2"], "\n\n"))
 end
 
 ## Plot: wind sweep over Θ
@@ -408,9 +502,9 @@ function plot_dtheta(dtheta)
     vline_style = (; c=:gray50, ls=:dash, label="")
 
     f1 = plot(x, P; style..., label="", ylabel="Power (kW)")
-    f2 = plot(x, Tmax; style..., label="max", ylabel="Line tension (kN)",
+    f2 = plot(x, Tmax; style..., label="", ylabel="Line tension (kN)",
         fillrange=Tmin, fillalpha=0.1)
-    plot!(f2, x, Tmin; style..., label="min")
+    plot!(f2, x, Tmin; style..., label="")
     f3 = plot(x, amax; style..., label="", ylabel="Max acceleration (m/s²)",
         xlabel="Δθ deviation from nominal (%)")
     foreach(f -> vline!(f, [0]; vline_style...), (f1, f2, f3))
@@ -433,7 +527,7 @@ function plot_shape_grid(g, dphi_opt)
     function pane(Z, title)
         plt = heatmap(x, y, Z; c=:viridis, title=title, titlefontsize=TICKFONTSIZE,
             xticks=-20:10:20, yticks=10:10:90, xlim=extrema(x), ylim=extrema(y),
-            xlabel="Δθ deviation (%)", ylabel="Δφ (°)")
+            xlabel="Δθ deviation (%)", ylabel="Δφ (deg)")
         vline!(plt, [0]; c=:white, ls=:dash, lw=1)
         hline!(plt, [dphi_opt]; c=:white, ls=:dash, lw=1)
         scatter!(plt, [0], [dphi_opt]; c=:white, markerstrokecolor=:black, ms=5)
@@ -469,7 +563,7 @@ function plot_landscape(land)
     # the labels the two-column grid would otherwise clip
     panels = [
         begin
-            x0 = center[i]  # the optimum, in physical units
+            x0 = TEX[syms[i]][3](center[i])  # the optimum, in display units
             ticks = ([x0 * lo, x0, x0 * hi],
                 [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
             plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
@@ -502,7 +596,7 @@ end
 
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
 my_defaults()
-default(xticks=4:2:16, xlim=(4, 16))
+default(xticks=5:15, widen=1.06)
 
 (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
 display(fig)
@@ -581,3 +675,4 @@ savefig(fig_ts, joinpath(OUTPATH, "optimization_timeseries_all.pdf"))
 
 ## Console report
 print_final_table()
+print_latex_tables(p_start, p_ref, lower, upper)

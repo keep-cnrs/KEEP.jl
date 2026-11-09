@@ -66,10 +66,11 @@ function time_series_panels(sol; N=500)
     one_period = abs(abs(q_ts[end, 2] - q_ts[1, 2]) - 2π) <= 1e-3
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
-    p_wts = plot(ts, q_ts[:, [1, 3, 4]]; c=[1 3 4], label="", legend=false,
-        ylabel="x (rad, rad/s)", xlabel="", xformatter=x -> "")
-    plot!(t_main, y_main; c=2, label="")
-    one_period || plot!(t_jump, y_jump; c=2, ls=:dot, label=false)
+    q_deg = rad2deg.(q_ts[:, [1, 3, 4]])
+    p_wts = plot(ts, q_deg; c=[1 3 4], label="", legend=false,
+        ylabel="x (deg, deg/s)", xlabel="", xformatter=x -> "")
+    plot!(t_main, rad2deg.(y_main); c=2, label="")
+    one_period || plot!(t_jump, rad2deg.(y_jump); c=2, ls=:dot, label=false)
 
     pw_stats = plot_avg_power_kW(sol, ts)
     pw = pw_stats.plt
@@ -83,11 +84,11 @@ function time_series_panels(sol; N=500)
     tmin, tmax = extrema(tension[ok])
     p_t = plot(ts[ok], tension[ok]; c=5, label="", legend=false,
         ylabel="Tension (kN)", xlabel="t (s)",
-        yticks=([0, tmin, tmax], ["0", f"{tmin:.1f}", f"{tmax:.1f}"]),
+        # yticks=([0, tmin, tmax], ["0", f"{tmin:.1f}", f"{tmax:.1f}"]),
         ylim=(0, tmax), widen=true)
 
-    y_wts = vcat(vec(q_ts[:, [1, 3, 4]]), filter(isfinite, y_main),
-        one_period ? Float64[] : filter(isfinite, y_jump))
+    y_wts = vcat(vec(q_deg), rad2deg.(filter(isfinite, y_main)),
+        one_period ? Float64[] : rad2deg.(filter(isfinite, y_jump)))
     return (; wts=p_wts, pw, tension=p_t,
         ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
             tension=(0.0, tmax)))
@@ -116,7 +117,7 @@ end
 
 "One hand-drawn legend per row: states, power, tension."
 function time_series_legends()
-    return (states=time_series_legend(("α", "τ mod 2π", "D(α)", "D(τ)"),
+    return (states=time_series_legend(("α", "τ mod 360 deg", "D(α)", "D(τ)"),
         ((; c=1), (; c=2), (; c=3), (; c=4))),
         power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red))),
         tension=time_series_legend(("T",), ((; c=5),)))

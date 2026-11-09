@@ -32,7 +32,7 @@ p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
 vbp = PMP.build_vbpara(p0)
 
 @info f"Optimal torque slope value
-b = I ω ≈ {p0.b:.2f} kg m² s⁻¹ rad⁻¹, with ω = 2π/period read from a simulation of the limit cycle (fixed point of b = I ω)."
+b ≈ {p0.b / rad2deg(1):.2f} kg m² s⁻¹ deg⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -167,19 +167,22 @@ f = q -> SteadyState.ddq_partial(q, vbp)
 
 # Canvas & Layout
 δ = 0
-plot(xlims=(-π - δ, π + δ), ylims=(-π - δ, π + δ), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
+    xticks=([-180, 0, 180], ["-180", "0", "180"]),
+    yticks=([-180, 0, 180], ["-180", "0", "180"]),
+    xlabel="α (deg)", ylabel="τ (deg)",
     grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
 # Background wind spans
-vspan!([-π, -π / 2]; theme.upwind..., label="Upwind arm")
-vspan!([π / 2, π]; theme.upwind...)
-vspan!([-π / 2, π / 2]; theme.downwind...) #, label="Downwind arm")
+vspan!([-180, -90]; theme.upwind..., label="Upwind arm")
+vspan!([90, 180]; theme.upwind...)
+vspan!([-90, 90]; theme.downwind...) #, label="Downwind arm")
 
 # Streamlines & Arrowheads
 line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
-plot!(line_x, line_y; theme.streamlines...)
+plot!(rad2deg.(line_x), rad2deg.(line_y); theme.streamlines...)
 
-L, W = 0.2, 0.06
+ax, ay = rad2deg.(ax), rad2deg.(ay)
+L, W = rad2deg(0.2), rad2deg(0.06)
 heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
     (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
     (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
@@ -192,8 +195,8 @@ N = 20
 τs = range(-π, π, 2N + 1)
 dd = [f((α, τ)) for τ in τs, α in αs]
 
-contour!(αs, τs, last.(dd); levels=[0], theme.nullcline_tau...)
-contour!(αs, τs, first.(dd); levels=[0], theme.nullcline_alpha...)
+contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], theme.nullcline_tau...)
+contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], theme.nullcline_alpha...)
 plot!([NaN], [NaN]; theme.nullcline_tau..., label="D²(τ) = 0")
 plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 
@@ -201,7 +204,7 @@ plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 ss = SteadyState.all_steady_states(vbp)
 
 styles = ss_style.(ss)
-scatter!(first.(ss), last.(ss);
+scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
     c=getproperty.(styles, :c),
     markerstrokecolor=getproperty.(styles, :markerstrokecolor),
     shape=getproperty.(styles, :shape),
@@ -209,7 +212,8 @@ scatter!(first.(ss), last.(ss);
     markerstrokewidth=getproperty.(styles, :markerstrokewidth))
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 plot!(widen=1.06)
-plot!(bottommargin=1Plots.mm, rightmargin=-10Plots.mm, size=plot_size(0.57))
+plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
+    topmargin=5Plots.mm, size=plot_size(0.57))
 savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
 display(current())
 @info "Chance to use Poincaré-Miranda theorem here?"
@@ -263,19 +267,22 @@ savefig(joinpath(@__DIR__, "figs", "equilibria_eigvals.pdf"))
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
 ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
 
-plot(xlims=(-π - 0.2, π + 0.2), ylims=(-π - 0.2, π + 0.2), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+plot(xlims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)),
+    ylims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)), aspect_ratio=:equal,
+    xticks=([-180, 0, 180], ["-180", "0", "180"]),
+    yticks=([-180, 0, 180], ["-180", "0", "180"]),
+    xlabel="α (deg)", ylabel="τ (deg)",
     grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
 
-vspan!([-π, -π / 2]; theme.upwind..., label="Arm upwind")
-vspan!([π / 2, π]; theme.upwind...)
-vspan!([-π / 2, π / 2]; theme.downwind..., label="Arm downwind")
+vspan!([-180, -90]; theme.upwind..., label="Arm upwind")
+vspan!([90, 180]; theme.upwind...)
+vspan!([-90, 90]; theme.downwind..., label="Arm downwind")
 
-contour!(αs, τs, last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
-contour!(αs, τs, first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
 
 styles = ss_style.(ss)
-scatter!(first.(ss), last.(ss);
+scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
     c=getproperty.(styles, :c),
     markerstrokecolor=getproperty.(styles, :markerstrokecolor),
     shape=getproperty.(styles, :shape),
@@ -288,11 +295,12 @@ for q in ss
     for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
         q0 = q .+ r_eq .* [cos(θ), sin(θ)]
         local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
-        qs = [sol(t)[1:2] for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
+        qs = [rad2deg.(sol(t)[1:2]) for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
         plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
     end
 end
-plot!(bottommargin=1Plots.mm, rightmargin=-10Plots.mm, size=plot_size(0.61))
+plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
+    topmargin=5Plots.mm, size=plot_size(0.61))
 
 savefig(joinpath(@__DIR__, "figs", "equilibria_trajectories.pdf"))
 display(plot!())
@@ -725,7 +733,7 @@ for u0 in seeds
 end
 
 ref_res = maximum(r -> r.res, refs)
-@info f"""Limit cycle inventory over α ∈ [0, π], τ ∈ [-π, π), (dα, dτ) ∈ [-{BK_M}, {BK_M}]² (half the torus, modulo S; symmetry residual {sym_err:.0e})
+@info f"""Limit cycle inventory over α ∈ [0, 180] deg, τ ∈ [-180, 180) deg, (dα, dτ) ∈ [-{rad2deg(BK_M):.0f}, {rad2deg(BK_M):.0f}] deg/s (half the torus, modulo S; symmetry residual {sym_err:.0e})
 Single shooting ({length(seeds)} Halton seeds → {attempts[1]}/{attempts[2]} per sign of dτ, {n_guess[]} turns, deflation): {length(found)} cycle(s) beyond the two references; references re-solved with residual {ref_res:.0e}
 Quasi-Monte-Carlo ({length(seeds)} Halton seeds, stable cycles only): {qmc[1]} → D(τ) > 0, {qmc[2]} → D(τ) < 0, {qmc[3]} → none"""
 
