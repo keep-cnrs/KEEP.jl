@@ -34,6 +34,89 @@ vbp = PMP.build_vbpara(p0)
 @info f"Optimal torque slope value
 b ≈ {p0.b / rad2deg(1):.2f} kg m² s⁻¹ deg⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
 
+## Parameter table for the paper
+# LaTeX table of the parameter set used here, sorted alphabetically by symbol.
+# b is the optimized PTO slope (kinetic criterion above); angles are in degrees
+# and b per degree, so b·dα is a torque when dα is read in deg/s.
+struct Parameter
+    key::Symbol
+    sym::String
+    descr::String
+    unit::String
+    value_override::Union{String,Nothing}
+end
+
+const LATEX_TO_UNICODE = Dict(
+    raw"\ell" => "l",
+    raw"\rho" => "ρ",
+    raw"\theta" => "θ",
+    raw"\Delta" => "Δ",
+    raw"\phi" => "φ"
+)
+
+function eor_transform(sym)
+    s = sym
+    for (k, v) in LATEX_TO_UNICODE
+        s = replace(s, k => v)
+    end
+    s = replace(s, raw"_" => "", raw"{" => "", raw"}" => "", raw"\\" => "")
+    return lowercase(s)
+end
+
+function print_param_table(p)
+    # symbol, description, unit, optional value override
+    params = [
+        Parameter(:a, "a", "Arm length", raw"\meter", nothing),
+        Parameter(:l, raw"\ell", "Line length", raw"\meter", nothing),
+        Parameter(:m, "m", "Kite mass", raw"\kg", nothing),
+        Parameter(:I, "I", "Arm inertia", raw"\kg\square\meter", nothing),
+        Parameter(:ρ_a, raw"\rho_a", "Air density", raw"\kg\per\cubic\meter", nothing),
+        Parameter(:d_l, raw"d_\ell", "Line diameter", raw"\meter", nothing),
+        Parameter(:S, "S", "Kite surface", raw"\square\meter", nothing),
+        Parameter(:C_L, "C_L", "Kite lift coefficient", "", nothing),
+        Parameter(:C_D, "C_D", "Kite drag coefficient", "", "C_L / 7"),
+        Parameter(:C_D_l, raw"C_{D,\ell}", "Line drag coefficient", "", nothing),
+        Parameter(:ρ_l, raw"\rho_\ell", "Line density", raw"\kg\per\cubic\meter", nothing),
+        Parameter(:g, "g", "Gravity", raw"\meter\per\square\second", nothing),
+        Parameter(:z0, "z_0", "Wind reference altitude", raw"\meter", nothing),
+        Parameter(:w0, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
+        Parameter(:b, "b", "Arm braking coefficient",
+            raw"\newton\meter\second\per\degree", f"{p.b / rad2deg(1):.9g}"),
+        Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle",
+            raw"\degree", f"{rad2deg(p.θ0):.0f}"),
+        Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height",
+            raw"\degree", f"{rad2deg(p.Δθ):.0f}"),
+        Parameter(:Δφ, raw"\Delta\phi", "Lemniscate azimuthal half-width",
+            raw"\degree", f"{rad2deg(p.Δφ):.0f}"),
+    ]
+
+    sort!(params, by=x -> eor_transform(x.sym))
+    table_rows = map(params) do p_item
+        val = isnothing(p_item.value_override) ? f"{p[p_item.key]:.9g}" : p_item.value_override
+        unit_col = isempty(p_item.unit) ? "" : raw"\si{" * p_item.unit * "}"
+        f"    ${p_item.sym}$ & {p_item.descr} & ${val}$ & {unit_col} \\\\ "
+    end
+
+    table_str = raw"""
+\begin{table}[thpb]
+\centering
+\caption{Parameter Description and Values}
+\label{tab:params}
+\begin{tabular}{l p{3.2cm} r l}
+    \toprule
+    {Symbol} & {Description} & {Value} & {Unit} \\
+    \midrule
+""" * join(table_rows, "\n") * raw"""
+
+    \bottomrule
+\end{tabular}
+\end{table}"""
+
+    println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
+end
+
+print_param_table(p0)
+
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
 #
@@ -257,7 +340,7 @@ plot!(xticks=(1:4, ["" for _ in 1:4]))
 plot!(leftmargin=5Plots.mm, bottommargin=2Plots.mm)
 
 display(current())
-savefig(joinpath(@__DIR__, "figs", "equilibria_eigvals.pdf"))
+savefig(joinpath(@__DIR__, "figs", "_equilibria_eigvals.pdf"))
 
 ## Trajectories near equilibria
 # Density of the physical flow around each equilibrium: N_eq trajectories seeded
@@ -325,6 +408,7 @@ sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
 
 sim_4D_fig = plot_time_series(sol)
 # save only: a second render of the same figure fails Plots' layout pass
+display(sim_4D_fig)
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 
 ## Convergence rate toward limit cycle
@@ -490,7 +574,7 @@ end
 
 plot!(bottommargin=3Plots.mm, leftmargin=7Plots.mm)
 display(conv_over)
-savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
+# savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
 
 cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
     f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]

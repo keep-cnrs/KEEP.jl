@@ -373,7 +373,7 @@ function latex_sci(x)
     x == 0 && return raw"$0$"
     e = floor(Int, log10(abs(x)))
     return raw"$" * string(round(x / exp10(e); digits=1)) * raw"\times10^{" *
-           string(e) * raw"}$"
+        string(e) * raw"}$"
 end
 
 """
@@ -384,10 +384,12 @@ degrees and b per degree. Δθ is held fixed, so it only enters the first captio
 """
 function print_latex_tables(p_init, p_opt, lower, upper)
     s0, s1 = cycle_report(p_init), cycle_report(p_opt)
-    data = [let (sym, unit, scale) = TEX[k]
-        OptVar(sym, unit, scale(lower[i]), scale(upper[i]),
-            scale(p_init[k]), scale(p_opt[k]))
-    end for (i, k) in enumerate(SYMS)]
+    data = [
+        let (sym, unit, scale) = TEX[k]
+            OptVar(sym, unit, scale(lower[i]), scale(upper[i]),
+                scale(p_init[k]), scale(p_opt[k]))
+        end for (i, k) in enumerate(SYMS)
+    ]
 
     # b per degree has a small lower bound (1 N m s/rad -> 0.0175)
     num(x) = abs(x) < 0.1 ? f"{x:.4f}" : f"{x:.1f}"
@@ -399,13 +401,13 @@ function print_latex_tables(p_init, p_opt, lower, upper)
     push!(results_rows, f"    Min line tension (\\si{{\\kilo\\newton}}) & {s0.Tmin / 1000:.2f} & {s1.Tmin / 1000:.2f} \\\\ ")
     push!(results_rows, f"    Max line tension (\\si{{\\kilo\\newton}}) & {s0.Tmax / 1000:.2f} & {s1.Tmax / 1000:.2f} \\\\ ")
     push!(results_rows, "    Norm of residual & {" * latex_sci(s0.residual) * "} & {" *
-                        latex_sci(s1.residual) * "} \\\\ ")
+        latex_sci(s1.residual) * "} \\\\ ")
 
     table_descr = join([
         raw"\begin{table}[thpb]",
         raw"\centering",
         raw"\caption{Description of the optimized parameters ($\Delta\theta = \SI{" *
-        string(round(rad2deg(p_init.Δθ); digits=2)) * raw"}{\degree}$ fixed).}",
+            string(round(rad2deg(p_init.Δθ); digits=2)) * raw"}{\degree}$ fixed).}",
         raw"\begin{tabular}{l S S}",
         raw"    \toprule",
         "    {Symbol (Unit)} & {Lower} & {Upper} \\\\",
@@ -421,7 +423,7 @@ function print_latex_tables(p_init, p_opt, lower, upper)
         raw"\begin{table}[thpb]",
         raw"\centering",
         raw"\caption{Optimization results at $w_0 = \SI{" *
-        string(round(Int, WIND_REF)) * raw"}{\meter\per\second}$.}",
+            string(round(Int, WIND_REF)) * raw"}{\meter\per\second}$.}",
         raw"\begin{tabular}{l S S}",
         raw"    \toprule",
         "    {Symbol (Unit)} & {Initial Guess} & {Solution} \\\\",
@@ -600,11 +602,11 @@ default(xticks=5:15, widen=1.06)
 
 (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
 display(fig)
-savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_theta.pdf"))
+savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_all.pdf"))
 for (f, panel) in zip(panels, ("power", "tension", "params"))
     plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
     display(f)
-    savefig(f, joinpath(OUTPATH, "optimization_$(panel)_theta.pdf"))
+    savefig(f, joinpath(OUTPATH, "optimization_wind_sweep_$(panel).pdf"))
 end
 
 #= Observation:

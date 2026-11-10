@@ -111,7 +111,7 @@
     <object data="figs/equilibria_eight_circle.pdf" type="application/pdf"></object>
     <p>Configuration for each equilibria, not a physical representation -- lines and arm are aligned in a vertical plane for all equilibria</p>
 
-    <object data="figs/equilibria_eigvals.pdf" type="application/pdf"></object>
+    <object data="figs/_equilibria_eigvals.pdf" type="application/pdf"></object>
     <p>All equilibria have at least one eigenvalue with positive real part, therefore they are all unstable. Regarding the magnitude of this real part, we can say that the ones on the side of the eight are <emph>more</emph> unstable than the ones in the center.</p>
 
     <object data="figs/time_series_4D.pdf" type="application/pdf"></object>
@@ -132,16 +132,16 @@
 
     <pre>
       ┌ Θ optimum at 9 m/s (interior in all four variables)
-      │ tether length ℓ          = 26.97 m      (init 31.0)
-      │ arm inertia I            = 351.6 kg m²  (init 1300)
-      │ braking coefficient b    = 737.1        (init 2888.3)
-      │ half-width Δφ            = 16.62°       (init 50°)
-      │ half-height Δθ           = 6° (fixed)
+      │ tether length ℓ = 26.97 m (init 31.0)
+      │ arm inertia I = 351.6 kg m² (init 1300)
+      │ braking coefficient b = 737.1 (init 2888.3)
+      │ half-width Δφ = 16.62° (init 50°)
+      │ half-height Δθ = 6° (fixed)
       │
-      │ period                   = 0.949 s      (init 2.828)
-      │ average power            = 12.253 kW    (init 9.639, +27.1 %)
-      │ line tension min–max     = 5.748–10.827 kN (init 3.356–8.856)
-      └ max kite acceleration    = 938.6 m/s²  (init 517.1)</pre>
+      │ period = 0.949 s (init 2.828)
+      │ average power = 12.253 kW (init 9.639, +27.1 %)
+      │ line tension min–max = 5.748–10.827 kN (init 3.356–8.856)
+      └ max kite acceleration = 938.6 m/s² (init 517.1)</pre>
     <p>No box constraint is active: Δφ sits at 16.6° between 10° and 90°, and I at 352 kg m² is 5.7 times the structural floor, so a power optimum prefers an arm heavier than strength requires. The tether shortens, the inertia and the period fall by factors of 3.7 and 3.0, and the faster cycle extracts 27 % more power from the same wind. This is a stationary optimum of a multimodal objective, not a global optimum.</p>
 
     <object data="figs/optimization_wind_sweep_theta.pdf" type="application/pdf"></object>

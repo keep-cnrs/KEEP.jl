@@ -95,37 +95,41 @@ function time_series_panels(sol; N=500)
 end
 
 """
-Legend tile: `Plots` splits a layout legend between subplots, and a GR legend
-swatch shrinks with its axis width, so the entries are drawn by hand (glyph
-positions are axis fractions). `shortcut`: the negative margins only cancel the
-padding Plots reserves between a plot and a legend column; revisit if the layout
-code changes.
+Legend tile: one fixed-width box per row (the same axis fraction in every row,
+so all three legends match), a handle long enough to read, and a label per
+entry. The entry spacing is set in points from `row_px`, the height of one
+layout row in pixels, so the entries stay clear of the text at any `plot_size`
+(a fixed axis-fraction spacing overlaps at small heights). Plots' GR legend
+would instead size the box from its labels and the handle from the subplot
+width, which is why the entries are drawn by hand.
 """
-function time_series_legend(names, styles)
+function time_series_legend(names, styles, row_px)
     p = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
-        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], leftmargin=-2Plots.mm)
+        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], margin=0Plots.mm)
     n = length(names)
-    ys = 0.5 .+ 0.065 .* ((n + 1) / 2 .- (1:n))
-    plot!(p, Shape([(0.0, last(ys) - 0.05), (0.97, last(ys) - 0.05),
-        (0.97, first(ys) + 0.035), (0.0, first(ys) + 0.035)]); c=:black, lw=1, fillcolor=:white)
+    dy = 1.25 * LEGENDFONTSIZE / row_px
+    ys = 0.5 .+ dy .* ((n + 1) / 2 .- (1:n))
+    pad = 0.65dy
+    plot!(p, Shape([(0.02, last(ys) - pad), (0.98, last(ys) - pad),
+        (0.98, first(ys) + pad), (0.02, first(ys) + pad)]); c=:black, lw=1, fillcolor=:white)
     for (y, style, name) in zip(ys, styles, names)
-        plot!(p, [0.05, 0.18], [y, y]; style...)
-        annotate!(p, 0.205, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+        plot!(p, [0.08, 0.28], [y, y]; style...)
+        annotate!(p, 0.32, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
     end
     return p
 end
 
 "One hand-drawn legend per row: states, power, tension."
-function time_series_legends()
-    return (states=time_series_legend(("α", "τ mod 360 deg", "D(α)", "D(τ)"),
-        ((; c=1), (; c=2), (; c=3), (; c=4))),
-        power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red))),
-        tension=time_series_legend(("T",), ((; c=5),)))
+function time_series_legends(row_px)
+    return (states=time_series_legend(("α", "τ mod 360°", "D(α)", "D(τ)"),
+        ((; c=1), (; c=2), (; c=3), (; c=4)), row_px),
+        power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red)), row_px),
+        tension=time_series_legend(("T",), ((; c=5),), row_px))
 end
 
 "Time series of one simulation `sol`, one hand-drawn legend per row."
-function plot_time_series(sol; N=500)
-    return plot_time_series_grid((sol,); N)  # same layout, so the same legend width
+function plot_time_series(sol; kwargs...)
+    return plot_time_series_grid((sol,); kwargs...)  # same layout, so the same legend width
 end
 
 """
@@ -133,9 +137,10 @@ Several simulations side by side: one column per solution, one row per panel
 (states, power, tension). The hand-drawn legend of each row sits in a dedicated
 last column, so every panel keeps the same width; the x axes are linked inside
 each column. The y limits of a row are shared by all columns, and every panel
-keeps its own y ticks.
+keeps its own y ticks. `legend_width` is the fraction of the figure width given
+to the legend column.
 """
-function plot_time_series_grid(sols; N=500)
+function plot_time_series_grid(sols; N=500, legend_width=0.16)
     n = length(sols)
     panels = [time_series_panels(sol; N) for sol in sols]
 
@@ -155,15 +160,16 @@ function plot_time_series_grid(sols; N=500)
     end
     for q in panels
         for p in (q.wts, q.pw, q.tension)
-            plot!(p, leftmargin=12Plots.mm)
+            plot!(p, leftmargin=10Plots.mm)
         end
-        plot!(q.tension, bottommargin=4Plots.mm)
+        plot!(q.tension, bottommargin=6Plots.mm)
     end
 
-    leg = time_series_legends()
+    sz = plot_size(1; height=0.5)
+    leg = time_series_legends(sz[2] / 3)
     return plot([q.wts for q in panels]..., leg.states,
         [q.pw for q in panels]..., leg.power,
         [q.tension for q in panels]..., leg.tension;
-        layout=grid(3, n + 1; widths=vcat(fill(0.84 / n, n), 0.16)),
-        link=:x, size=plot_size(1; height=1.5))
+        layout=grid(3, n + 1; widths=vcat(fill((1 - legend_width) / n, n), legend_width)),
+        link=:x, size=sz)
 end
