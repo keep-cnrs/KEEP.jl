@@ -385,7 +385,7 @@ end
 plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
     topmargin=5Plots.mm, size=plot_size(0.61))
 
-savefig(joinpath(@__DIR__, "figs", "equilibria_trajectories.pdf"))
+savefig(joinpath(@__DIR__, "figs", "_equilibria_trajectories.pdf"))
 display(plot!())
 
 ## Are lines and arm aligned in the xy plane, do they belong to the same vertical plane ?
@@ -411,68 +411,11 @@ sim_4D_fig = plot_time_series(sol)
 display(sim_4D_fig)
 savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
 
-## Convergence rate toward limit cycle
-# 1. Reference limit cycle calculation
-u0 = PM4.build_u(dτ=1)
-tf = 50
-cb = LC.build_poincare_callback(eps(1.0))
-const LC_CONV_TOL = 1e-13
-sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
-x_infty = sol.u[end]
-
-# Reference convergence rate
-errors = [LC.distance_on_section(u, x_infty) for u in sol.u[1:(end-1)]][1:10]
-n = length(errors)
-i1, i2 = 1, 6
-convergence_rate = -(log10(errors[i2]) - log10(errors[i1])) / (i2 - i1)
-
-# Base plot setup
-p_conv = plot(
-    yscale=:log10,
-    xlim=(0, n + 1),
-    xticks=0:2:100,
-    ylim=(1e-16, 1e2),
-    yticks=10.0 .^ (0:-3:-16),
-    xlabel="Lemniscate revolutions",
-    ylabel="Distance to limit"
-)
-
-# Reference slope line
-plot!(i -> errors[i1] * exp10(-convergence_rate * (i - i1)), label="", c=:black)
-annotate!((4.2, 1e-10, (f"slope = {convergence_rate:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
-
-# 2. Integrate multiple initial conditions (N x N grid)
-N = 50
-u0s = [PM4.build_u(; α, τ, dτ=1) for (α, τ) in eachcol(sample(10, Float64[-π, -π], Float64[π, π], HaltonSample()))]
-sols = [PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL) for u0 in u0s]
-
-perturbed_params = (;
-    ls=:dot,
-    alpha=0.4,
-    c=:gray,
-    label="Perturbed trajectories"
-)
-
-# 3. Overlay each trajectory connected by dashed lines
-for (idx, s) in enumerate(sols)
-    # Distances to the limit cycle on the Poincaré section
-    traj_errors = [LC.distance_on_section(u, x_infty) for u in s.u]
-    x_vals = 1:length(traj_errors)
-
-    plot!(x_vals, traj_errors .+ 1e-16; perturbed_params..., label="")
-end
-
-# 4. Highlight the reference points on top
-plot!(errors .+ 1e-16, label=raw"$|| x_i - x_\infty  ||$", color=1, ls=:dash, marker=:circle, linealpha=0.5)
-plot!([NaN], [NaN]; perturbed_params...)
-plot!(leftmargin=7Plots.mm, bottommargin=3Plots.mm)
-
-display(p_conv)
-savefig(p_conv, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
-
-
 ## Convergence rate of the two cycles, side by side
 # Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
+const LC_CONV_TOL = 1e-13
+const CB = LC.build_poincare_callback(eps(1.0))
+
 function get_slope(distances; tol_start, tol_end)
     i1 = findfirst(<(tol_start), distances)
     i2 = findlast(>(tol_end), distances)
@@ -480,7 +423,7 @@ function get_slope(distances; tol_start, tol_end)
 end
 
 function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol=LC_CONV_TOL)
-    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=cb, save_end=false, tol)
+    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=CB, save_end=false, tol)
     u_infty = sol.u[end]
     n_max = 11
     distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
@@ -496,10 +439,12 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol
 
     perturbed_params = (; ls=:dot, lw=2, alpha=0.4, c=:gray, label="Perturbed trajectories")
     plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black)
-    for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
-        s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=cb, save_end=false, tol)
-        plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
-            perturbed_params..., label="")
+    if ntrace > 0
+        for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+            s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=CB, save_end=false, tol)
+            plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
+                perturbed_params..., label="")
+        end
     end
 
     annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
@@ -508,20 +453,20 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol
 
     if legend
         plot!([NaN]; distance_style..., label=raw"$|| x_i - x_\infty  ||$")
-        plot!([NaN]; perturbed_params...)
+        ntrace > 0 && plot!([NaN]; perturbed_params...)
     end
     return plt
 end
 
-p_conv_p = plot_convergence_panel(vbp, +1, 1; legend=false)
-p_conv_m = plot_convergence_panel(vbp, -1, 2)
+p_conv_p = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
+p_conv_m = plot_convergence_panel(vbp, -1, 2; ntrace=0)
 plot!(p_conv_p, leftmargin=11Plots.mm)
 plot!(p_conv_m, leftmargin=5Plots.mm)
 plot!(p_conv_p, ylabel="Distance to limit")
 conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
 plot!(bottommargin=7Plots.mm)
 display(conv_two)
-savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_panels.pdf"))
+savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
 ## Convergence rate of the two cycles, verified with Floquet multipliers
 # Reference runs from (0, 0, 0, ±1).
@@ -548,7 +493,7 @@ end
 # One solve per cycle feeds the info caption.
 cycles = NamedTuple[]
 for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
-    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
+    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
     local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
     local rate, μ, T = floquet_rate(sol, vbp)
     local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
