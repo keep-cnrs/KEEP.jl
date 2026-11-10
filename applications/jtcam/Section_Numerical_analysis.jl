@@ -523,9 +523,8 @@ plot!(bottommargin=7Plots.mm)
 display(conv_two)
 savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence_two_panels.pdf"))
 
-## Convergence rate of the two cycles, overlaid, verified with Floquet multipliers
-# Reference runs from (0, 0, 0, ±1); data, trend line and slope label share
-# the cycle color. The D(τ) < 0 slope sits above the lines, D(τ) > 0 below.
+## Convergence rate of the two cycles, verified with Floquet multipliers
+# Reference runs from (0, 0, 0, ±1).
 #
 # The secant slopes are measured on the log plots; the multipliers give them
 # independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
@@ -546,35 +545,17 @@ function floquet_rate(sol, vbp)
     return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, T
 end
 
-# One solve per cycle feeds both the plot and the info caption.
+# One solve per cycle feeds the info caption.
 cycles = NamedTuple[]
-for (dτ, color, label) in ((1, 1, "D(τ) > 0"), (-1, 2, "D(τ) < 0"))
+for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
     local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=cb, save_end=false, tol=LC_CONV_TOL)
     local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
     local rate, μ, T = floquet_rate(sol, vbp)
     local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
     # largest eigenvalue found with differentiation: predicts the per-revolution rate
     local λ = maximum(abs, μ[abs.(μ) .< 1/2])
-    push!(cycles, (; dτ, color, label, distances, secant, rate, λ, T))
+    push!(cycles, (; dτ, label, distances, secant, rate, λ, T))
 end
-
-conv_over = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:10,
-    ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
-    xlabel="Lemniscate revolutions", ylabel="Distance to limit")
-style = (; ls=:dash, marker=:circle)
-for c in reverse(cycles)  # blue (D(τ) > 0) is drawn last, on top
-    local i1 = findfirst(<(1e-2), c.distances)
-    plot!(i -> c.distances[i1] * exp10(-c.secant * (i - i1)); c.color, lw=1)
-    plot!(c.distances .+ 1e-16; style..., c.color)
-end
-# Ghost entries put the blue cycle first in the legend.
-for c in cycles
-    plot!([NaN]; style..., lw=2, ms=10, c=c.color, label=f"{c.label}, slope={c.secant:.2f}")
-end
-
-plot!(bottommargin=3Plots.mm, leftmargin=7Plots.mm)
-display(conv_over)
-# savefig(conv_over, joinpath(OUTPATH, "limit_cycle_convergence_overlay.pdf"))
 
 cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
     f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
