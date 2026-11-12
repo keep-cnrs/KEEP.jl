@@ -40,7 +40,7 @@ points_per_second = 30
 fig_traj_short = VIZ.plot_trajectory_10D(sol10; tspan=(0, tf_short), points_per_second)
 fig_traj = VIZ.plot_trajectory_10D(sol10; points_per_second)
 fig_traj_cb = VIZ.plot_trajectory_10D(sol10_cb; points_per_second)
-params = (; xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false)
+params = (; xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false, widen=false)
 plot!(fig_traj_short; title="tf = 20 s", params..., legend=:topleft)
 plot!(fig_traj; title="tf = 100 s", params...)
 plot!(fig_traj_cb; title="tf = 100 s + callback", params...)
@@ -74,50 +74,10 @@ plot!(bottommargin=3Plots.mm, leftmargin=6Plots.mm)
 display(current())
 savefig(current(), joinpath(@__DIR__, "figs", "residuals_10D_interp.pdf"))
 
-
-## --- Model equivalence at maximum accuracy (Alg = Vern9, abstol = reltol = 1e-10) ---
-# Short window: the raw 10D model's constraint drift grows with time, keep it small.
-tf_cmp = 100.0
-tc = range(0, tf_cmp, length=1000)
-pos10(ss) = [PM10.compute_pos1(q, p) for q in ss.(tc, idxs=1:5)]
-pos4(ss) = [PM4.compute_OK(PM4.compute_Rτ(q, vbp), vbp) for q in ss.(tc, idxs=1:2)]
-dist(a, b) = norm.(a .- b)
-
-s10 = PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=1e-10, save_everystep=true)
-s10cb = PM10.integrate(u0_10, tf_cmp, p, Vern9(); tol=1e-10, save_everystep=true, callback)
-s4 = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-10, save_everystep=true)
-s4f = PM4.integrate(u0_4, tf_cmp, vbp, Vern9(); tol=1e-12, save_everystep=true)  # numerical floor
-
-p10_t, p10cb_t, p4_t, p4f_t = pos10(s10), pos10(s10cb), pos4(s4), pos4(s4f)
-floor_d = dist(p4_t, p4f_t)
-
-# Pairwise kite-position difference (m) against the numerical floor
-v1 = plot(title="Pairwise kite-position difference (Vern9, 1e-10)",
-    xlabel="Time (s)", ylabel="Position difference (m)", yscale=:log,
-    ylims=(1e-13, 1e-9), left_margin=8Plots.mm, bottom_margin=6Plots.mm)
-plot!(v1, tc, dist(p10_t, p4_t), label="10D vs 4D")
-plot!(v1, tc, dist(p10cb_t, p4_t), label="10D + callback vs 4D")
-plot!(v1, tc, dist(p10_t, p10cb_t), label="10D vs 10D + callback")
-plot!(v1, tc, floor_d, label="Numerical floor", ls=:dash, c=:black)
-
-# Common significant digits of the kite position, relative to the line length l
-names = ["10D", "10D + callback", "4D"]
-digits(a, b) = -log10(maximum(dist(a, b)) / p.l)
-D = [a === b ? NaN : digits(a, b) for a in (p10_t, p10cb_t, p4_t), b in (p10_t, p10cb_t, p4_t)]
-v3 = heatmap(D, xticks=(1:3, names), yticks=(1:3, names), xmirror=true, yflip=true,
-    color=:Purples, aspect_ratio=1, title="Common significant digits",
-    colorbar_title="matching digits")
-for i in 1:3, j in 1:3
-    isnan(D[i, j]) || annotate!(v3, i, j, text(round(D[i, j], digits=1), 10, :black))
-end
-
-cmp = plot(v1, v3, layout=(1, 2), size=SIZE_FULL)
-savefig(cmp, joinpath(@__DIR__, "figs", "_comparison.pdf"))
-display(cmp)
-
 ## Models converge to the same reference trajectory
 pos10(sol) = [PM10.compute_pos1(u[1:5], sol.prob.p) for u in sol.u]
 pos4(sol) = [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
+dist(a, b) = norm.(a .- b)
 
 saveat = range(0, tf_short, 1001)  # sample times
 tols = exp10.(-2:-1:-12)

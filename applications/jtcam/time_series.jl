@@ -45,9 +45,8 @@ function plot_avg_power_kW(sol, ts)
     dα = sol.(ts, idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
     avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
-    plt = plot(ts, power; c=:black, label="", legend=false, ylabel="Power (kW)")
-    plot!([t0, tf], [avg_power, avg_power]; c=:red, label="")
-    plot!(xlabel="t (s)")
+    plt = plot(ts, power; c=:black, xlabel="t (s)", ylabel="Power (kW)", yticks=0:10:100)
+    plot!([t0, tf], [avg_power, avg_power]; c=:red)
     return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
 end
 
@@ -67,9 +66,8 @@ function time_series_panels(sol; N=500)
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
     q_deg = rad2deg.(q_ts[:, [1, 3, 4]])
-    p_wts = plot(ts, q_deg; c=[1 3 4], label="", legend=false,
-        ylabel="x (deg, deg/s)", xlabel="", xformatter=x -> "")
-    plot!(t_main, rad2deg.(y_main); c=2, label="")
+    p_wts = plot(ts, q_deg; c=[1 3 4], ylabel="x (deg, deg/s)", xlabel="", xformatter=x -> "", yticks=-720:180:720)
+    plot!(t_main, rad2deg.(y_main); c=2)
     one_period || plot!(t_jump, rad2deg.(y_jump); c=2, ls=:dot, label=false)
 
     pw_stats = plot_avg_power_kW(sol, ts)
@@ -82,16 +80,14 @@ function time_series_panels(sol; N=500)
     tension = PM4.compute_line_tension.(sol.(ts), Ref(sol.prob.p)) ./ 1000
     ok = isfinite.(tension)
     tmin, tmax = extrema(tension[ok])
-    p_t = plot(ts[ok], tension[ok]; c=5, label="", legend=false,
-        ylabel="Tension (kN)", xlabel="t (s)",
-        # yticks=([0, tmin, tmax], ["0", f"{tmin:.1f}", f"{tmax:.1f}"]),
-        ylim=(0, tmax), widen=true)
+    tmin = min(0.0, tmin)
+    p_t = plot(ts[ok], tension[ok]; c=5, ylabel="Tension (kN)", xlabel="t (s)", yticks=-100:5:100, ylim=(tmin, tmax), widen=true)
 
     y_wts = vcat(vec(q_deg), rad2deg.(filter(isfinite, y_main)),
         one_period ? Float64[] : rad2deg.(filter(isfinite, y_jump)))
     return (; wts=p_wts, pw, tension=p_t,
         ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
-            tension=(0.0, tmax)))
+            tension=(tmin, tmax)))
 end
 
 """
@@ -104,7 +100,7 @@ would instead size the box from its labels and the handle from the subplot
 width, which is why the entries are drawn by hand.
 """
 function time_series_legend(names, styles, row_px)
-    p = plot(; framestyle=:none, showaxis=false, grid=false, legend=false,
+    p = plot(; framestyle=:none, showaxis=false, grid=false,
         xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], margin=0Plots.mm)
     n = length(names)
     dy = 1.25 * LEGENDFONTSIZE / row_px

@@ -135,7 +135,8 @@ function my_defaults()
         # Margins & Legends
         margin=0Plots.mm, # 4Plots.mm,
         legend=:topright,
-        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85)
+        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85),
+        widen=true
     )
 end
 

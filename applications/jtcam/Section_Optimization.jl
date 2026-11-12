@@ -517,7 +517,7 @@ function plot_dtheta(dtheta)
     Tmin = [d.Tmin / 1000 for d in dtheta]
     Tmax = [d.Tmax / 1000 for d in dtheta]
     amax = [d.amax for d in dtheta]
-    style = (; c=1, m=:circle)
+    style = (; c=:black)
     vline_style = (; c=:gray50, ls=:dash, label="")
 
     f1 = plot(x, P; style..., label="", ylabel="Power (kW)")
@@ -530,8 +530,8 @@ function plot_dtheta(dtheta)
     foreach(f -> plot!(f, xticks=-10:5:10, xlim=(-11, 11)), (f1, f2, f3))
     foreach(f -> plot!(f, xformatter=x -> ""), (f1, f2))
 
-    return plot(f1, f2, f3; layout=(3, 1), size=plot_size(3, 2),
-        leftmargin=9Plots.mm, bottommargin=4Plots.mm)
+    # return plot(f1, f2, f3; layout=(1, 3), size=plot_size(1, 2), leftmargin=9Plots.mm, bottommargin=4Plots.mm)
+    return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2), leftmargin=9Plots.mm, bottommargin=4Plots.mm)
 end
 
 ## Plot: shape map over Δθ and Δφ
@@ -564,32 +564,35 @@ end
 
 ## Plot: objective landscape around the Θ optimum
 """
-Plot a normalized landscape from `landscape`: one pane per parameter, two
-columns. The x axis is the parameter in its own units, spanning ±`window`
-around the optimum, whose value is the middle tick (`-10%`, value, `+10%`).
-The cost function (still normalized by its optimum) is a line, solid inside
-the box constraint and dotted outside it, the crossing interpolated linearly
-between the two samples that bracket the bound. Each box constraint is a black
-double vertical line, always drawn (clipped when it falls outside the window)
-and on top of the line.
+Plot a normalized landscape from `landscape`: one row of four panels, one per
+parameter, with a single `P / P*` label on the left. Each panel is drawn in the
+colour of its parameter in the wind-sweep parameter panel. The x axis is the
+parameter in its own units, spanning ±`window` around the optimum, whose value
+is the middle tick (`-10%`, value, `+10%`). Each panel keeps two y ticks: the
+top of the axis and the lowest of its default ticks. The cost function (still
+normalized by its optimum) is a line, solid inside the box constraint and
+dotted outside it, the crossing interpolated linearly between the two samples
+that bracket the bound. Each box constraint is a black double vertical line,
+always drawn (clipped when it falls outside the window) and on top of the line.
+A black vertical line marks the optimum and a horizontal one the lowest y tick;
+both are drawn under the data.
 """
 function plot_landscape(land)
     (; xs, syms, ys, window, box, center) = land
-    nrows = cld(length(syms), 2)
     lo, hi = 1 - window, 1 + window
 
     # the margins are per panel (the theme sets margin = 0) and leave room for
-    # the labels the two-column grid would otherwise clip
+    # the tick labels, which sit outside the axis in every panel
     panels = [
         begin
             x0 = TEX[syms[i]][3](center[i])  # the optimum, in display units
             ticks = ([x0 * lo, x0, x0 * hi],
                 [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
             plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
-                title="$(LABELS[sym]))",
-                ylabel=(isodd(i) ? "P / P*" : ""),
-                leftmargin=(isodd(i) ? 9 : 5)Plots.mm, rightmargin=5Plots.mm,
-                bottommargin=7Plots.mm, topmargin=4Plots.mm)
+                title="$(LABELS[sym])",
+                ylabel=(i == 1 ? "P / P*" : ""),
+                leftmargin=(i == 1 ? 18 : 5)Plots.mm, rightmargin=4Plots.mm,
+                bottommargin=5Plots.mm, topmargin=2.5Plots.mm)
             # value of the sampled curve at a factor x, linearly interpolated
             interp(x) = begin
                 k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1)
@@ -599,18 +602,28 @@ function plot_landscape(land)
             piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b)
             xa, xb = max(box[i][1], lo), min(box[i][2], hi)  # box ∩ window
             xa < xb && plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb));
-                c=1, ls=:solid)
+                c=i, ls=:solid)
             for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi))
-                a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=1, ls=:dot)
+                a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=i, ls=:dot)
             end
             for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
                 vline!(plt, [x0 * (edge + k * window / 40)]; c=:black, lw=1.2)
             end
+            # keep only the axis top (P/P* = 1) and the lowest default tick
+            tv, tl = first(Plots.get_ticks(plt, :y))
+            plot!(plt, yticks=([minimum(tv), 1], [tl[argmin(tv)], "1"]))
+            hline!([minimum(tv)], lw=1, alpha=1, c=:black)
+            vline!([x0], lw=1, alpha=1, c=:black)
+            # the backend draws the series in list order, so move the two guide
+            # lines in front of the data to keep them underneath it
+            series = plt[1].series_list
+            pushfirst!(series, pop!(series), pop!(series))
             plt
         end for (i, sym) in enumerate(syms)
     ]
 
-    return plot(panels...; layout=(nrows, 2), size=plot_size(1.12nrows, 2))
+    return plot(panels...; layout=(1, length(syms)), size=plot_size(1/2, 2),
+        framestyle=:grid, grid=false)
 end
 
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
@@ -647,10 +660,11 @@ the maximum. The peak acceleration is U-shaped in Δθ: 1035 m/s² at −10 %,
 a 926 m/s² minimum at +2 %, and 1128 m/s² at +10 %.
 =#
 
-my_defaults()
-fig_shape = plot_shape_grid(shape, rad2deg(p_ref.Δφ))
-display(fig_shape)
-savefig(fig_shape, joinpath(OUTPATH, "optimization_shape_grid.pdf"))
+## Δθ/Δφ heatmap
+# my_defaults()
+# fig_shape = plot_shape_grid(shape, rad2deg(p_ref.Δφ))
+# display(fig_shape)
+# savefig(fig_shape, joinpath(OUTPATH, "optimization_shape_grid.pdf"))
 
 ##
 #= Observation:
@@ -666,7 +680,6 @@ falls to 129 m/s² at Δθ = +20 %, Δφ = 81°. Δφ = 90° has no pumping cycl
 
 my_defaults()
 fig_land = plot_landscape(LANDSCAPE)
-plot!(size=plot_size(1, 1))
 display(fig_land)
 savefig(fig_land, joinpath(OUTPATH, "optimization_landscape.pdf"))
 
