@@ -16,7 +16,7 @@ using Logging
 
 using LinearAlgebra: norm
 
-include("jtcam_theme.jl")
+include(joinpath(@__DIR__, "plot_helpers.jl"))
 
 ## Setup
 p = PMP.build_para()
@@ -45,7 +45,13 @@ plot!(fig_traj_short; title="tf = 20 s", params..., legend=:topleft)
 plot!(fig_traj; title="tf = 100 s", params...)
 plot!(fig_traj_cb; title="tf = 100 s + callback", params...)
 tf_fig = plot(fig_traj_short, fig_traj, fig_traj_cb, layout=(1, 3), size=SIZE_FULL)
-# plot!(leftmargin=2Plots.mm)
+# one tick at each end of each axis, plus 0 when it is interior
+for i in 1:3
+    plot!(tf_fig, subplot=i,
+        xticks=edge_ticks(tf_fig[i], :x; include_zero=true),
+        yticks=edge_ticks(tf_fig[i], :y; include_zero=true),
+        zticks=edge_ticks(tf_fig[i], :z; include_zero=true))
+end
 savefig(tf_fig, joinpath(@__DIR__, "figs", "trajectory_10D_short_long_cb.pdf"))
 display(tf_fig)
 

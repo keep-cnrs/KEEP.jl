@@ -13,9 +13,8 @@
 #    optimization at each wind speed and compare with the 9 m/s optimum held
 #    fixed. ℓ spans 15–200 m and b 1–1e6; the Δφ box is (10°, 90°), and the
 #    inertia floor is set by sizing the aluminium arm (see `I_BOUNDS`).
-#  - Δθ: sweep it ±10 % around its nominal value at the optimum with Θ fixed,
-#    and plot the power, the line-tension envelope and the maximum kite
-#    acceleration.
+#  - Δθ: sweep it from 2° to 20° at the optimum with Θ fixed, and plot the
+#    power, the line-tension envelope and the maximum kite acceleration.
 #  - SHAPE: 10×10 map of the same quantities over (Δθ, Δφ) at the optimal
 #    (ℓ, I, b), again without re-optimizing anything.
 #
@@ -39,8 +38,7 @@ using SplitApplyCombine: invert
 using Logging: with_logger, NullLogger
 using LinearAlgebra: norm
 
-include(joinpath(@__DIR__, "jtcam_theme.jl"))
-include(joinpath(@__DIR__, "time_series.jl"))
+include(joinpath(@__DIR__, "plot_helpers.jl"))
 
 ## Settings
 const TOL = 1e-5
@@ -59,9 +57,16 @@ const B_BOUNDS = (1.0, 1.0e6)                # braking slope b
 # No upper bound: extra mass is allowed if it buys power.
 const I_BOUNDS = (62.0, 1.0e6)               # arm inertia I (kg m²)
 const DPHI_BOUNDS = deg2rad.((10.0, 90.0))   # fixed shape box, in radians
-const DTHETA_WINDOW = 0.1                     # ±10 % around the nominal Δθ
+const DTHETA_RANGE = (2.0, 20.0)              # Δθ sweep, in degrees
 const SHAPE_WINDOW = 0.2                      # ±20 % for the shape map
 const GRID_N = 10
+
+# Marks shared by the wind sweep, the landscape and the Δθ plots: the floor of
+# the landscape's y axis, the translucent band that marks the reference
+# condition (the same as at the reference wind speed) and the thin line of the
+# horizontal floor. Built here and passed to the plot functions.
+const GUIDES = (; ymin=0.9, line=(; c=:black, lw=5, alpha=0.3),
+    floor=(; c=:black, lw=1, alpha=1))
 
 # Parameter names, units and scales from the stored value to the displayed one.
 # An angle is rad2deg; a per-angle unit is the inverse, so that b·dα stays a
@@ -74,7 +79,7 @@ const TEX = Dict(:l => (raw"$\ell$", raw"\si{\meter}", identity),
 # Parameter names and units for the axis titles and the legends
 const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b",
     :Δθ => "Δθ", :Δφ => "Δφ")
-const UNITS = Dict(:l => "m", :I => "kg m²", :b => "kg m² s⁻¹ deg⁻¹",
+const UNITS = Dict(:l => "m", :I => "kg m²", :b => "N m deg s⁻¹",
     :Δθ => "deg", :Δφ => "deg")
 
 ## Helpers
@@ -182,19 +187,19 @@ function opt_step(p, syms, lower, upper)
 end
 
 """
-Δθ sweep at the optimum: vary Δθ by `factors` around its nominal value with Θ
-fixed and take the limit cycle of the perturbed system. Starting from the same
+Δθ sweep at the optimum: take the limit cycle at each absolute angle (in
+degrees) in `angles_deg` with Θ fixed. Starting from the same
 `u0 = (α, τ, dα, dτ) = (0, τ0, 0, 1)` picks the same (dτ > 0) pumping cycle at
 every point.
 """
-function dtheta_study(p, factors; n=2001)
+function dtheta_study(p, angles_deg; n=2001)
     u0 = PM4.build_u(; dτ=1)
-    return map(factors) do f
+    return map(angles_deg) do a
         q = copy(p)
-        q.Δθ = f * p.Δθ
+        q.Δθ = deg2rad(a)
         sol = LC.compute_limit_cycle(u0, PMP.build_vbpara(q);
             tol=TOL, save_everystep=true, tf=100.0)
-        (; f, cycle_stats(sol; n)...)
+        (; Δθ=a, cycle_stats(sol; n)...)
     end
 end
 
@@ -268,8 +273,9 @@ winds = range(5, 15, length=11)
 i_ref = findfirst(x -> x >= WIND_REF, winds)
 sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref)
 
-## Numerical: Δθ sensitivity at the optimum
-dtheta = dtheta_study(p_ref, range(1 - DTHETA_WINDOW, 1 + DTHETA_WINDOW, length=11))
+## Numerical: Δθ sensitivity at the optimum, with the nominal angle included
+dtheta_angles = sort(unique(vcat(range(DTHETA_RANGE..., length=11), rad2deg(p_ref.Δθ))))
+dtheta = dtheta_study(p_ref, dtheta_angles)
 
 ## Numerical: 10×10 shape map at the optimal ℓ, I, b
 shape = shape_grid(p_ref,
@@ -318,10 +324,10 @@ function print_final_table()
     println()
 
     println("Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
-    println(rpad("Δθ (%)", 8), rpad("P (kW)", 10), rpad("Tmin (kN)", 11),
+    println(rpad("Δθ (deg)", 10), rpad("P (kW)", 10), rpad("Tmin (kN)", 11),
         rpad("Tmax (kN)", 11), rpad("spread (kN)", 12), "max a (m/s²)")
     for d in dtheta
-        println(rpad(f"{(d.f - 1) * 100:+.0f}", 8), rpad(round(d.P / 1000; digits=3), 10),
+        println(rpad(round(d.Δθ; digits=1), 10), rpad(round(d.P / 1000; digits=3), 10),
             rpad(round(d.Tmin / 1000; digits=3), 11), rpad(round(d.Tmax / 1000; digits=3), 11),
             rpad(round((d.Tmax - d.Tmin) / 1000; digits=3), 12), round(d.amax; digits=1))
     end
@@ -442,13 +448,13 @@ end
 """
 Three half-width panels of the wind sweep: average power, line tension (min–max
 envelope), and the re-optimized parameters normalized by their maximum over the
-wind range. The dotted black curve is the 9 m/s reference held fixed, and the
-grey dashed vertical line marks that reference wind speed in every panel. The
+wind range. The dotted black curve is the 9 m/s reference held fixed, and a
+translucent black band marks that reference wind speed in every panel. The
 parameter panel has no legend: the braking coefficient is annotated at the lower
 left, where its curve is, and the other three are stacked on the right in their
 vertical order at the last wind speed.
 """
-function plot_wind_sweep(winds, sweep, i_ref)
+function plot_wind_sweep(winds, sweep, i_ref, guides)
     (; syms, no_opt, opt, theta) = sweep
     power_vec = [s.P for s in opt]
     min_tension_vec = [s.Tmin for s in opt]
@@ -463,7 +469,7 @@ function plot_wind_sweep(winds, sweep, i_ref)
     # Average power
     f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 60), yticks=0:20:100, widen=true)
     plot!(f1, winds, power0 ./ 1000; ref_style...)
-    plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1)
+    plot!(f1, winds, power_vec ./ 1000; c=1)
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
     f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 40), yticks=0:20:100, widen=true)
@@ -477,8 +483,13 @@ function plot_wind_sweep(winds, sweep, i_ref)
     # plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
     plot!(f3, winds, theta_norm; c=permutedims(collect(1:n)))
 
-    # mark the wind speed the reference parameters were optimized at
-    foreach(f -> vline!(f, [WIND_REF]; c=:gray50, ls=:dash,), (f1, f2, f3))
+    # the reference wind speed is marked by the same band as the other guide
+    # lines; the backend draws series in list order, so moving it in front of
+    # the data keeps the band under the curves
+    for f in (f1, f2, f3)
+        vline!(f, [WIND_REF]; guides.line...)
+        pushfirst!(f[1].series_list, pop!(f[1].series_list))
+    end
 
     # annotations instead of a legend: the braking coefficient at the lower
     # left (its curve is the lowest there), then the other three stacked on the
@@ -507,31 +518,41 @@ end
 
 ## Plot: Δθ sensitivity (justifies holding Δθ fixed)
 """
-Three panels of the Δθ sweep at the optimum: average power, the line-tension
-envelope (min–max) and the peak kite acceleration. The x axis is the relative
-deviation from the nominal Δθ, and the dashed line marks the nominal value.
+The power and line-tension panels of the Δθ sweep at the optimum, side by side:
+Δθ in degrees, from `DTHETA_RANGE`, with a sample at the nominal angle. The
+power is normalized by its value at the nominal Δθ, so the nominal sits at 1
+and the axis runs from 0 to the peak. The tension panel keeps its own ticks. A
+`guides.line` vertical line marks the nominal angle.
 """
-function plot_dtheta(dtheta)
-    x = [100 * (d.f - 1) for d in dtheta]
+function plot_dtheta(dtheta, guides, mark)
+    ang = [d.Δθ for d in dtheta]
     P = [d.P / 1000 for d in dtheta]
     Tmin = [d.Tmin / 1000 for d in dtheta]
     Tmax = [d.Tmax / 1000 for d in dtheta]
     amax = [d.amax for d in dtheta]
     style = (; c=:black)
-    vline_style = (; c=:gray50, ls=:dash, label="")
 
-    f1 = plot(x, P; style..., label="", ylabel="Power (kW)")
-    f2 = plot(x, Tmax; style..., label="", ylabel="Line tension (kN)",
-        fillrange=Tmin, fillalpha=0.1)
-    plot!(f2, x, Tmin; style..., label="")
-    f3 = plot(x, amax; style..., label="", ylabel="Max acceleration (m/s²)",
-        xlabel="Δθ deviation from nominal (%)")
-    foreach(f -> vline!(f, [0]; vline_style...), (f1, f2, f3))
-    foreach(f -> plot!(f, xticks=-10:5:10, xlim=(-11, 11)), (f1, f2, f3))
-    foreach(f -> plot!(f, xformatter=x -> ""), (f1, f2))
+    # power relative to its value at the nominal Δθ, so the nominal sits at 1;
+    # over the full sweep the power collapses away from it, so the axis runs
+    # from 0 to the peak with the nominal marked by the guide line
+    Pn = P ./ P[argmin(abs.(ang .- mark))]
+    f1 = plot(ang, Pn; style..., label="", ylabel="P / P*",
+        ylims=(0, maximum(Pn)), yticks=([0, 0.5, 1], ["0", "0.5", "1"]),
+        xlabel="Δθ (deg)")
+    f2 = plot(ang, Tmax; style..., label="", ylabel="Line tension (kN)",
+        fillrange=Tmin, fillalpha=0.1, xlabel="Δθ (deg)")
+    plot!(f2, ang, Tmin; style..., label="")
+    f3 = plot(ang, amax; style..., label="", ylabel="Max acceleration (m/s²)",
+        xlabel="Δθ (deg)")
+    foreach(f -> vline!(f, [mark]; guides.line...), (f1, f2, f3))
+    foreach(f -> plot!(f, xticks=2:2:20, xlim=extrema(ang)), (f1, f2, f3))
 
-    # return plot(f1, f2, f3; layout=(1, 3), size=plot_size(1, 2), leftmargin=9Plots.mm, bottommargin=4Plots.mm)
-    return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2), leftmargin=9Plots.mm, bottommargin=4Plots.mm)
+    # the margins are per panel (the theme sets margin = 0): only the left one
+    # carries a y label and y tick labels
+    plot!(f1, leftmargin=18Plots.mm, bottommargin=10Plots.mm)
+    plot!(f2, leftmargin=6Plots.mm, bottommargin=10Plots.mm)
+    # return plot(f1, f2, f3; layout=(1, 3), size=plot_size(1, 2))
+    return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2))
 end
 
 ## Plot: shape map over Δθ and Δφ
@@ -568,16 +589,18 @@ Plot a normalized landscape from `landscape`: one row of four panels, one per
 parameter, with a single `P / P*` label on the left. Each panel is drawn in the
 colour of its parameter in the wind-sweep parameter panel. The x axis is the
 parameter in its own units, spanning ±`window` around the optimum, whose value
-is the middle tick (`-10%`, value, `+10%`). Each panel keeps two y ticks: the
-top of the axis and the lowest of its default ticks. The cost function (still
-normalized by its optimum) is a line, solid inside the box constraint and
-dotted outside it, the crossing interpolated linearly between the two samples
-that bracket the bound. Each box constraint is a black double vertical line,
-always drawn (clipped when it falls outside the window) and on top of the line.
-A black vertical line marks the optimum and a horizontal one the lowest y tick;
-both are drawn under the data.
+is the middle tick (`-10%`, value, `+10%`). The y axis is the same in every
+panel, `(guides.ymin, 1)`, labelled on the leftmost panel only, with ticks at
+`guides.ymin` and 1 (the power curve of a parameter that loses more than 10 % is
+clipped at the floor). The cost function (still normalized by its optimum) is a
+line, solid inside the box constraint and dotted outside it, the crossing
+interpolated linearly between the two samples that bracket the bound. Each box
+constraint is a black double vertical line, always drawn (clipped when it falls
+outside the window) and on top of the line. A `guides.line` band marks the
+optimum vertically and a `guides.floor` line the power floor horizontally; both
+are drawn under the data.
 """
-function plot_landscape(land)
+function plot_landscape(land, guides)
     (; xs, syms, ys, window, box, center) = land
     lo, hi = 1 - window, 1 + window
 
@@ -588,10 +611,13 @@ function plot_landscape(land)
             x0 = TEX[syms[i]][3](center[i])  # the optimum, in display units
             ticks = ([x0 * lo, x0, x0 * hi],
                 [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
-            plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
-                title="$(LABELS[sym])",
+            plt = plot(; xlims=(x0 * lo, x0 * hi), ylims=(guides.ymin, 1),
+                xticks=ticks, title="$(LABELS[sym])",
                 ylabel=(i == 1 ? "P / P*" : ""),
-                leftmargin=(i == 1 ? 18 : 5)Plots.mm, rightmargin=4Plots.mm,
+                # only the leftmost panel labels its two ticks
+                yticks=(i == 1 ? ([guides.ymin, 1], [plain_tick(guides.ymin), "1"]) :
+                        ([guides.ymin, 1], ["", ""])),
+                leftmargin=(i == 1 ? 18 : 3)Plots.mm, rightmargin=4Plots.mm,
                 bottommargin=5Plots.mm, topmargin=2.5Plots.mm)
             # value of the sampled curve at a factor x, linearly interpolated
             interp(x) = begin
@@ -609,11 +635,9 @@ function plot_landscape(land)
             for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
                 vline!(plt, [x0 * (edge + k * window / 40)]; c=:black, lw=1.2)
             end
-            # keep only the axis top (P/P* = 1) and the lowest default tick
-            tv, tl = first(Plots.get_ticks(plt, :y))
-            plot!(plt, yticks=([minimum(tv), 1], [tl[argmin(tv)], "1"]))
-            hline!([minimum(tv)], lw=1, alpha=1, c=:black)
-            vline!([x0], lw=1, alpha=1, c=:black)
+            # every panel draws the shared floor and the optimum line
+            hline!([guides.ymin]; guides.floor...)
+            vline!([x0]; guides.line...)
             # the backend draws the series in list order, so move the two guide
             # lines in front of the data to keep them underneath it
             series = plt[1].series_list
@@ -629,7 +653,7 @@ end
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
 my_defaults()
 
-(; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
+(; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
 display(fig)
 savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_all.pdf"))
 for (f, panel) in zip(panels, ("power", "tension", "params"))
@@ -648,16 +672,18 @@ at 5 m/s Tmax rises from 3.34 to 3.49 kN and Tmin falls from 1.99 to 1.72 kN.
 
 ## Varying Δθ
 my_defaults()
-fig_dtheta = plot_dtheta(dtheta)
+fig_dtheta = plot_dtheta(dtheta, GUIDES, rad2deg(p_ref.Δθ))
 display(fig_dtheta)
 savefig(fig_dtheta, joinpath(OUTPATH, "optimization_dtheta.pdf"))
 
 #= Observation:
-Power is flat in Δθ: 2.4 % over ±10 %, with a maximum of 12.279 kW at −4 %
-(+0.2 % over nominal). Smaller Δθ lowers Tmin by 5.4 % and raises Tmax by 3.8 %
-at −10 %, so the tension spread widens by 14 %; the minimum stays at about half
-the maximum. The peak acceleration is U-shaped in Δθ: 1035 m/s² at −10 %,
-a 926 m/s² minimum at +2 %, and 1128 m/s² at +10 %.
+Power peaks at the nominal Δθ (12.25 kW at 6°, 12.25 at 5.6°) and collapses
+away from it: 3.96 kW at 2° and 0.75 kW at 20°. Tmax is lowest near 7.4°
+(10.27 kN) and rises to 13.8 kN at both ends, while Tmin falls to 5.6 kN near
+the peak and climbs to 9.64 kN at 2°, so the envelope is narrowest around 6–7°
+and about twice as wide at 20° (6.25–13.51 kN). The peak acceleration is
+minimal at the nominal (939 m/s²) and grows to 5499 m/s² at 2° and 5115 m/s²
+at 20°.
 =#
 
 ## Δθ/Δφ heatmap
@@ -679,7 +705,7 @@ falls to 129 m/s² at Δθ = +20 %, Δφ = 81°. Δφ = 90° has no pumping cycl
 =#
 
 my_defaults()
-fig_land = plot_landscape(LANDSCAPE)
+fig_land = plot_landscape(LANDSCAPE, GUIDES)
 display(fig_land)
 savefig(fig_land, joinpath(OUTPATH, "optimization_landscape.pdf"))
 
@@ -704,7 +730,9 @@ for (name, sol) in zip(names, sols)
         savefig(fig, joinpath(OUTPATH, "optimization_timeseries_$name.pdf"))
     end
 end
-fig_ts = plot_time_series_grid(sols)
+# "PTO optimum" is the initial guess (the power-take-off sizing point);
+# "Dynamic optimum" is the same system optimized for average power.
+fig_ts = plot_time_series_grid(sols; titles=("PTO optimum", "Dynamic optimum"))
 display(fig_ts)
 savefig(fig_ts, joinpath(OUTPATH, "optimization_timeseries_all.pdf"))
 

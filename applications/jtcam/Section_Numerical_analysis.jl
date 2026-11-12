@@ -22,8 +22,7 @@ using PyFormattedStrings: @f_str
 using Roots
 using ForwardDiff
 
-include(joinpath(@__DIR__, "jtcam_theme.jl"))
-include(joinpath(@__DIR__, "time_series.jl"))
+include(joinpath(@__DIR__, "plot_helpers.jl"))
 
 
 ## Determine optimal parameters using kinetic model
@@ -32,7 +31,7 @@ p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
 vbp = PMP.build_vbpara(p0)
 
 @info f"Optimal torque slope value
-b ≈ {p0.b / rad2deg(1):.2f} kg m² s⁻¹ deg⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
+b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
 
 ## Parameter table for the paper
 # LaTeX table of the parameter set used here, sorted alphabetically by symbol.

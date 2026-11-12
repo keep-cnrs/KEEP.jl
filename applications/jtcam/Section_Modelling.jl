@@ -11,7 +11,7 @@ Pkg.activate(@__DIR__)
 using Plots
 using LinearAlgebra: norm
 
-include(joinpath(@__DIR__, "jtcam_theme.jl"))
+include(joinpath(@__DIR__, "plot_helpers.jl"))
 
 ## Spindle torus
 a, l = 2, 3
@@ -79,6 +79,10 @@ plot!([]; longitude_pars..., lw=default(:lw))
 plot!([]; latitude_pars..., lw=default(:lw))
 plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
 plot!(size=plot_size(1, 1.06))
+# one tick at each end of each axis, plus 0 when it is interior
+plot!(fig, xticks=edge_ticks(fig[1], :x; include_zero=true),
+    yticks=edge_ticks(fig[1], :y; include_zero=true),
+    zticks=edge_ticks(fig[1], :z; include_zero=true))
 
 display(fig)
 savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
