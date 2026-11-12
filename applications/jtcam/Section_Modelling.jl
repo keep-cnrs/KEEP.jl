@@ -78,7 +78,7 @@ plot!([]; arm_tip_pars..., lw=default(:lw))
 plot!([]; longitude_pars..., lw=default(:lw))
 plot!([]; latitude_pars..., lw=default(:lw))
 plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
-plot!(size=plot_size(0.53))
+plot!(size=plot_size(1, 1.06))
 
 display(fig)
 savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))

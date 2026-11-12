@@ -46,17 +46,21 @@ const LEGENDFONTSIZE = 10
 const ANNOTATIONFONTSIZE = 10
 
 # --- Sizing Functions & Global Objects ---
-"""By default, width is 1 * WIDTH_PT and height is 3/8 * WIDTH_PT (for two 4/3 plots)"""
-function plot_size(width=1; height=3/8, dpi=DPI)
-    width_in = width * WIDTH_PT / PT_PER_INCH
-    height_in = height * WIDTH_PT / PT_PER_INCH
+"""
+One width unit is half the text width and one height unit 3/8 of it, so
+`plot_size(1, 1)` is a half-width 4/3 plot and `plot_size(1, 2)` spans the text
+width at the same height.
+"""
+function plot_size(height=1, width=1; dpi=DPI)
+    width_in = width * WIDTH_PT / 2 / PT_PER_INCH
+    height_in = height * 3 * WIDTH_PT / 8 / PT_PER_INCH
     width_px = round(Int, width_in * dpi)
     height_px = round(Int, height_in * dpi)
     return (width_px, height_px)
 end
 
-const SIZE_FULL = plot_size()
-const SIZE_HALF = plot_size(0.5)
+const SIZE_FULL = plot_size(1, 2)
+const SIZE_HALF = plot_size(1, 1)
 
 # --- Palette ---
 const PALETTE = Plots.palette(:auto)

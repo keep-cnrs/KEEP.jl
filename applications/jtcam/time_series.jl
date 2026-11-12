@@ -165,7 +165,7 @@ function plot_time_series_grid(sols; N=500, legend_width=0.16)
         plot!(q.tension, bottommargin=6Plots.mm)
     end
 
-    sz = plot_size(1; height=0.5)
+    sz = plot_size(4 / 3, 2)
     leg = time_series_legends(sz[2] / 3)
     return plot([q.wts for q in panels]..., leg.states,
         [q.pw for q in panels]..., leg.power,

@@ -410,7 +410,7 @@ function print_latex_tables(p_init, p_opt, lower, upper)
             string(round(rad2deg(p_init.Δθ); digits=2)) * raw"}{\degree}$ fixed).}",
         raw"\begin{tabular}{l S S}",
         raw"    \toprule",
-        "    {Symbol (Unit)} & {Lower} & {Upper} \\\\",
+        "    {Symbol (Unit)} & {Lower bound} & {Upper bound} \\\\",
         raw"    \midrule",
         bounds_rows...,
         raw"    \bottomrule",
@@ -440,10 +440,13 @@ end
 
 ## Plot: wind sweep over Θ
 """
-Three panels of the wind sweep: average power, line tension (min–max envelope),
-and the re-optimized parameters normalized by their maximum over the wind
-range. The dotted black curve is the 9 m/s reference held fixed, and the grey
-dashed vertical line marks that reference wind speed in every panel.
+Three half-width panels of the wind sweep: average power, line tension (min–max
+envelope), and the re-optimized parameters normalized by their maximum over the
+wind range. The dotted black curve is the 9 m/s reference held fixed, and the
+grey dashed vertical line marks that reference wind speed in every panel. The
+parameter panel has no legend: the braking coefficient is annotated at the lower
+left, where its curve is, and the other three are stacked on the right in their
+vertical order at the last wind speed.
 """
 function plot_wind_sweep(winds, sweep, i_ref)
     (; syms, no_opt, opt, theta) = sweep
@@ -458,29 +461,45 @@ function plot_wind_sweep(winds, sweep, i_ref)
     ref_style = (; ls=:dot, c=:black)
 
     # Average power
-    f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)")
-    plot!(f1, winds, power0 ./ 1000; ref_style..., label=ref)
-    plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1, label="Re-optimized")
+    f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 60), yticks=0:20:100, widen=true)
+    plot!(f1, winds, power0 ./ 1000; ref_style...)
+    plot!(f1, winds, power_vec ./ 1000; m=:circle, c=1)
 
     # Line tension, min–max envelope (lower is better for wearing the lines out)
-    f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)")
-    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style..., label=[ref ""])
-    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1, label="Re-optimized")
+    f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 40), yticks=0:20:100, widen=true)
+    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style...)
+    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1)
     plot!(f2, winds, min_tension_vec ./ 1000; c=1)
 
     # Optimized parameters, normalized by their maximum over the wind range
     n = length(syms)
-    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(-0.1, 1.1), ylabel="Parameters", xformatter=:plain, xlabel="Wind speed (m/s)", legend=:bottomright)
+    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(0, 1), ylabel="Parameters", xformatter=:plain, xlabel="Wind speed (m/s)", legend=false, widen=true)
     # plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
-    plot!(f3, winds, theta_norm; c=permutedims(collect(1:n)), label=permutedims([LABELS[s] for s in syms]))
+    plot!(f3, winds, theta_norm; c=permutedims(collect(1:n)))
 
     # mark the wind speed the reference parameters were optimized at
-    foreach(f -> vline!(f, [WIND_REF]; c=:gray50, ls=:dash, label=""), (f1, f2, f3))
+    foreach(f -> vline!(f, [WIND_REF]; c=:gray50, ls=:dash,), (f1, f2, f3))
 
-    # three panels of a third of the text height, full text width; the margins
+    # annotations instead of a legend: the braking coefficient at the lower
+    # left (its curve is the lowest there), then the other three stacked on the
+    # right below the curves, in their vertical order at the last wind speed
+    names = Dict(:l => "Line length", :I => "Arm inertia",
+        :b => "Arm braking coefficient", :Δφ => "Lemniscate width")
+    ib = findfirst(==(:b), syms)
+    annotate!(f3, first(winds) + 0.25, theta_norm[ib][1] - 0.14,
+        (names[:b], ANNOTATIONFONTSIZE, :left, PALETTE[ib]))
+    y = 0.62
+    for i in sortperm([theta_norm[i][end] for i in eachindex(syms)]; rev=true)
+        i == ib && continue
+        annotate!(f3, last(winds) - 0.25, y,
+            (names[syms[i]], ANNOTATIONFONTSIZE, :right, PALETTE[i]))
+        y -= 0.10
+    end
+
+    # three panels of a third of the text height, half text width; the margins
     # leave room for the axis labels (the theme sets margin = 0)
-    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
-        leftmargin=8Plots.mm, bottommargin=4Plots.mm)
+    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(2, 1),
+        leftmargin=10Plots.mm, bottommargin=4Plots.mm)
     # the three panels share one x axis: only the bottom panel labels it
     foreach(i -> plot!(fig, subplot=i, xformatter=x -> "", xlabel=""), (1, 2))
     return (; fig, panels=(f1, f2, f3))
@@ -511,7 +530,7 @@ function plot_dtheta(dtheta)
     foreach(f -> plot!(f, xticks=-10:5:10, xlim=(-11, 11)), (f1, f2, f3))
     foreach(f -> plot!(f, xformatter=x -> ""), (f1, f2))
 
-    return plot(f1, f2, f3; layout=(3, 1), size=plot_size(1; height=3 * 0.375),
+    return plot(f1, f2, f3; layout=(3, 1), size=plot_size(3, 2),
         leftmargin=9Plots.mm, bottommargin=4Plots.mm)
 end
 
@@ -539,7 +558,7 @@ function plot_shape_grid(g, dphi_opt)
     p3 = pane(g.amax, "max a (m/s²)")
     plot!(p2, ylabel="")
     plot!(p3, ylabel="")
-    return plot(p1, p2, p3; layout=(1, 3), size=plot_size(1; height=0.5),
+    return plot(p1, p2, p3; layout=(1, 3), size=plot_size(4 / 3, 2),
         leftmargin=6Plots.mm, bottommargin=5Plots.mm, topmargin=4Plots.mm)
 end
 
@@ -567,7 +586,7 @@ function plot_landscape(land)
             ticks = ([x0 * lo, x0, x0 * hi],
                 [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
             plt = plot(; xlims=(x0 * lo, x0 * hi), widen=true, xticks=ticks,
-                title="$(LABELS[sym])\n($(UNITS[sym]))",
+                title="$(LABELS[sym]))",
                 ylabel=(isodd(i) ? "P / P*" : ""),
                 leftmargin=(isodd(i) ? 9 : 5)Plots.mm, rightmargin=5Plots.mm,
                 bottommargin=7Plots.mm, topmargin=4Plots.mm)
@@ -591,18 +610,17 @@ function plot_landscape(land)
         end for (i, sym) in enumerate(syms)
     ]
 
-    return plot(panels...; layout=(nrows, 2), size=plot_size(1; height=nrows * 0.42))
+    return plot(panels...; layout=(nrows, 2), size=plot_size(1.12nrows, 2))
 end
 
 ## Plot: wind sweep, Δθ, shape map, landscape, time series
 my_defaults()
-default(xticks=5:15, widen=1.06)
 
 (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref)
 display(fig)
 savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_all.pdf"))
 for (f, panel) in zip(panels, ("power", "tension", "params"))
-    plot!(f, size=SIZE_FULL, leftmargin=8Plots.mm, bottommargin=6Plots.mm)
+    plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
     display(f)
     savefig(f, joinpath(OUTPATH, "optimization_wind_sweep_$(panel).pdf"))
 end
@@ -615,6 +633,7 @@ At 15 m/s Tmax falls from 33.2 to 29.7 kN while Tmin rises from 12.2 to 16.1 kN;
 at 5 m/s Tmax rises from 3.34 to 3.49 kN and Tmin falls from 1.99 to 1.72 kN.
 =#
 
+## Varying Δθ
 my_defaults()
 fig_dtheta = plot_dtheta(dtheta)
 display(fig_dtheta)
@@ -633,6 +652,7 @@ fig_shape = plot_shape_grid(shape, rad2deg(p_ref.Δφ))
 display(fig_shape)
 savefig(fig_shape, joinpath(OUTPATH, "optimization_shape_grid.pdf"))
 
+##
 #= Observation:
 At the fixed optimal ℓ, I, b the shape map peaks at Δθ = −20 %, Δφ = 18.9°
 with 12.46 kW and collapses away from it: 6.44 kW at Δθ = +20 %, Δφ = 10°,
@@ -646,9 +666,11 @@ falls to 129 m/s² at Δθ = +20 %, Δφ = 81°. Δφ = 90° has no pumping cycl
 
 my_defaults()
 fig_land = plot_landscape(LANDSCAPE)
+plot!(size=plot_size(1, 1))
 display(fig_land)
 savefig(fig_land, joinpath(OUTPATH, "optimization_landscape.pdf"))
 
+##
 #= Observation:
 ℓ is the stiffest direction (−11.5 % at −10 %, −8.1 % at +10 %), I is about
 four times flatter (−2.6 %), and b more than twenty times flatter (−0.4 %). The

@@ -296,7 +296,7 @@ scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 plot!(widen=1.06)
 plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(0.57))
+    topmargin=5Plots.mm, size=plot_size(1, 1.14))
 savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
 display(current())
 @info "Chance to use Poincaré-Miranda theorem here?"
@@ -317,7 +317,7 @@ p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw
     marker_kwargs=ss_style.(ss_upwind), project_eight=true)
 plot!(title="Upwind arm", background_color_subplot=theme.upwind.c)
 
-plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(height=0.4))
+plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
 savefig(joinpath(@__DIR__, "figs", "equilibria_eight_circle.pdf"))
 display(current())
 
@@ -383,7 +383,7 @@ for q in ss
     end
 end
 plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(0.61))
+    topmargin=5Plots.mm, size=plot_size(1, 1.22))
 
 savefig(joinpath(@__DIR__, "figs", "_equilibria_trajectories.pdf"))
 display(plot!())
@@ -569,7 +569,7 @@ yticks_ = (c[2]-δ):δ:(c[2]+δ)
 xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
 yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
 plot!(l, tickfontsize=TICKFONTSIZE - 1)
-plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(0.5, height=2/8))
+plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
 
 display(plot!())
 savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
