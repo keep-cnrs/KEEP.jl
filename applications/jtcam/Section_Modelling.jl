@@ -23,8 +23,8 @@ kite_pos = [a + l * cos(β0), 0, l * sin(β0)]
 
 # mesh as flat line segments (GR's wireframe chokes on matrix grids); a mesh
 # rather than a surface so the self-intersecting interior stays visible
-lg = range(0, 2π, length=120)  # points along each grid line
-lk = range(0, 2π, length=40)   # grid lines
+lg = range(0, 2π; length=120)  # points along each grid line
+lk = range(0, 2π; length=40)   # grid lines
 xs = Float64[];
 ys = Float64[];
 zs = Float64[]
@@ -49,12 +49,24 @@ for αj in lk
     push!(zs, NaN)
 end
 
-fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
-    xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
-    title="Spindle torus, not to scale", label="", legend=:outerright)
+fig = plot(
+    xs,
+    ys,
+    zs;
+    c=:black,
+    alpha=0.4,
+    lw=0.5,
+    aspect_ratio=:equal,
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+    title="Spindle torus, not to scale",
+    label="",
+    legend=:outerright,
+)
 
 # set of possible arm-tip positions: circle of radius a in the xy-plane
-θc = range(0, 2π, length=200)
+θc = range(0, 2π; length=200)
 arm_tip_pars = (; c=:blue, lw=3, label="Arm-tip locus")
 plot!(fig, a * cos.(θc), a * sin.(θc), zero(θc); arm_tip_pars..., label="")
 
@@ -67,7 +79,14 @@ plot!(fig, [a, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., la
 longitude_pars = (; c=:orange, lw=2, label="Kite longitude")
 latitude_pars = (; c=:green, lw=2, label="Kite latitude")
 plot!(fig, a .+ l .* cos.(θc), zero(θc), l .* sin.(θc); longitude_pars..., label="")
-plot!(fig, (a + l * cos(β0)) .* cos.(θc), (a + l * cos(β0)) .* sin.(θc), fill(l * sin(β0), length(θc)); latitude_pars..., label="")
+plot!(
+    fig,
+    (a + l * cos(β0)) .* cos.(θc),
+    (a + l * cos(β0)) .* sin.(θc),
+    fill(l * sin(β0), length(θc));
+    latitude_pars...,
+    label="",
+)
 
 kite_pars = (; c=:red, ms=7, label="Kite")
 scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")
@@ -77,12 +96,15 @@ plot!([]; arm_and_lines_pars..., lw=default(:lw))
 plot!([]; arm_tip_pars..., lw=default(:lw))
 plot!([]; longitude_pars..., lw=default(:lw))
 plot!([]; latitude_pars..., lw=default(:lw))
-plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
-plot!(size=plot_size(1, 1.06))
+plot!(; leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
+plot!(; size=plot_size(1, 1.06))
 # one tick at each end of each axis, plus 0 when it is interior
-plot!(fig, xticks=edge_ticks(fig[1], :x; include_zero=true),
+plot!(
+    fig;
+    xticks=edge_ticks(fig[1], :x; include_zero=true),
     yticks=edge_ticks(fig[1], :y; include_zero=true),
-    zticks=edge_ticks(fig[1], :z; include_zero=true))
+    zticks=edge_ticks(fig[1], :z; include_zero=true),
+)
 
 display(fig)
 savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
@@ -95,26 +117,43 @@ savefig(fig, joinpath(@__DIR__, "figs", "spindle_torus.pdf"))
 dx, dy = 1 / 4, 1 / 2
 up_col, down_col = 1, 2
 
-τ = range(0, 360, length=501)
+τ = range(0, 360; length=501)
 θ = τ -> sind(2 * τ)
 φ = τ -> sind(τ)
 
-plot(xmirror=true)
-plot!(xticks=([-1, 0, 1], (raw"$-Δφ$", raw"$φ = 0$", raw"$Δφ$")),
-    yticks=([-1, 0, 1], (raw"$θ_0 + Δθ$", raw"$θ = θ_0$", raw"$θ_0 - Δθ$"))
+plot(; xmirror=true)
+plot!(;
+    xticks=([-1, 0, 1], (raw"$-Δφ$", raw"$φ = 0$", raw"$Δφ$")),
+    yticks=([-1, 0, 1], (raw"$θ_0 + Δθ$", raw"$θ = θ_0$", raw"$θ_0 - Δθ$")),
 )
 
-plot!(φ.(τ), θ.(τ), c=:grey)
+plot!(φ.(τ), θ.(τ); c=:grey)
 
-plot!(φ.([0, τ_φ]), θ.([τ_φ, τ_φ]), color=:black)
-annotate!(sum(φ.([0, τ_φ])) / 2, sum(θ.([τ_φ, τ_φ])) / 2 - 0.1, (raw"$Δφ$", ANNOTATIONFONTSIZE, :black, :top))
+plot!(φ.([0, τ_φ]), θ.([τ_φ, τ_φ]); color=:black)
+annotate!(
+    sum(φ.([0, τ_φ])) / 2,
+    sum(θ.([τ_φ, τ_φ])) / 2 - 0.1,
+    (raw"$Δφ$", ANNOTATIONFONTSIZE, :black, :top),
+)
 
-plot!(φ.([τ_θ, τ_θ]), θ.([τ_θ, 0]), color=:black)
-annotate!(sum(φ.([τ_θ, τ_θ])) / 2 + 0.05, sum(θ.([τ_θ, 0])) / 2, (raw"$Δθ$", ANNOTATIONFONTSIZE, :black, :left))
-quiver!([0], [0], quiver=([dx], [-dy]), c=up_col)
-quiver!([0], [0], quiver=([-dx], [dy]), c=down_col)
-annotate!(dx - 0.05, -dy - 0.25, (raw"$\dot{\tau} > 0$", ANNOTATIONFONTSIZE, :center, PALETTE[up_col]))
-annotate!(-dx + 0.05, dy + 0.25, (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
-plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
+plot!(φ.([τ_θ, τ_θ]), θ.([τ_θ, 0]); color=:black)
+annotate!(
+    sum(φ.([τ_θ, τ_θ])) / 2 + 0.05,
+    sum(θ.([τ_θ, 0])) / 2,
+    (raw"$Δθ$", ANNOTATIONFONTSIZE, :black, :left),
+)
+quiver!([0], [0]; quiver=([dx], [-dy]), c=up_col)
+quiver!([0], [0]; quiver=([-dx], [dy]), c=down_col)
+annotate!(
+    dx - 0.05,
+    -dy - 0.25,
+    (raw"$\dot{\tau} > 0$", ANNOTATIONFONTSIZE, :center, PALETTE[up_col]),
+)
+annotate!(
+    -dx + 0.05,
+    dy + 0.25,
+    (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[down_col]),
+)
+plot!(; size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
 display(current())
 savefig(current(), joinpath(OUTPATH, "eight_plot.pdf"))

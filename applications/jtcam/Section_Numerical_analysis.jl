@@ -24,7 +24,6 @@ using ForwardDiff
 
 include(joinpath(@__DIR__, "plot_helpers.jl"))
 
-
 ## Determine optimal parameters using kinetic model
 p0 = PMP.build_para()
 p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
@@ -50,7 +49,7 @@ const LATEX_TO_UNICODE = Dict(
     raw"\rho" => "ρ",
     raw"\theta" => "θ",
     raw"\Delta" => "Δ",
-    raw"\phi" => "φ"
+    raw"\phi" => "φ",
 )
 
 function eor_transform(sym)
@@ -79,19 +78,43 @@ function print_param_table(p)
         Parameter(:g, "g", "Gravity", raw"\meter\per\square\second", nothing),
         Parameter(:z0, "z_0", "Wind reference altitude", raw"\meter", nothing),
         Parameter(:w0, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
-        Parameter(:b, "b", "Arm braking coefficient",
-            raw"\newton\meter\second\per\degree", f"{p.b / rad2deg(1):.9g}"),
-        Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle",
-            raw"\degree", f"{rad2deg(p.θ0):.0f}"),
-        Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height",
-            raw"\degree", f"{rad2deg(p.Δθ):.0f}"),
-        Parameter(:Δφ, raw"\Delta\phi", "Lemniscate azimuthal half-width",
-            raw"\degree", f"{rad2deg(p.Δφ):.0f}"),
+        Parameter(
+            :b,
+            "b",
+            "Arm braking coefficient",
+            raw"\newton\meter\second\per\degree",
+            f"{p.b / rad2deg(1):.9g}",
+        ),
+        Parameter(
+            :θ0,
+            raw"\theta_0",
+            "Lemniscate mean polar angle",
+            raw"\degree",
+            f"{rad2deg(p.θ0):.0f}",
+        ),
+        Parameter(
+            :Δθ,
+            raw"\Delta\theta",
+            "Lemniscate polar half-height",
+            raw"\degree",
+            f"{rad2deg(p.Δθ):.0f}",
+        ),
+        Parameter(
+            :Δφ,
+            raw"\Delta\phi",
+            "Lemniscate azimuthal half-width",
+            raw"\degree",
+            f"{rad2deg(p.Δφ):.0f}",
+        ),
     ]
 
-    sort!(params, by=x -> eor_transform(x.sym))
+    sort!(params; by=x -> eor_transform(x.sym))
     table_rows = map(params) do p_item
-        val = isnothing(p_item.value_override) ? f"{p[p_item.key]:.9g}" : p_item.value_override
+        val = if isnothing(p_item.value_override)
+            f"{p[p_item.key]:.9g}"
+        else
+            p_item.value_override
+        end
         unit_col = isempty(p_item.unit) ? "" : raw"\si{" * p_item.unit * "}"
         f"    ${p_item.sym}$ & {p_item.descr} & ${val}$ & {unit_col} \\\\ "
     end
@@ -111,7 +134,7 @@ function print_param_table(p)
 \end{tabular}
 \end{table}"""
 
-    println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
+    return println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
 end
 
 print_param_table(p0)
@@ -137,7 +160,9 @@ equilibria.
 Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
 and seed positions / unit field directions for the arrows.
 """
-function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+function streamlines(
+    f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0
+)
     gx, gy = gridsize
     xmin, xmax = xlims
     ymin, ymax = ylims
@@ -163,8 +188,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
         k3 === nothing && return nothing
         k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
         k4 === nothing && return nothing
-        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
-            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+        return (
+            x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]),
+        )
     end
     line_x, line_y = Float32[], Float32[]
     ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
@@ -197,7 +224,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
                 x = step_rk4(x, d, stepsize)
                 x === nothing && break
                 (xmin ≤ x[1] ≤ xmax && ymin ≤ x[2] ≤ ymax) || break
-                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                idx = (
+                    clamp(searchsortedlast(rx, x[1]), 1, gx),
+                    clamp(searchsortedlast(ry, x[2]), 1, gy),
+                )
                 if idx != ccur
                     mask[idx...] || break
                     mask[idx...] = false
@@ -249,11 +279,19 @@ f = q -> SteadyState.ddq_partial(q, vbp)
 
 # Canvas & Layout
 δ = 0
-plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
+plot(;
+    xlims=(-180 - δ, 180 + δ),
+    ylims=(-180 - δ, 180 + δ),
+    aspect_ratio=:equal,
     xticks=([-180, 0, 180], ["-180", "0", "180"]),
     yticks=([-180, 0, 180], ["-180", "0", "180"]),
-    xlabel="α (deg)", ylabel="τ (deg)",
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+    xlabel="α (deg)",
+    ylabel="τ (deg)",
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 # Background wind spans
 vspan!([-180, -90]; theme.upwind..., label="Upwind arm")
 vspan!([90, 180]; theme.upwind...)
@@ -265,10 +303,13 @@ plot!(rad2deg.(line_x), rad2deg.(line_y); theme.streamlines...)
 
 ax, ay = rad2deg.(ax), rad2deg.(ay)
 L, W = rad2deg(0.2), rad2deg(0.06)
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
-    (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
-    (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
-         for (s, u, v) in zip(zip(ax, ay), au, av)]
+heads = [
+    Shape([
+        (s[1] + L / 2 * u, s[2] + L / 2 * v),
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u),
+    ]) for (s, u, v) in zip(zip(ax, ay), au, av)
+]
 plot!(heads; theme.heads...)
 
 # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
@@ -286,16 +327,24 @@ plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 ss = SteadyState.all_steady_states(vbp)
 
 styles = ss_style.(ss)
-scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
+scatter!(
+    rad2deg.(first.(ss)),
+    rad2deg.(last.(ss));
     c=getproperty.(styles, :c),
     markerstrokecolor=getproperty.(styles, :markerstrokecolor),
     shape=getproperty.(styles, :shape),
     ms=getproperty.(styles, :ms),
-    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+    markerstrokewidth=getproperty.(styles, :markerstrokewidth),
+)
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
-plot!(widen=1.06)
-plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(1, 1.14))
+plot!(; widen=1.06)
+plot!(;
+    leftmargin=6Plots.mm,
+    bottommargin=5Plots.mm,
+    rightmargin=5Plots.mm,
+    topmargin=5Plots.mm,
+    size=plot_size(1, 1.14),
+)
 savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
 display(current())
 @info "Chance to use Poincaré-Miranda theorem here?"
@@ -309,34 +358,44 @@ display(current())
 ## circle eight plot with identification
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
 ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
-p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:black, lw=2),
-    marker_kwargs=ss_style.(ss_downwind), project_eight=true)
-plot!(title="Downwind arm", background_color_subplot=theme.downwind.c)
-p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw=2),
-    marker_kwargs=ss_style.(ss_upwind), project_eight=true)
-plot!(title="Upwind arm", background_color_subplot=theme.upwind.c)
+p_downwind = VIZ.plot_eight_circle(
+    ss_downwind,
+    vbp;
+    plot_kwargs=(; color=:black, lw=2),
+    marker_kwargs=ss_style.(ss_downwind),
+    project_eight=true,
+)
+plot!(; title="Downwind arm", background_color_subplot=theme.downwind.c)
+p_upwind = VIZ.plot_eight_circle(
+    ss_upwind,
+    vbp;
+    plot_kwargs=(; color=:black, lw=2),
+    marker_kwargs=ss_style.(ss_upwind),
+    project_eight=true,
+)
+plot!(; title="Upwind arm", background_color_subplot=theme.upwind.c)
 
 plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
 savefig(joinpath(@__DIR__, "figs", "equilibria_eight_circle.pdf"))
 display(current())
 
 ## All eigen values
-dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
+dyn = (u) -> PM4.dynamics(PM4.build_u(; α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
 
 ss_ = sort([q for q in ss if q[2] > 0]; by=q -> (!is_down(q), !is_center(q)))  # one left member per symmetric pair: down-center, down-side, up-center, up-side
 evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
-hline([0], c=:black)
+hline([0]; c=:black)
 # hspan!([-100, 0]; c=:green, alpha=.1, label="Stable")
 # hspan!([0, 100]; c=:red, alpha=.1, label="Unstable")
 for (k, q) in enumerate(ss_)  # same marker style as the equilibria figure
     local style = is_down(q) ? theme.downwind : theme.upwind
-    vspan!([k - 1/4, k + 1/4]; style...)
+    vspan!([k - 1 / 4, k + 1 / 4]; style...)
     scatter!(fill(k, length(evs[k])), real.(evs[k]); ss_style(q)...)
 end
 annotate!([2.5, 2.5], [7.5, -1.5], ["Repulsive", "Attractive"])
-plot!(xlabel="Equilibrium", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
-plot!(xticks=(1:4, ["" for _ in 1:4]))
-plot!(leftmargin=5Plots.mm, bottommargin=2Plots.mm)
+plot!(; xlabel="Equilibrium", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
+plot!(; xticks=(1:4, ["" for _ in 1:4]))
+plot!(; leftmargin=5Plots.mm, bottommargin=2Plots.mm)
 
 display(current())
 savefig(joinpath(@__DIR__, "figs", "_equilibria_eigvals.pdf"))
@@ -349,40 +408,75 @@ savefig(joinpath(@__DIR__, "figs", "_equilibria_eigvals.pdf"))
 ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
 ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
 
-plot(xlims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)),
-    ylims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)), aspect_ratio=:equal,
+plot(;
+    xlims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)),
+    ylims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)),
+    aspect_ratio=:equal,
     xticks=([-180, 0, 180], ["-180", "0", "180"]),
     yticks=([-180, 0, 180], ["-180", "0", "180"]),
-    xlabel="α (deg)", ylabel="τ (deg)",
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+    xlabel="α (deg)",
+    ylabel="τ (deg)",
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 
 vspan!([-180, -90]; theme.upwind..., label="Arm upwind")
 vspan!([90, 180]; theme.upwind...)
 vspan!([-90, 90]; theme.downwind..., label="Arm downwind")
 
-contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
-contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
+contour!(
+    rad2deg.(αs),
+    rad2deg.(τs),
+    last.(dd);
+    levels=[0],
+    color=:gray,
+    alpha=0.4,
+    linewidth=1.2,
+    label="",
+)
+contour!(
+    rad2deg.(αs),
+    rad2deg.(τs),
+    first.(dd);
+    levels=[0],
+    color=:gray,
+    alpha=0.4,
+    linewidth=1.2,
+    label="",
+)
 
 styles = ss_style.(ss)
-scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
+scatter!(
+    rad2deg.(first.(ss)),
+    rad2deg.(last.(ss));
     c=getproperty.(styles, :c),
     markerstrokecolor=getproperty.(styles, :markerstrokecolor),
     shape=getproperty.(styles, :shape),
     ms=getproperty.(styles, :ms),
-    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+    markerstrokewidth=getproperty.(styles, :markerstrokewidth),
+)
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
 
 N_eq, r_eq, t_eq = 100, π / 10, 1
 for q in ss
-    for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
+    for θ in range(0, 2π; length=N_eq + 1)[1:(end - 1)]
         q0 = q .+ r_eq .* [cos(θ), sin(θ)]
-        local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
+        local sol = PM4.integrate(
+            PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true
+        )
         qs = [rad2deg.(sol(t)[1:2]) for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
         plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
     end
 end
-plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(1, 1.22))
+plot!(;
+    leftmargin=6Plots.mm,
+    bottommargin=5Plots.mm,
+    rightmargin=5Plots.mm,
+    topmargin=5Plots.mm,
+    size=plot_size(1, 1.22),
+)
 
 savefig(joinpath(@__DIR__, "figs", "_equilibria_trajectories.pdf"))
 display(plot!())
@@ -425,28 +519,40 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol
     sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=CB, save_end=false, tol)
     u_infty = sol.u[end]
     n_max = 11
-    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
+    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end - 1)]][1:min(end, n_max - 1)]
 
     tol_start, tol_end = 1e-2, 10tol
     slope = get_slope(distances; tol_start, tol_end)
     i1 = findfirst(<(tol_start), distances)
 
-    plt = plot(; yscale=:log10, xlim=(0, n_max), xticks=0:2:100,
-        ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
+    plt = plot(;
+        yscale=:log10,
+        xlim=(0, n_max),
+        xticks=0:2:100,
+        ylim=(1e-16, 1e2),
+        yticks=10.0 .^ (0:-3:-16),
         xlabel=f"""Lemniscate revolutions, D(τ) {dτ>0 ? ">" : "<"} 0""",
     )
 
     perturbed_params = (; ls=:dot, lw=2, alpha=0.4, c=:gray, label="Perturbed trajectories")
     plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black)
     if ntrace > 0
-        for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
-            s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=CB, save_end=false, tol)
-            plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
-                perturbed_params..., label="")
+        for (α, τ) in
+            eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+            s = PM4.integrate(
+                PM4.build_u(; α, τ, dτ), tf, p; callback=CB, save_end=false, tol
+            )
+            plot!(
+                [LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
+                perturbed_params...,
+                label="",
+            )
         end
     end
 
-    annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
+    annotate!((
+        5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")
+    ))
     distance_style = (; c=color, ls=:dot, marker=:circle)
     plot!(distances .+ 1e-16; distance_style...)
 
@@ -459,11 +565,11 @@ end
 
 p_conv_p = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
 p_conv_m = plot_convergence_panel(vbp, -1, 2; ntrace=0)
-plot!(p_conv_p, leftmargin=11Plots.mm)
-plot!(p_conv_m, leftmargin=5Plots.mm)
-plot!(p_conv_p, ylabel="Distance to limit")
+plot!(p_conv_p; leftmargin=11Plots.mm)
+plot!(p_conv_m; leftmargin=5Plots.mm)
+plot!(p_conv_p; ylabel="Distance to limit")
 conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
-plot!(bottommargin=7Plots.mm)
+plot!(; bottommargin=7Plots.mm)
 display(conv_two)
 savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 
@@ -478,7 +584,7 @@ savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
 # Poincaré-section states, so its last two saved times span exactly one
 # revolution and build_shooting(sol) is the cycle's shooting (residuals ~1e-13).
 function Φ(x, T; vbp)
-    Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
+    return Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
 end
 
 function floquet_rate(sol, vbp)
@@ -486,23 +592,32 @@ function floquet_rate(sol, vbp)
     u0, T = LC.unpack_shooting(s)
     x0 = collect(Array(u0))[1:4]
     μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ(x, T; vbp), x0)))  # jacobian is an SMatrix
-    return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, T
+    return -log10(maximum(abs, μ[abs.(μ) .< 1 / 2])), μ, T
 end
 
 # One solve per cycle feeds the info caption.
 cycles = NamedTuple[]
 for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
-    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
-    local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
+    local sol = PM4.integrate(
+        PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL
+    )
+    local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end - 1)]][1:10]
     local rate, μ, T = floquet_rate(sol, vbp)
     local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
     # largest eigenvalue found with differentiation: predicts the per-revolution rate
-    local λ = maximum(abs, μ[abs.(μ) .< 1/2])
+    local λ = maximum(abs, μ[abs.(μ) .< 1 / 2])
     push!(cycles, (; dτ, label, distances, secant, rate, λ, T))
 end
 
-cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
-    f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
+cycle_lines = [
+    join(
+        (
+            f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
+            f"T = {c.T:.6f}, λ = {c.λ:.4g}",
+        ),
+        ", ",
+    ) for c in cycles
+]
 @info f"""Each revolution, the distance is divided by 10^slope. The eigenvalues λ are the dominant non-unit Floquet multipliers found with differentiation.
 {join(cycle_lines, '\n')}"""
 
@@ -553,21 +668,27 @@ end
 
 n_splits = 4
 # arrows = [permutedims(repeat([true], n_splits - 1)) false]
-plot(aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20)
-plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
-plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
-plot!([NaN], [NaN], c=1, label="D(τ) > 0")
-plot!([NaN], [NaN], c=2, label="D(τ) < 0")
+plot(; aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20)
+plot!(invert(yz_split(lc_m, n_splits))...; lw=4, c=2, arrows=true)
+plot!(invert(yz_split(lc_p, n_splits))...; lw=2, c=1, arrows=true)
+plot!([NaN], [NaN]; c=1, label="D(τ) > 0")
+plot!([NaN], [NaN]; c=2, label="D(τ) < 0")
 plot!([0], [26])
 c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ, set by hand
 c, δ = [12, 16.5], 0.5
-lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
+lens!(
+    [c[1] - δ, c[1] + δ],
+    [c[2] - δ, c[2] + δ];
+    inset=(1, bbox(0.3, 0.05, 0.3, 0.4)),
+    lw=1.5,
+    lc=:grey,
+)
 l = plot!().inset_subplots[1]
-xticks_ = (c[1]-δ):δ:(c[1]+δ)
-yticks_ = (c[2]-δ):δ:(c[2]+δ)
+xticks_ = (c[1] - δ):δ:(c[1] + δ)
+yticks_ = (c[2] - δ):δ:(c[2] + δ)
 xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
 yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
-plot!(l, tickfontsize=TICKFONTSIZE - 1)
+plot!(l; tickfontsize=TICKFONTSIZE - 1)
 plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
 
 display(plot!())
@@ -577,7 +698,6 @@ savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
 Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
 Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
 =#
-
 
 ## Inventory of limit cycles: deflated single shooting vs quasi-Monte-Carlo
 #
@@ -613,11 +733,15 @@ const BK_NSEEDS = 100  # Halton points in the fundamental domain
 vec4(u) = [u[1], u[2], u[3], u[4]]
 
 # S is an exact symmetry: f(S u) = S f(u), the mirror acting on velocities.
-sym_err = maximum([(0.3, 0.7, 0.4, 1.2), (-1.1, -2.0, -0.9, -0.5),
-    (2.5, 3.0, 1.7, 2.2), (-2.9, -3.0, -3.0, -2.0)]) do (α, τ, dα, dτ)
+sym_err = maximum([
+    (0.3, 0.7, 0.4, 1.2),
+    (-1.1, -2.0, -0.9, -0.5),
+    (2.5, 3.0, 1.7, 2.2),
+    (-2.9, -3.0, -3.0, -2.0),
+]) do (α, τ, dα, dτ)
     v = PM4.dynamics(PM4.build_u(α, τ, dα, dτ, 0.0), vbp)
     w = PM4.dynamics(PM4.build_u(-α, τ + π, -dα, dτ, 0.0), vbp)
-    norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
+    return norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
 end
 @assert sym_err < 1e-10 "S is not a symmetry of the model (residual $sym_err)"
 
@@ -634,7 +758,9 @@ end
 
 search_prob = ODEProblem(f_search!, zeros(4), (0.0, 1.0), vbp)
 section = BK.SectionSS([0.0, 1.0, 0.0, 0.0], [0.0, TAU0, 0.0, 0.0])
-sh = BK.Shooting(search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000)
+sh = BK.Shooting(
+    search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000
+)
 
 # BK's shooting closes on u(T) = u(0); the twist is constant, so only the τ row of
 # the closure block changes and the Jacobian stays BK's.
@@ -650,7 +776,7 @@ BK.getu0(w::TwistedShooting) = w.u0
 BK.getdelta(w::TwistedShooting) = BK.getdelta(w.sh)
 function BK.residual(w::TwistedShooting, x, p)
     out = BK.po_residual(w.sh, x, p)
-    out[end-3] -= w.twist  # closure rows are (α, τ, dα, dτ), then the section row
+    out[end - 3] -= w.twist  # closure rows are (α, τ, dα, dτ), then the section row
     return out
 end
 BK.jacobian(w::TwistedShooting, x, p) = BK.po_jacobian(w.sh, x, p)
@@ -661,24 +787,35 @@ cycle_guess(lc) = vcat(vec4(lc(0.0)), lc.t[end])
 "A root as its section state (x[2] = TAU0 by the section constraint)."
 root_state(x) = (α=rem2pi(x[1], RoundNearest), dα=x[3], dτ=x[4], T=x[5])
 
-same_cycle(a, b) = abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 && abs(a.dα - b.dα) < 1e-4 &&
-    abs(a.dτ - b.dτ) < 1e-4 && abs(a.T - b.T) < 1e-4
+function same_cycle(a, b)
+    return abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 &&
+           abs(a.dα - b.dα) < 1e-4 &&
+           abs(a.dτ - b.dτ) < 1e-4 &&
+           abs(a.T - b.T) < 1e-4
+end
 
-npar = BK.NewtonPar(tol=1e-9, max_iterations=15, verbose=false)
+npar = BK.NewtonPar(; tol=1e-9, max_iterations=15, verbose=false)
 
 # The two references, re-solved by the shooting.
 refs = map((+1, -1)) do sense
     tw = TwistedShooting(sh, cycle_guess(sense > 0 ? lc_p : lc_m), sense * 2π)
     s = BK.solve(tw, BK.Newton(), npar)
     @assert BK.converged(s) "reference cycle (D(τ) $sense) not recovered by shooting"
-    (sense=sense, x=collect(s.u), state=root_state(s.u), res=norm(BK.residual(tw, s.u, vbp), Inf))
+    return (
+        sense=sense,
+        x=collect(s.u),
+        state=root_state(s.u),
+        res=norm(BK.residual(tw, s.u, vbp), Inf),
+    )
 end
 
 cb_turn = LC.build_poincare_callback(Inf)  # stop at the first crossing
 "Shooting guess from the section state u0: one turn of the true flow."
 function turn_guess(u0)
     tf = 4π / clamp(abs(u0[4]), 0.5, BK_M)
-    sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
+    sol = PM4.integrate(
+        u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000
+    )
     length(sol.t) < 2 && return nothing  # no full turn in the box
     return vcat(vec4(sol.u[end]), sol.t[end])
 end
@@ -702,11 +839,14 @@ function find_cycle(sense, defOp, guess)
         return nothing
     end
     all(abs(u[3]) <= BK_M && abs(u[4]) <= BK_M for u in traj.u) || return nothing
-    norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 || return nothing
+    norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 ||
+        return nothing
     return (x=x, state=st)
 end
 
-seeds = eachcol(sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample()))
+seeds = eachcol(
+    sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample())
+)
 
 found = NamedTuple[]
 attempts = zeros(Int, 2)
@@ -722,7 +862,8 @@ for sense in (+1, -1)
         n_guess[] += 1
         local r = find_cycle(sense, defOp, guess)
         r === nothing && continue
-        (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) && continue
+        (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) &&
+            continue
         push!(defOp, copy(r.x))
         push!(found, r)
     end
@@ -733,10 +874,21 @@ end
 cb_conv = LC.build_poincare_callback(1e-8)
 qmc = zeros(Int, 3)  # D(τ) > 0, D(τ) < 0, none
 for u0 in seeds
-    local sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
-        callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000)
+    local sol = PM4.integrate(
+        PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0),
+        60,
+        vbp;
+        callback=cb_conv,
+        save_end=false,
+        tol=1e-8,
+        maxiters=1_000_000,
+    )
     u = sol.u[end]
-    d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf)
+    d = if all(isfinite, u)
+        (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0)))
+    else
+        (Inf, Inf)
+    end
     k = argmin(d)
     qmc[minimum(d) < 1e-3 ? k : 3] += 1
 end
