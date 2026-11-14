@@ -5,7 +5,7 @@ using KEEP: PointMass4 as PM4
 using KEEP.PointMassPara
 
 p = build_vbpara(build_para())
-u0 = PM4.build_u(α=0.3, τ=0.5, dα=0.4, dτ=1.0)
+u0 = PM4.build_u(; α=0.3, τ=0.5, dα=0.4, dτ=1.0)
 h = 1e-4
 
 # Central difference of the Cartesian kite position along the true flow.
