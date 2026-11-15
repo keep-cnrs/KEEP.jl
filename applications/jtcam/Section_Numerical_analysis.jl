@@ -559,8 +559,7 @@ plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
 plot!([NaN], [NaN], c=1, label="D(τ) > 0")
 plot!([NaN], [NaN], c=2, label="D(τ) < 0")
 plot!([0], [26])
-c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ, set by hand
-c, δ = [12, 16.5], 0.5
+c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ was set by hand
 lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
 l = plot!().inset_subplots[1]
 xticks_ = (c[1]-δ):δ:(c[1]+δ)

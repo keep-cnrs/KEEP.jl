@@ -13,8 +13,9 @@
 #    optimization at each wind speed and compare with the 9 m/s optimum held
 #    fixed. ℓ spans 15–200 m and b 1–1e6; the Δφ box is (10°, 90°), and the
 #    inertia floor is set by sizing the aluminium arm (see `I_BOUNDS`).
-#  - Δθ: sweep it from 2° to 20° at the optimum with Θ fixed, and plot the
-#    power, the line-tension envelope and the maximum kite acceleration.
+#  - Δθ: sweep it from 2° to 20° at the optimum with Θ fixed, then re-optimize
+#    Θ at each angle, and plot the power and the line-tension envelope with and
+#    without re-optimization.
 #  - SHAPE: 10×10 map of the same quantities over (Δθ, Δφ) at the optimal
 #    (ℓ, I, b), again without re-optimizing anything.
 #
@@ -100,9 +101,10 @@ end
 # value of one parameter. `lower`/`upper` are the box constraints of `syms`.
 # `p_fixed` is the parameter set the no-optimization cycle is taken at, so a
 # continuation can start from a neighbour's optimum `p0` without moving the
-# reference curve.
+# reference curve. `guess` is Ipopt's initial guess (see `clamp_guess`), which
+# lets a retry start from the neighbouring cycle states instead of cold.
 function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense, tol,
-    wall=MAX_WALL_TIME)
+    wall=MAX_WALL_TIME, guess=(;))
     p_fixed = copy(p_fixed)
     p_fixed[param] = value
 
@@ -115,7 +117,8 @@ function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense
     p0 = copy(p0)
     p0[param] = value
     solution, stats, _ = with_logger(NullLogger()) do
-        OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=wall)
+        OPT.optimize(p0, syms, lower, upper; sense, tol, max_wall_time=wall,
+            initial_guess=guess)
     end
     p_opt = copy(p0)
     p_opt[syms] .= solution.params[syms]  # physical units
@@ -125,15 +128,16 @@ function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense
     lc = LC.compute_limit_cycle(vbp; sense=sense, save_everystep=true, tol=tol)
     stats_opt = cycle_stats(lc)
 
-    return stats_no_opt, stats_opt, collect(p_opt[syms]), stats
+    return stats_no_opt, stats_opt, collect(p_opt[syms]), stats, solution
 end
 
 """
 Wind sweep: hold `p_ref` fixed, or re-optimize `syms` inside `lower`/`upper` at
 each wind speed, marching outward from the reference wind `i_ref`. Each point is
 first solved from the 9 m/s optimum; if that does not converge, it is retried
-from the neighbouring wind's optimum. The wide boxes make the objective
-multimodal, so neither start alone succeeds at every wind speed.
+from the neighbouring wind's optimum, with its cycle states as Ipopt's initial
+guess as well as its parameters. The wide boxes make the objective multimodal,
+so neither start alone succeeds at every wind speed.
 Returns the statistics with and without re-optimization and the optimized
 parameters.
 """
@@ -142,22 +146,26 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
     no_opt = Vector{Any}(undef, n)
     opt = Vector{Any}(undef, n)
     theta = Vector{Vector{Float64}}(undef, n)
+    sols = Vector{Any}(undef, n)
     ok = falses(n)
     from_theta(θ) = (p=copy(p_ref); p[syms].=θ; p)
-    function run!(i, p0)
+    function run!(i, p0, guess=(;), wall=SWEEP_WALL_TIME)
         r = compute_results(:w0, winds[i];
             syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
-            wall=SWEEP_WALL_TIME)
-        no_opt[i], opt[i], theta[i] = r[1], r[2], r[3]
+            wall=wall, guess=guess)
+        no_opt[i], opt[i], theta[i], sols[i] = r[1], r[2], r[3], r[5]
         ok[i] = r[4].status == :first_order
     end
     for i in i_ref:-1:1
+        @info "  wind sweep $(i)/$(n): $(winds[i]) m/s"
         run!(i, p_ref)
-        !ok[i] && i < i_ref && run!(i, from_theta(theta[i+1]))
+        !ok[i] && i < i_ref &&
+            run!(i, from_theta(theta[i+1]), clamp_guess(sols[i+1]))
     end
     for i in (i_ref+1):n
+        @info "  wind sweep $(i)/$(n): $(winds[i]) m/s"
         run!(i, p_ref)
-        !ok[i] && run!(i, from_theta(theta[i-1]))
+        !ok[i] && run!(i, from_theta(theta[i-1]), clamp_guess(sols[i-1]))
     end
     for i in eachindex(winds)
         ok[i] || @warn "re-optimization at $(winds[i]) m/s did not converge"
@@ -166,6 +174,17 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
 end
 
 maxnormalize(x) = x ./ maximum(x)
+
+"""
+Neighbour solution as an Ipopt initial guess. The cycle states are clamped just
+inside the box `OPT.optimize` asserts on: a cycle that starts at α = ±π puts the
+guess on the bound, which `optimize` rejects.
+"""
+clamp_guess(::Nothing) = (;)
+clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6),
+    dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6),
+    dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6),
+    tf=clamp(s.tf, 1.1e-3, 99.0), P=clamp(s.P, 1.1e-3, 9.9e4))
 
 """
 One optimization step with the compilation warm-up: the first solve with a
@@ -204,6 +223,71 @@ function dtheta_study(p, angles_deg; n=2001)
 end
 
 """
+Δθ sweep with re-optimization: at each absolute angle (degrees) in `angles_deg`,
+set Δθ and re-optimize `syms` inside `lower`/`upper`, marching outward from the
+nominal angle `i0`. The objective is multimodal and a single start is not
+reliable: 4° needs the nominal cycle states as initial guess, and at 2° a plain
+start from 4° converges to a box-corner local optimum (7.3 kW against 12.8). So
+each angle tries, in order, the neighbour's optimum with the neighbour's cycle
+states, the same parameters cold, and `p_ref` with the nominal's states, and
+keeps the best converged average power; `walls` are the per-attempt wall-clock
+caps. Statistics come from `dtheta_study` at the solved point, i.e. from the
+same dτ > 0 cycle as the fixed curve.
+"""
+function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; i0,
+    walls=(60.0, 60.0, 90.0))
+    n = length(angles_deg)
+    stats = Vector{Any}(undef, n)
+    p_at = Vector{Any}(undef, n)
+    sols = Vector{Any}(undef, n)
+    function attempt(i, p0, g, wall)
+        q = copy(p0)
+        q.Δθ = deg2rad(angles_deg[i])
+        try
+            solution, st, _ = with_logger(NullLogger()) do
+                OPT.optimize(q, syms, lower, upper; sense=SENSE, tol=TOL,
+                    max_wall_time=wall, initial_guess=g)
+            end
+            p = copy(q)
+            p[syms] .= solution.params[syms]
+            return (p=p, status=st.status, sol=solution, P=solution.P)
+        catch
+            return (p=copy(p0), status=:error, sol=nothing, P=NaN)
+        end
+    end
+    function run!(i, prev)
+        @info "  Δθ re-optimization $(i)/$(n): $(angles_deg[i])°"
+        starts = prev === nothing ? ((p_ref, (;)),) :
+            ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)),
+             (p_ref, clamp_guess(sols[i0])))
+        best = nothing
+        for (k, (start, g)) in enumerate(starts)
+            k == length(starts) && best !== nothing && best.status == :first_order && break
+            r = attempt(i, start, g, walls[k])
+            if r.status == :first_order &&
+               (best === nothing || best.status != :first_order || r.P > best.P)
+                best = r
+            elseif best === nothing
+                best = r
+            end
+        end
+        best.status == :first_order ||
+            @warn "re-optimization at Δθ = $(angles_deg[i])° did not converge" best.status
+        p_at[i], sols[i] = best.p, best.sol
+        stats[i] = only(dtheta_study(best.p, [angles_deg[i]]))
+        return nothing
+    end
+    run!(i0, nothing)
+    for i in (i0-1):-1:1
+        run!(i, (p=p_at[i+1], sol=sols[i+1]))       # walk left from the nominal
+    end
+    for i in (i0+1):n                               # restart at the nominal
+        run!(i, (p=(i == i0+1 ? p_ref : p_at[i-1]), sol=(i == i0+1 ? sols[i0] : sols[i-1])))
+    end
+    return stats
+end
+
+"""
 10×10 shape map at fixed (ℓ, I, b): one limit cycle per (Δθ, Δφ), no
 re-optimization. Rows are Δφ, columns are Δθ factors. A cell stays NaN when no
 dτ > 0 pumping cycle is found.
@@ -215,6 +299,7 @@ function shape_grid(p, factors, dphi_deg; n=401)
     Tmax = fill(NaN, size(P))
     amax = fill(NaN, size(P))
     for (j, dphi) in enumerate(dphi_deg), (i, f) in enumerate(factors)
+        i == 1 && @info "  shape map row $(j)/$(length(dphi_deg)): Δφ = $(dphi)°"
         q = copy(p)
         q.Δθ = f * p.Δθ
         q.Δφ = deg2rad(dphi)
@@ -265,24 +350,35 @@ p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
 lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
 upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
 
+@info "opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, ", ")))"
 opt_ref = opt_step(p_start, SYMS, lower, upper)
 p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
 
 ## Numerical: wind sweep over Θ, from the 9 m/s optimum
 winds = range(5, 15, length=11)
 i_ref = findfirst(x -> x >= WIND_REF, winds)
+@info "opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s"
 sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref)
 
 ## Numerical: Δθ sensitivity at the optimum, with the nominal angle included
-dtheta_angles = sort(unique(vcat(range(DTHETA_RANGE..., length=11), rad2deg(p_ref.Δθ))))
+# 2° to 20° in steps of 2°, which already contains the nominal (6°)
+dtheta_angles = collect(range(DTHETA_RANGE..., length=10))
+@info "opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles"
 dtheta = dtheta_study(p_ref, dtheta_angles)
 
+## Numerical: Δθ sweep with Θ re-optimized at each angle
+@info "opt: Δθ sweep with Θ re-optimized, $(length(dtheta_angles)) angles"
+dtheta_opt = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
+    i0=argmin(abs.(dtheta_angles .- rad2deg(p_ref.Δθ))))
+
 ## Numerical: 10×10 shape map at the optimal ℓ, I, b
+@info "opt: shape map $(GRID_N)×$(GRID_N) at the optimal ℓ, I, b"
 shape = shape_grid(p_ref,
     range(1 - SHAPE_WINDOW, 1 + SHAPE_WINDOW, length=GRID_N),
     range(rad2deg.(DPHI_BOUNDS)..., length=GRID_N))  # shape_grid takes degrees
 
 ## Numerical: objective landscape around the Θ optimum
+@info "opt: objective landscape around the Θ optimum"
 LANDSCAPE = landscape(p_ref, SYMS; lower, upper)
 
 ## Numerical: report
@@ -323,13 +419,16 @@ function print_final_table()
     end
     println()
 
-    println("Δθ sensitivity at the Θ optimum (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
-    println(rpad("Δθ (deg)", 10), rpad("P (kW)", 10), rpad("Tmin (kN)", 11),
-        rpad("Tmax (kN)", 11), rpad("spread (kN)", 12), "max a (m/s²)")
-    for d in dtheta
-        println(rpad(round(d.Δθ; digits=1), 10), rpad(round(d.P / 1000; digits=3), 10),
-            rpad(round(d.Tmin / 1000; digits=3), 11), rpad(round(d.Tmax / 1000; digits=3), 11),
-            rpad(round((d.Tmax - d.Tmin) / 1000; digits=3), 12), round(d.amax; digits=1))
+    println("Δθ sweep: Θ fixed against re-optimized (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
+    println(rpad("Δθ (deg)", 10), rpad("P0 (kW)", 9), rpad("P (kW)", 9), rpad("gain", 8),
+        rpad("Tmax0 (kN)", 12), rpad("Tmax (kN)", 11), rpad("amax0", 9), "amax")
+    for (d0, d) in zip(dtheta, dtheta_opt)
+        gain = (d.P / d0.P - 1) * 100
+        println(rpad(f"{d0.Δθ:.1f}", 10), rpad(f"{d0.P / 1000:.2f}", 9),
+            rpad(f"{d.P / 1000:.2f}", 9),
+            rpad(abs(gain) < 0.5 ? "—" : f"{gain:+.0f} %", 8),
+            rpad(f"{d0.Tmax / 1000:.2f}", 12), rpad(f"{d.Tmax / 1000:.2f}", 11),
+            rpad(f"{d0.amax:.0f}", 9), f"{d.amax:.0f}")
     end
     println()
 
@@ -518,40 +617,51 @@ end
 
 ## Plot: Δθ sensitivity (justifies holding Δθ fixed)
 """
-The power and line-tension panels of the Δθ sweep at the optimum, side by side:
-Δθ in degrees, from `DTHETA_RANGE`, with a sample at the nominal angle. The
-power is normalized by its value at the nominal Δθ, so the nominal sits at 1
-and the axis runs from 0 to the peak. The tension panel keeps its own ticks. A
-`guides.line` vertical line marks the nominal angle.
+The power and line-tension panels of the Δθ sweep, side by side: Δθ in degrees,
+2° to 20° in steps of 2°, which includes the nominal angle. The power is
+normalized by its value at the nominal with Θ fixed, so the two conditions meet
+at 1 there and the gap between them is what holding Θ costs. Θ held at the
+optimum is drawn as black points, Θ re-optimized at each angle as a black line;
+the tension panel draws both min–max envelopes, the fixed one as points and the
+re-optimized one filled. A `guides.line` band marks the nominal angle.
 """
-function plot_dtheta(dtheta, guides, mark)
+function plot_dtheta(dtheta, dopt, guides, mark)
     ang = [d.Δθ for d in dtheta]
-    P = [d.P / 1000 for d in dtheta]
-    Tmin = [d.Tmin / 1000 for d in dtheta]
-    Tmax = [d.Tmax / 1000 for d in dtheta]
-    amax = [d.amax for d in dtheta]
+    i0 = argmin(abs.(ang .- mark))
     style = (; c=:black)
 
-    # power relative to its value at the nominal Δθ, so the nominal sits at 1;
-    # over the full sweep the power collapses away from it, so the axis runs
-    # from 0 to the peak with the nominal marked by the guide line
-    Pn = P ./ P[argmin(abs.(ang .- mark))]
-    f1 = plot(ang, Pn; style..., label="", ylabel="P / P*",
-        ylims=(0, maximum(Pn)), yticks=([0, 0.5, 1], ["0", "0.5", "1"]),
-        xlabel="Δθ (deg)")
-    f2 = plot(ang, Tmax; style..., label="", ylabel="Line tension (kN)",
-        fillrange=Tmin, fillalpha=0.1, xlabel="Δθ (deg)")
-    plot!(f2, ang, Tmin; style..., label="")
-    f3 = plot(ang, amax; style..., label="", ylabel="Max acceleration (m/s²)",
-        xlabel="Δθ (deg)")
-    foreach(f -> vline!(f, [mark]; guides.line...), (f1, f2, f3))
-    foreach(f -> plot!(f, xticks=2:2:20, xlim=extrema(ang)), (f1, f2, f3))
+    Pn = [d.P for d in dtheta] ./ dtheta[i0].P
+    Pn_opt = [d.P for d in dopt] ./ dtheta[i0].P
+    Tmin0 = [d.Tmin / 1000 for d in dtheta]
+    Tmax0 = [d.Tmax / 1000 for d in dtheta]
+    Tmin1 = [d.Tmin / 1000 for d in dopt]
+    Tmax1 = [d.Tmax / 1000 for d in dopt]
+
+    # power relative to its value at the nominal Δθ with Θ fixed, so the nominal
+    # sits at 1 on both curves and the axis runs from 0 to the peak
+    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, label="Θ fixed",
+        ylabel="P / P*", xlabel="Δθ (deg)", ylims=(0, 1.03max(1, maximum(Pn_opt))),
+        yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright)
+    plot!(f1, ang, Pn_opt; style..., label="Θ re-optimized")
+
+    f2 = plot(ang, Tmax0; style..., seriestype=:scatter, ms=4, label="",
+        ylabel="Line tension (kN)", xlabel="Δθ (deg)")
+    scatter!(f2, ang, Tmin0; style..., ms=4, label="")
+    plot!(f2, ang, Tmax1; style..., label="", fillrange=Tmin1, fillalpha=0.1)
+    plot!(f2, ang, Tmin1; style..., label="")
+
+    foreach(f -> vline!(f, [mark]; guides.line...), (f1, f2))
+    foreach(f -> plot!(f, xticks=2:2:20, xlim=extrema(ang)), (f1, f2))
+    # the backend draws the series in list order, so moving the band in front of
+    # the data keeps it under the curves
+    for f in (f1, f2)
+        pushfirst!(f[1].series_list, pop!(f[1].series_list))
+    end
 
     # the margins are per panel (the theme sets margin = 0): only the left one
     # carries a y label and y tick labels
     plot!(f1, leftmargin=18Plots.mm, bottommargin=10Plots.mm)
     plot!(f2, leftmargin=6Plots.mm, bottommargin=10Plots.mm)
-    # return plot(f1, f2, f3; layout=(1, 3), size=plot_size(1, 2))
     return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2))
 end
 
@@ -672,18 +782,23 @@ at 5 m/s Tmax rises from 3.34 to 3.49 kN and Tmin falls from 1.99 to 1.72 kN.
 
 ## Varying Δθ
 my_defaults()
-fig_dtheta = plot_dtheta(dtheta, GUIDES, rad2deg(p_ref.Δθ))
+fig_dtheta = plot_dtheta(dtheta, dtheta_opt, GUIDES, rad2deg(p_ref.Δθ))
 display(fig_dtheta)
 savefig(fig_dtheta, joinpath(OUTPATH, "optimization_dtheta.pdf"))
 
 #= Observation:
-Power peaks at the nominal Δθ (12.25 kW at 6°, 12.25 at 5.6°) and collapses
-away from it: 3.96 kW at 2° and 0.75 kW at 20°. Tmax is lowest near 7.4°
-(10.27 kN) and rises to 13.8 kN at both ends, while Tmin falls to 5.6 kN near
-the peak and climbs to 9.64 kN at 2°, so the envelope is narrowest around 6–7°
-and about twice as wide at 20° (6.25–13.51 kN). The peak acceleration is
-minimal at the nominal (939 m/s²) and grows to 5499 m/s² at 2° and 5115 m/s²
-at 20°.
+Holding Θ costs almost everything away from the nominal: the power falls from
+12.25 kW at 6° to 3.96 kW at 2° and 0.75 kW at 20°, while Tmax rises to 13.8 kN
+at both ends and the peak acceleration reaches 5499 m/s² at 2° and 5115 at 20°.
+Re-optimizing Θ at each angle recovers nearly all of it: 12.82 kW at 2° and
+8.27 kW at 20° (+223 % and +1010 % over the fixed optimum), 8.3–12.8 kW over the
+whole sweep. The re-optimized power peaks at 2–4° (12.8 kW, 4.6 % above the
+nominal), so 6° is not power-optimal once Θ follows.
+The re-optimized loads are lower and flatter: Tmax stays at 9.9–10.8 kN and the
+peak acceleration at 831–1730 m/s², against 13.8 kN and 5499 m/s² with Θ fixed.
+The optimum slides from a light, weakly braked arm at 2° (ℓ = 28.1 m,
+I = 96 kg m², b = 240, Δφ on its 10° bound) to a heavy one at 20° (ℓ = 25.6 m,
+I = 1489 kg m², b = 2312, Δφ = 28.5°); ℓ stays within 25.6–28.1 m.
 =#
 
 ## Δθ/Δφ heatmap
