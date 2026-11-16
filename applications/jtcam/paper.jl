@@ -54,6 +54,8 @@ function kite_velocity(u, p)
 end
 
 function cycle_metrics(sol; n=1001)
+    sol === nothing && return (; P=NaN, period=NaN, Tmin=NaN, Tmax=NaN, αmax=NaN, # no orbit: NaN, do not crash
+        amax=NaN, κmax=NaN, Rmin=NaN)
     ts = range(sol.t[1], sol.t[end], n)
     us = sol.(ts)
     p = sol.prob.p
@@ -73,6 +75,7 @@ function cycle_metrics(sol; n=1001)
         Rmin = 1 / maximum(κ),
     )
 end
+nothing #hide
 
 # ## 1. Mathematical Model & 10D-to-4D Validation
 #
@@ -167,6 +170,7 @@ end
 pto = pto_sizing_1d(p_nom)
 p_1d = PMP.build_para(I=pto.I, b=pto.b)
 m_1d = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(p_1d); sense=+, tol=1e-5, save_everystep=true))
+nothing #hide
 
 # Also compute the 4D kinetic-criterion baseline (nominal I, b = I ω from 4D period)
 p_kin = PMP.build_para()
@@ -195,12 +199,14 @@ dyn4(u) = PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp_ki
 ss_left = [q for q in ss if q[2] > 0]
 max_re_eig = maximum(q -> maximum(real, eigvals(Array(ForwardDiff.jacobian(dyn4, [q..., 0, 0])))), ss_left)
 min_re_eig = minimum(q -> maximum(real, eigvals(Array(ForwardDiff.jacobian(dyn4, [q..., 0, 0])))), ss_left)
+nothing #hide
 
 # Two attracting limit cycles (D(τ) > 0 rises on outer sides; D(τ) < 0 rises in center)
 lc_p = LC.compute_limit_cycle(vbp_kin; sense=(+), save_everystep=true)
 lc_m = LC.compute_limit_cycle(vbp_kin; sense=(-), save_everystep=true)
 mp = cycle_metrics(lc_p)
 mm = cycle_metrics(lc_m)
+nothing #hide
 
 # Floquet multipliers & convergence slope
 const CB_POINC = LC.build_poincare_callback(eps(1.0)) #hide
@@ -213,6 +219,7 @@ function floquet_rate(sol, vbp) #hide
 end #hide
 fl_p = floquet_rate(PM4.integrate(PM4.build_u(; dτ=1), 50, vbp_kin; callback=CB_POINC, save_end=false, tol=1e-13), vbp_kin) #hide
 fl_m = floquet_rate(PM4.integrate(PM4.build_u(; dτ=-1), 50, vbp_kin; callback=CB_POINC, save_end=false, tol=1e-13), vbp_kin) #hide
+nothing #hide
 
 # Exhaustive inventory on the fundamental domain (modulo S(α,τ,dα,dτ) = (-α, τ+π, -dα, dτ))
 const BK_M, BK_NSEEDS = 10, 100
@@ -275,7 +282,7 @@ for u0 in seeds #hide
     qmc_counts[minimum(d) < 1e-3 ? argmin(d) : 3] += 1 #hide
 end #hide
 
-#Plots: transient time series & convergence #hide
+# Transient settling onto the pumping cycle
 sol_trans = PM4.integrate(PM4.build_u(; dτ=1), 10, vbp_kin; save_everystep=true) #hide
 save_fig(plot_time_series(sol_trans), "time_series_4D") #hide
 
@@ -302,8 +309,9 @@ const SENSE_OPT = +
 const SYMS_OPT = [:l, :I, :b, :Δφ]
 const LOWER_OPT = [15.0, 62.0, 1.0, deg2rad(10.0)]
 const UPPER_OPT = [200.0, 1.0e6, 1.0e6, deg2rad(90.0)]
+nothing #hide
 
-# Warm-up + timed solve #hide
+# Warm-up, then the timed solve
 with_logger(NullLogger()) do #hide
     OPT.optimize(p_kin, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=120.0) #hide
 end #hide
@@ -317,7 +325,8 @@ p_opt[SYMS_OPT] .= sol_opt.params[SYMS_OPT]
 
 lc_opt = LC.compute_limit_cycle(PMP.build_vbpara(p_opt); sense=SENSE_OPT, tol=TOL_OPT, save_everystep=true)
 m_opt = cycle_metrics(lc_opt)
-res_opt = norm(LC.endpoint_residuals(lc_opt; sense=SENSE_OPT))
+res_opt = lc_opt === nothing ? NaN : norm(LC.endpoint_residuals(lc_opt; sense=SENSE_OPT))
+nothing #hide
 
 fig_ts = plot_time_series_grid((lc_p, lc_opt); titles=("Kinetic baseline", "Dynamic optimum")) #hide
 save_fig(fig_ts, "optimization_timeseries_all") #hide
@@ -346,13 +355,13 @@ Note that peak tension at the optimum (**$(round(m_opt.Tmax / 1000; digits=2)) k
 
 # ### Local Landscape, Shape Sensitivity ($\Delta\theta, \Delta\varphi$), and Wind Robustness
 
-clamp_guess(::Nothing) = (;) #hide
+clamp_guess(::Nothing) = (;)
 clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6), dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6), #hide
     dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6), tf=clamp(s.tf, 1.1e-3, 99.0), P=clamp(s.P, 1.1e-3, 9.9e4)) #hide
+nothing #hide
 
-# 1. Local 1D landscape around Θ* (±10%) #hide
-println(stderr, "[paper] landscape...") #hide
-xs_land = range(0.9, 1.1, length=21) #hide
+# Local landscape around the optimum, one parameter at a time (±10 %)
+xs_land = range(0.9, 1.1, length=21)
 land_ys = [begin #hide
     row = [begin #hide
         q = copy(p_opt); q[sym] = x * p_opt[sym] #hide
@@ -361,51 +370,64 @@ land_ys = [begin #hide
     end for x in xs_land] #hide
     row ./ row[11] #hide
 end for sym in SYMS_OPT] #hide
+nothing #hide
 
-# 2. Δθ sweep (2° to 20°), fixed Θ* vs re-optimized #hide
-println(stderr, "[paper] dtheta sweep...") #hide
-dtheta_angles = collect(range(2.0, 20.0, length=10)) #hide
+# Δθ sweep, 2° to 20°: Θ held at the optimum against Θ re-optimized at each angle
+dtheta_angles = collect(range(2.0, 20.0, length=10))
 dtheta_fixed = [begin #hide
     q = copy(p_opt); q.Δθ = deg2rad(a) #hide
     sol = LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(q); tol=TOL_OPT, save_everystep=true, tf=100.0) #hide
     (; Δθ=a, cycle_metrics(sol)...) #hide
 end for a in dtheta_angles] #hide
+nothing #hide
 
-i0_dt = argmin(abs.(dtheta_angles .- rad2deg(p_opt.Δθ))) #hide
+i0_dt = argmin(abs.(dtheta_angles .- rad2deg(p_opt.Δθ)))
 dtheta_reopt = Vector{Any}(undef, length(dtheta_angles)) #hide
 p_dt_at = Vector{Any}(undef, length(dtheta_angles)) #hide
 sol_dt_at = Vector{Any}(undef, length(dtheta_angles)) #hide
+function attempt_dt!(i, st_p, g) #hide
+    q = copy(st_p); q.Δθ = deg2rad(dtheta_angles[i]) #hide
+    try #hide
+        s, st, _ = with_logger(NullLogger()) do #hide
+            OPT.optimize(q, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=60.0, initial_guess=g) #hide
+        end #hide
+        p_new = copy(q); p_new[SYMS_OPT] .= s.params[SYMS_OPT] #hide
+        return (p=p_new, status=st.status, sol=s, P=s.P) #hide
+    catch #hide
+        return (p=copy(q), status=:error, sol=nothing, P=NaN) #hide
+    end #hide
+end #hide
 function run_dt!(i, prev) #hide
-    starts = prev === nothing ? ((p_opt, (;)),) : ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)), (p_opt, clamp_guess(sol_dt_at[i0_dt]))) #hide
+    starts = prev === nothing ? ((p_opt, (;)),) : ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)), (p_opt, clamp_guess(sol_dt_at[i0_dt])), (p_opt, (;))) #hide
+    fixed_P = dtheta_fixed[i].P     # Θ held at the nominal: always feasible, so a lower P is another branch #hide
     best = nothing #hide
     for (k, (st_p, g)) in enumerate(starts) #hide
-        k == length(starts) && best !== nothing && best.status == :first_order && break #hide
-        q = copy(st_p); q.Δθ = deg2rad(dtheta_angles[i]) #hide
-        r = try #hide
-            s, st, _ = with_logger(NullLogger()) do #hide
-                OPT.optimize(q, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=15.0, initial_guess=g) #hide
-            end #hide
-            p_new = copy(q); p_new[SYMS_OPT] .= s.params[SYMS_OPT] #hide
-            (p=p_new, status=st.status, sol=s, P=s.P) #hide
-        catch; (p=copy(q), status=:error, sol=nothing, P=NaN) end #hide
+        r = attempt_dt!(i, st_p, g) #hide
         if r.status == :first_order && (best === nothing || best.status != :first_order || r.P > best.P) #hide
             best = r #hide
         elseif best === nothing #hide
             best = r #hide
         end #hide
+        k == length(starts) && break #hide
+        best.status == :first_order && best.P >= fixed_P * (1 - 1e-3) && break #hide
     end #hide
+    best.status == :first_order && best.P >= fixed_P * (1 - 1e-3) || #hide
+        @warn "Δθ = $(dtheta_angles[i])°: best re-optimization does not beat the fixed Θ" best.status best.P fixed_P #hide
     p_dt_at[i], sol_dt_at[i] = best.p, best.sol #hide
-    sol = LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(best.p); tol=TOL_OPT, save_everystep=true, tf=100.0) #hide
-    dtheta_reopt[i] = (; Δθ=dtheta_angles[i], cycle_metrics(sol)...) #hide
+    if best.status == :first_order #hide
+        sol = LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(best.p); tol=TOL_OPT, save_everystep=true, tf=100.0) #hide
+        dtheta_reopt[i] = (; Δθ=dtheta_angles[i], cycle_metrics(sol)...) #hide
+    else #hide
+        dtheta_reopt[i] = (; Δθ=dtheta_angles[i], cycle_metrics(nothing)...)   # no solved point: a gap, not a bogus power #hide
+    end #hide
 end #hide
 run_dt!(i0_dt, nothing) #hide
 for i in (i0_dt-1):-1:1; run_dt!(i, (p=p_dt_at[i+1], sol=sol_dt_at[i+1])); end #hide
 for i in (i0_dt+1):length(dtheta_angles); run_dt!(i, (p=(i == i0_dt + 1 ? p_opt : p_dt_at[i-1]), sol=(i == i0_dt + 1 ? sol_dt_at[i0_dt] : sol_dt_at[i-1]))); end #hide
 
-# 3. 10×10 shape map over (Δθ, Δφ) at optimal (ℓ, I, b) #hide
-println(stderr, "[paper] shape map...") #hide
-shape_factors = range(0.8, 1.2, length=10) #hide
-shape_dphi = range(10.0, 90.0, length=10) #hide
+# 10×10 shape map over (Δθ, Δφ), at the optimal (ℓ, I, b) and with nothing re-optimized
+shape_factors = range(0.8, 1.2, length=10)
+shape_dphi = range(10.0, 90.0, length=10)
 P_map = fill(NaN, 10, 10); Tmax_map = fill(NaN, 10, 10); amax_map = fill(NaN, 10, 10) #hide
 for (j, dphi) in enumerate(shape_dphi), (i, f) in enumerate(shape_factors) #hide
     q = copy(p_opt); q.Δθ = f * p_opt.Δθ; q.Δφ = deg2rad(dphi) #hide
@@ -415,8 +437,7 @@ for (j, dphi) in enumerate(shape_dphi), (i, f) in enumerate(shape_factors) #hide
     P_map[j, i], Tmax_map[j, i], amax_map[j, i] = m.P / 1000, m.Tmax / 1000, m.amax #hide
 end #hide
 
-# 4. Wind sweep 5..15 m/s #hide
-println(stderr, "[paper] wind sweep...") #hide
+# Wind sweep, 5 to 15 m/s: the 9 m/s optimum held fixed against Θ re-optimized
 winds = collect(range(5.0, 15.0, length=11))
 i_ref_w = findfirst(>=(WIND_REF), winds) #hide
 w_fixed = Vector{Any}(undef, length(winds)) #hide
@@ -424,27 +445,52 @@ w_opt = Vector{Any}(undef, length(winds)) #hide
 w_theta = Vector{Vector{Float64}}(undef, length(winds)) #hide
 w_sols = Vector{Any}(undef, length(winds)) #hide
 w_ok = falses(length(winds)) #hide
-function run_w!(i, p_init_w, g=(;)) #hide
-    pf = copy(p_opt); pf.w0 = winds[i] #hide
-    w_fixed[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(pf); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
+function attempt_w!(i, p_init_w, g) #hide
     p0w = copy(p_init_w); p0w.w0 = winds[i] #hide
     s, st, _ = with_logger(NullLogger()) do #hide
         OPT.optimize(p0w, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=15.0, initial_guess=g) #hide
     end #hide
     pw = copy(p0w); pw[SYMS_OPT] .= s.params[SYMS_OPT] #hide
-    w_opt[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(pw); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
-    w_theta[i] = collect(pw[SYMS_OPT]); w_sols[i] = s; w_ok[i] = (st.status == :first_order) #hide
+    return (p=pw, status=st.status, sol=s, P=s.P) #hide
+end #hide
+"Starts at wind speed `i`: the reference, then the already-solved neighbour." #hide
+function w_starts(i) #hide
+    i == i_ref_w && return ((p_opt, (;)),) #hide
+    j = i < i_ref_w ? i + 1 : i - 1 #hide
+    isassigned(w_theta, j) || return ((p_opt, (;)),) #hide
+    g = clamp_guess(w_sols[j]) #hide
+    return ((p_opt, (;)), ((p=copy(p_opt); p[SYMS_OPT] .= w_theta[j]; p), g), (p_opt, g)) #hide
+end #hide
+function solve_w!(i) #hide
+    pf = copy(p_opt); pf.w0 = winds[i] #hide
+    w_fixed[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(pf); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
+    best = nothing #hide
+    for (p0, g) in w_starts(i) #hide
+        r = attempt_w!(i, p0, g) #hide
+        r.status == :first_order || continue #hide
+        (best === nothing || r.P > best.P) && (best = r) #hide
+        r.P >= w_fixed[i].P * (1 - 1e-3) && break   # keeping p_opt is feasible: a lower P is another branch #hide
+    end #hide
+    if best === nothing #hide
+        w_opt[i] = cycle_metrics(nothing); w_ok[i] = false; return nothing #hide
+    end #hide
+    w_opt[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(best.p); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
+    w_theta[i] = collect(best.p[SYMS_OPT]); w_sols[i] = best.sol #hide
+    w_ok[i] = w_opt[i].P >= w_fixed[i].P * (1 - 1e-3) #hide
+    return nothing #hide
 end #hide
 for i in i_ref_w:-1:1 #hide
-    run_w!(i, p_opt) #hide
-    !w_ok[i] && i < i_ref_w && run_w!(i, (p=copy(p_opt); p[SYMS_OPT] .= w_theta[i+1]; p), clamp_guess(w_sols[i+1])) #hide
+    solve_w!(i) #hide
 end #hide
 for i in (i_ref_w+1):length(winds) #hide
-    run_w!(i, p_opt) #hide
-    !w_ok[i] && run_w!(i, (p=copy(p_opt); p[SYMS_OPT] .= w_theta[i-1]; p), clamp_guess(w_sols[i-1])) #hide
+    solve_w!(i) #hide
+end #hide
+for i in eachindex(winds) #hide
+    w_ok[i] && continue #hide
+    @warn "wind sweep at $(winds[i]) m/s: best re-optimization does not beat the fixed parameters" w_opt[i].P w_fixed[i].P #hide
 end #hide
 
-# Figures for Section 4 #hide
+# Figures of this subsection
 f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
 plot!(f_dtheta_p, dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_reopt]; c=:black, label="Θ re-optimized") #hide
 f_dtheta_t = plot(dtheta_angles, [d.Tmax / 1000 for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="", xlabel="Δθ (deg)", ylabel="Line tension (kN)") #hide
@@ -452,13 +498,11 @@ scatter!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_fixed]; c=:bl
 plot!(f_dtheta_t, dtheta_angles, [d.Tmax / 1000 for d in dtheta_reopt]; c=:black, label="", fillrange=[d.Tmin / 1000 for d in dtheta_reopt], fillalpha=0.1) #hide
 plot!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_reopt]; c=:black, label="") #hide
 save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=6Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
-
 x_map = 100 .* (shape_factors .- 1) #hide
 p_s1 = heatmap(x_map, shape_dphi, P_map; c=:viridis, title="P (kW)", xlabel="Δθ dev (%)", ylabel="Δφ (deg)") #hide
 p_s2 = heatmap(x_map, shape_dphi, Tmax_map; c=:viridis, title="Tmax (kN)", xlabel="Δθ dev (%)") #hide
 p_s3 = heatmap(x_map, shape_dphi, amax_map; c=:viridis, title="max a (m/s²)", xlabel="Δθ dev (%)") #hide
 save_fig(plot(p_s1, p_s2, p_s3; layout=(1, 3), size=plot_size(4 / 3, 2), bottommargin=5Plots.mm, leftmargin=6Plots.mm), "optimization_shape_grid") #hide
-
 f_wp = plot(winds, [s.P / 1000 for s in w_fixed]; ls=:dot, c=:black, label="Fixed 9 m/s", ylabel="Power (kW)") #hide
 plot!(f_wp, winds, [s.P / 1000 for s in w_opt]; c=1, label="Re-optimized") #hide
 f_wt = plot(winds, [s.Tmax / 1000 for s in w_fixed]; ls=:dot, c=:black, label="", ylabel="Tension (kN)") #hide
@@ -468,12 +512,14 @@ plot!(f_wt, winds, [s.Tmin / 1000 for s in w_opt]; c=1, label="") #hide
 theta_norm = [θ ./ maximum(θ) for θ in invert(w_theta)] #hide
 f_wpar = plot(winds, theta_norm; c=permutedims(1:4), label=["ℓ" "I" "b" "Δφ"], xlabel="Wind speed (m/s)", ylabel="Norm. params", legend=:right) #hide
 save_fig(plot(f_wp, f_wt, f_wpar; layout=(3, 1), size=plot_size(2, 1), leftmargin=10Plots.mm, bottommargin=4Plots.mm), "optimization_wind_sweep_all") #hide
-
 gain_5 = (w_opt[1].P / w_fixed[1].P - 1) * 100 #hide
 gain_15 = (w_opt[end].P / w_fixed[end].P - 1) * 100 #hide
+dt_valid = filter(d -> isfinite(d.P), dtheta_reopt) #hide
+dt_best = isempty(dt_valid) ? NaN : maximum(d -> d.P, dt_valid) #hide
+dt_failed = count(d -> !isfinite(d.P), dtheta_reopt) #hide
 Markdown.parse("""
 - **Local landscape (±10% around \$\\Theta^*\$):** \$\\ell\$ is the stiffest direction (**$(round((land_ys[1][1] - 1) * 100; digits=1))%** at \$-10\\%\$, **$(round((land_ys[1][end] - 1) * 100; digits=1))%** at \$+10\\%\$), followed by \$\\Delta\\varphi\$ (**$(round((land_ys[4][1] - 1) * 100; digits=1))%** / **$(round((land_ys[4][end] - 1) * 100; digits=1))%**), \$I\$ (**$(round((land_ys[2][1] - 1) * 100; digits=1))%**), and \$b\$ (**$(round((land_ys[3][1] - 1) * 100; digits=1))%**).
-- **Why \$\\Delta\\theta = 6^\\circ\$ is held fixed:** across \$\\Delta\\theta \\in [2^\\circ, 20^\\circ]\$, re-optimizing \$\\Theta\$ peaks at **$(round(maximum(d -> d.P, dtheta_reopt) / 1000; digits=2)) kW** (only **+$(round((maximum(d -> d.P, dtheta_reopt) / m_opt.P - 1) * 100; digits=1))%** above \$6^\\circ\$), while the \$10\\times 10\$ shape map shows power is governed by a narrow \$\\Delta\\varphi\$ band near \$19^\\circ\$ (peaking at **$(round(maximum(filter(isfinite, P_map)); digits=2)) kW**).
+- **Why \$\\Delta\\theta = 6^\\circ\$ is held fixed:** continuing the \$\\Theta\$ optimum from one angle to the next over \$\\Delta\\theta \\in [2^\\circ, 20^\\circ]\$, the re-optimized branch peaks at **$(round(dt_best / 1000; digits=2)) kW** (only **+$(round((dt_best / m_opt.P - 1) * 100; digits=1))%** above the \$6^\\circ\$ point)$(dt_failed == 0 ? "" : " — $(dt_failed) of $(length(dtheta_angles)) angles did not converge and are left out"), while the \$10\\times 10\$ shape map shows power is governed by a narrow \$\\Delta\\varphi\$ band near \$19^\\circ\$ (peaking at **$(round(maximum(filter(isfinite, P_map)); digits=2)) kW**).
 - **Wind robustness (\$5\\text{--}15\\,\\text{m/s}\$):** expected power scales from **$(round(w_opt[1].P / 1000; digits=2)) kW** (\$5\\,\\text{m/s}\$) to **$(round(w_opt[end].P / 1000; digits=2)) kW** (\$15\\,\\text{m/s}\$). Holding the \$9\\,\\text{m/s}\$ optimum fixed gives up only **$(round(gain_5; digits=1))%** at \$5\\,\\text{m/s}\$ and **$(round(gain_15; digits=1))%** at \$15\\,\\text{m/s}\$—confirming strong robustness without mechanical reconfiguration.
 
 ![Δθ sensitivity](figs/optimization_dtheta.png)

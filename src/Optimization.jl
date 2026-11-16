@@ -101,8 +101,9 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 - `optim_para_upper`: A vector of `Float64` specifying the upper bounds for the
   `optim_para_syms` *in their physical units*.
 - `sense`: + for rising on the sides of the lemniscate, - for kite dropping on the sides
-- `tol`: Absolute/relative tolerance for the ODE solver. The optimization
-  solver's tolerance will be `sqrt(tol)`.
+- `tol`: Absolute/relative tolerance for the ODE solver. The dynamics inside the
+  non-linear constraints is integrated at `tol / 10`, and Ipopt is called with
+  tolerance `tol`.
 - `max_wall_time`: Maximum wall-clock time in seconds for the Ipopt solver.
 - `linear_solver`: The linear solver to use for the Ipopt solver, cf. https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_Linear_Solver. Defaults to "mumps".
 - `initial_guess`: A `NamedTuple`, `Dict`, or `ComponentArray` specifying initial starting values in **physical units**. This can partially or fully overwrite the baseline limit cycle guess. Because it accepts and returns physical dimensions, the returned `solution` can be passed directly into this argument for iterative refinements. Defaults to an empty NamedTuple `(;)`.
@@ -192,10 +193,15 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     ## Contraintes de raccordement en bout de cycle
     lc = uc = zero(cons(optim_vars, vbp))
 
-    symbols_not_in_bounds = [s for s in keys(optim_vars) if !(lb[s] < optim_vars[s] < ub[s])]
-    if length(symbols_not_in_bounds) > 0
-        s = first(symbols_not_in_bounds)
-        @assert false "Optimization variable $s with value $(optim_vars[s]) is not in bounds [$(lb[s]), $(ub[s])]."
+    # Ipopt needs the starting point strictly inside the box, but a warm start taken
+    # from a bound-active solution sits exactly on the bound. Compare the flat vectors:
+    # `keys(optim_vars)` collapses the nested `params` field to one key, so a
+    # per-symbol check cannot see a parameter sitting on its bound.
+    x0, lo, hi = collect(optim_vars), collect(lb), collect(ub)
+    outside = .!((lo .< x0) .& (x0 .< hi))
+    if any(outside)
+        @warn "optimize: initial guess clamped into the box" idxs = findall(outside) value = x0[outside] lower = lo[outside] upper = hi[outside]
+        optim_vars = CA(clamp.(x0, nextfloat.(lo), prevfloat.(hi)), OPT_VARS_AXES)
     end
     @assert all(lc .<= uc) "Non-linear constraints are not feasible"
 

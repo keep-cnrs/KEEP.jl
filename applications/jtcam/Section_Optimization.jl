@@ -84,8 +84,12 @@ const UNITS = Dict(:l => "m", :I => "kg m²", :b => "N m deg s⁻¹",
     :Δθ => "deg", :Δφ => "deg")
 
 ## Helpers
-"Average power, line-tension extrema, peak kite acceleration and period of a cycle."
+"""
+Average power, line-tension extrema, peak kite acceleration and period of a cycle."""
 function cycle_stats(sol; n=2001)
+    # `compute_limit_cycle` returns `nothing` when no periodic orbit was found: report
+    # NaN instead of crashing, so the caller treats the point as a failure.
+    sol === nothing && return (; P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, period=NaN)
     ts = range(sol.t[1], sol.t[end], n)
     us = sol.(ts)
     p = sol.prob.p
@@ -133,15 +137,21 @@ end
 
 """
 Wind sweep: hold `p_ref` fixed, or re-optimize `syms` inside `lower`/`upper` at
-each wind speed, marching outward from the reference wind `i_ref`. Each point is
-first solved from the 9 m/s optimum; if that does not converge, it is retried
-from the neighbouring wind's optimum, with its cycle states as Ipopt's initial
-guess as well as its parameters. The wide boxes make the objective multimodal,
-so neither start alone succeeds at every wind speed.
+each wind speed, marching outward from the reference wind `i_ref`.
+
+Keeping `p_ref` is a feasible point of the optimization at every wind speed, so
+a re-optimization that converges *below* the fixed curve is not the maximum
+there: it is a different branch. Each wind speed therefore tries its starts in
+order (the reference, then the neighbouring wind's optimum with its cycle states
+as Ipopt's initial guess), keeps the best of them, and stops as soon as one
+beats the fixed curve; if none does, the point is kept and a warning is emitted.
+The wide boxes make the objective multimodal, so no single start succeeds at
+every wind speed.
+
 Returns the statistics with and without re-optimization and the optimized
 parameters.
 """
-function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
+function wind_sweep(syms, p_ref, winds, lower, upper, i_ref; rtol=1e-3)
     n = length(winds)
     no_opt = Vector{Any}(undef, n)
     opt = Vector{Any}(undef, n)
@@ -149,26 +159,46 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref)
     sols = Vector{Any}(undef, n)
     ok = falses(n)
     from_theta(θ) = (p=copy(p_ref); p[syms].=θ; p)
-    function run!(i, p0, guess=(;), wall=SWEEP_WALL_TIME)
-        r = compute_results(:w0, winds[i];
-            syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
-            wall=wall, guess=guess)
-        no_opt[i], opt[i], theta[i], sols[i] = r[1], r[2], r[3], r[5]
-        ok[i] = r[4].status == :first_order
+    guess_of(j) = isassigned(sols, j) ? clamp_guess(sols[j]) : (;)
+
+    "Starts at wind speed `i`: the reference, then the already-solved neighbour."
+    function starts(i)
+        i == i_ref && return ((p_ref, (;)),)
+        j = i < i_ref ? i + 1 : i - 1
+        isassigned(theta, j) || return ((p_ref, (;)),)
+        return ((p_ref, (;)), (from_theta(theta[j]), guess_of(j)), (p_ref, guess_of(j)))
     end
+
+    function solve!(i)
+        best = nothing
+        for (p0, guess) in starts(i)
+            r = compute_results(:w0, winds[i];
+                syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
+                wall=SWEEP_WALL_TIME, guess=guess)
+            r[4].status == :first_order || continue
+            (best === nothing || r[2].P > best[2].P) && (best = r)
+            # Keeping `p_ref` is always feasible, so the optimum cannot be below the
+            # fixed curve: a converged point below it is another branch, try the next start.
+            r[2].P >= r[1].P * (1 - rtol) && break
+        end
+        best === nothing && return (ok[i] = false)
+        no_opt[i], opt[i], theta[i], sols[i] = best[1], best[2], best[3], best[5]
+        ok[i] = opt[i].P >= no_opt[i].P * (1 - rtol)
+        return nothing
+    end
+
     for i in i_ref:-1:1
         @info "  wind sweep $(i)/$(n): $(winds[i]) m/s"
-        run!(i, p_ref)
-        !ok[i] && i < i_ref &&
-            run!(i, from_theta(theta[i+1]), clamp_guess(sols[i+1]))
+        solve!(i)
     end
     for i in (i_ref+1):n
         @info "  wind sweep $(i)/$(n): $(winds[i]) m/s"
-        run!(i, p_ref)
-        !ok[i] && run!(i, from_theta(theta[i-1]), clamp_guess(sols[i-1]))
+        solve!(i)
     end
     for i in eachindex(winds)
-        ok[i] || @warn "re-optimization at $(winds[i]) m/s did not converge"
+        ok[i] && continue
+        isassigned(opt, i) || (@warn "wind sweep at $(winds[i]) m/s: no converged re-optimization"; continue)
+        @warn "wind sweep at $(winds[i]) m/s: best re-optimization ($(round(opt[i].P / 1000; digits=3)) kW) does not beat the fixed parameters ($(round(no_opt[i].P / 1000; digits=3)) kW)"
     end
     return (; syms, no_opt, opt, theta)
 end
@@ -229,13 +259,16 @@ nominal angle `i0`. The objective is multimodal and a single start is not
 reliable: 4° needs the nominal cycle states as initial guess, and at 2° a plain
 start from 4° converges to a box-corner local optimum (7.3 kW against 12.8). So
 each angle tries, in order, the neighbour's optimum with the neighbour's cycle
-states, the same parameters cold, and `p_ref` with the nominal's states, and
-keeps the best converged average power; `walls` are the per-attempt wall-clock
-caps. Statistics come from `dtheta_study` at the solved point, i.e. from the
-same dτ > 0 cycle as the fixed curve.
+states, the same parameters cold, `p_ref` with the nominal's states, and `p_ref`
+cold (the cycle-state guess can be worse than none at a distant angle), keeps
+the best converged average power, and stops as soon as one beats the fixed-`Θ`
+value at that angle (which is always feasible, so nothing below it can be the
+optimum); `walls` are the per-attempt wall-clock caps. A point where every start
+fails is reported as `NaN`, not as a gain. Statistics come from `dtheta_study`
+at the solved point, i.e. from the same dτ > 0 cycle as the fixed curve.
 """
 function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; i0,
-    walls=(60.0, 60.0, 90.0))
+    walls=(60.0, 60.0, 60.0, 90.0), rtol=1e-3)
     n = length(angles_deg)
     stats = Vector{Any}(undef, n)
     p_at = Vector{Any}(undef, n)
@@ -257,12 +290,12 @@ function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; i0,
     end
     function run!(i, prev)
         @info "  Δθ re-optimization $(i)/$(n): $(angles_deg[i])°"
+        fixed = only(dtheta_study(p_ref, [angles_deg[i]]))   # Θ held at the nominal
         starts = prev === nothing ? ((p_ref, (;)),) :
             ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)),
-             (p_ref, clamp_guess(sols[i0])))
+             (p_ref, clamp_guess(sols[i0])), (p_ref, (;)))
         best = nothing
         for (k, (start, g)) in enumerate(starts)
-            k == length(starts) && best !== nothing && best.status == :first_order && break
             r = attempt(i, start, g, walls[k])
             if r.status == :first_order &&
                (best === nothing || best.status != :first_order || r.P > best.P)
@@ -270,11 +303,19 @@ function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; i0,
             elseif best === nothing
                 best = r
             end
+            k == length(starts) && break
+            # Holding Θ at the nominal is always feasible, so a converged point below
+            # the fixed-Θ value at this angle is another branch: try the next start.
+            best.status == :first_order && best.P >= fixed.P * (1 - rtol) && break
         end
-        best.status == :first_order ||
-            @warn "re-optimization at Δθ = $(angles_deg[i])° did not converge" best.status
+        if best.status != :first_order || best.P < fixed.P * (1 - rtol)
+            @warn "re-optimization at Δθ = $(angles_deg[i])° does not beat the fixed Θ ($(round(fixed.P / 1000; digits=3)) kW)" best.status best.P
+        end
         p_at[i], sols[i] = best.p, best.sol
-        stats[i] = only(dtheta_study(best.p, [angles_deg[i]]))
+        # A timed-out solve leaves half-converged parameters: report a gap rather than a
+        # bogus power for a point that was never solved.
+        stats[i] = best.status == :first_order ? only(dtheta_study(best.p, [angles_deg[i]])) :
+            (; Δθ=angles_deg[i], P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, period=NaN)
         return nothing
     end
     run!(i0, nothing)
@@ -333,8 +374,12 @@ function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
     power(sym, x) = begin
         q = copy(p)
         q[sym] = x * p[sym]
-        lc = LC.compute_limit_cycle(PMP.build_vbpara(q); sense=SENSE, tol=tol)
-        return lc.u[end][5] / lc.t[end]
+        lc = try
+            LC.compute_limit_cycle(PMP.build_vbpara(q); sense=SENSE, tol=tol)
+        catch
+            nothing        # no closed cycle with this sign: report a gap, not a crash
+        end
+        return lc === nothing ? NaN : lc.u[end][5] / lc.t[end]
     end
     vals = [power(sym, x) for sym in syms, x in xs]
     k0 = findmin(abs.(xs .- 1))[2]  # the optimum, where the landscape is normalized

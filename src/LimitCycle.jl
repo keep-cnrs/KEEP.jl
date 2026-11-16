@@ -87,8 +87,9 @@ Return a callback that saves the states when passing through section = 0. If two
 function build_poincare_callback(tol=DEFAULT_TOLERANCE; section=poincare_section)
     # `abstol` is not a root-find tolerance: it is the re-trigger guard of
     # DiffEqBase.nudge_tprev. Below ~eps(t) the guard stops working, the same crossing
-    # is saved twice, and the shooting then has T = 0.
-    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=max(tol / 10, 1e-12))
+    # is saved twice, and the shooting then has T = 0. It must stay finite: `tol = Inf`
+    # means "stop at the first crossing" and must not become an infinite tolerance.
+    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=clamp(tol / 10, 1e-12, 1e-3))
 end
 
 
@@ -162,11 +163,33 @@ function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, kwargs...)
     sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
     shooting = build_shooting(sol)
     shooting === nothing && return nothing
-    return shoot(shooting, vbp; tol=tol, kwargs...)
+    lc = shoot(shooting, vbp; tol=tol, kwargs...)
+    # `build_shooting` keeps the last two section crossings, which are unrelated when the
+    # trajectory has not settled: check that what comes back closes on itself, in the
+    # direction it actually travels, before handing it out as a limit cycle.
+    sense = shooting[3] > 0 ? (+) : (-)
+    res = maximum(abs, endpoint_residuals(lc; sense=sense))
+    if res > max(100tol, 1e-6)
+        @error "compute_limit_cycle: the trajectory is not a limit cycle" res T = lc.t[end] Δτ = lc.u[end][2] - lc.u[1][2] dτ0 = shooting[3] tol
+        return nothing
+    end
+    return lc
 end
+
+"""
+Compute the attracting limit cycle with `sense(dτ) > 0`, by integrating from the
+Poincaré-section state `u0 = (α, τ, dα, dτ) = (0, TAU0, 0, sense(1))`.
+
+Both pumping cycles are attracting, so the sign of `dτ` selects one and the
+magnitude of the seed only needs to be a reasonable guess. Use `all_limit_cycles`
+for an inventory of every cycle in a box; the two calls are independent."""
 function compute_limit_cycle(vbp; sense, tol=DEFAULT_TOLERANCE, kwargs...)
-    all_lcs = all_limit_cycles(vbp; tol=tol, kwargs...)
-    return first(filter(lc -> sense(lc.u[1][4]) > 0, all_lcs))
+    u0 = PM4.build_u(; dτ=sense(1.0))
+    lc = compute_limit_cycle(u0, vbp; tol=tol, kwargs...)
+    lc === nothing &&
+        error("compute_limit_cycle: no closed limit cycle with dτ = $(sense(1.0)) (never settled, or not periodic)")
+    sense(lc.u[1][4]) > 0 || error("compute_limit_cycle: converged to a cycle with dτ of the wrong sign")
+    return lc
 end
 
 
@@ -182,14 +205,15 @@ Comptue all limit cycles by sampling `N` initial conditions within a region of t
  - A rough integration with low precision (sqrt(tol))
  - Clusterize and take centroids
  - Integrate each centroid with high precision (tol)"""
-function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=5, N=100, tol=DEFAULT_TOLERANCE, kwargs...)
+function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=10, N=100, tol=DEFAULT_TOLERANCE, kwargs...)
     dαmin, dαmax = dτmin, dτmax = -vmax, vmax
 
     samples = sample(N, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
     u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
-    # `build_shooting` returns `nothing` for a seed that diverges, and the clustering cannot use it.
-    rough_shootings = filter(!isnothing,
-        [build_shooting(compute_limit_cycle(u0, vbp; tol=sqrt(tol))) for u0 in u0s])
+    # A seed that diverges, or whose trajectory does not close, returns `nothing` and
+    # the clustering cannot use it.
+    rough = [compute_limit_cycle(u0, vbp; tol=sqrt(tol)) for u0 in u0s]
+    rough_shootings = filter(!isnothing, [lc === nothing ? nothing : build_shooting(lc) for lc in rough])
     isempty(rough_shootings) && error("no limit cycle seed converged")
 
     clusters = dbscan(reduce(hcat, rough_shootings), 100sqrt(tol))
