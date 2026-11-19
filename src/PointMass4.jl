@@ -1,7 +1,7 @@
 module PointMass4
 
-import LinearAlgebra: norm, normalize, ⋅, ×
-using StaticArrays
+import LinearAlgebra: norm, normalize, ⋅, ×, dot
+using StaticArrays: SA, SMatrix, @SMatrix, StaticArrays
 import NaNMath as nm
 import OrdinaryDiffEqVerner: Vern9
 import ForwardDiff
@@ -12,7 +12,7 @@ using KEEP.TorqueFunction
 using KEEP.Integrate: _integrate
 import KEEP: DEFAULT_TOLERANCE, TAU0
 
-export dynamics, integrate, build_u, kite_acceleration
+export dynamics, integrate, integrate_verified, build_u, kite_acceleration
 
 @doc raw"""
 Compute the jacobian of `f` at `x`.
@@ -90,12 +90,18 @@ end
 
 
 @doc raw"""
-Compute du, the evolution of the state.
+Compute du with automatic differentiation: the reference implementation.
+
+Same model as [`dynamics`](@ref), but every kinematic derivative is obtained by
+`ForwardDiff` in the right-hand side (six AD calls per evaluation). It is kept as
+the independent check of the closed form, and as the `rhs = :verified` backend of
+`KEEP.Optimization.optimize`. Do not delete it: it is what the equivalence test
+compares against.
 
 u = (α, τ, dα, dτ)
 du = (dα, dτ, ddα, ddτ)
 """
-function dynamics(u, p, t=0)
+function _dynamics_verified(u, p, t=0)
     L, M, T = lmt(p)
     α, _ = q = u[SA[1, 2]]
     dα, _ = dq = u[SA[3, 4]]
@@ -156,6 +162,136 @@ function dynamics(u, p, t=0)
     return SA[dq[1], dq[2], ddq[1], ddq[2], instantaneous_power]
 end
 
+@doc raw"""
+θ, φ and their first two τ-derivatives (eq. 4 and 10 of `pm2-model-derivation-reworked.tex`).
+"""
+function _sph_derivs(τ, p)
+    θ = p.θ0 + p.Δθ * sin(2τ)
+    φ = p.φ0 + p.Δφ * sin(τ)
+    θp = 2p.Δθ * cos(2τ)
+    θpp = -4p.Δθ * sin(2τ)
+    φp = p.Δφ * cos(τ)
+    φpp = -p.Δφ * sin(τ)
+    return θ, φ, θp, θpp, φp, φpp
+end
+
+@doc raw"""
+Explicit kinematics of the cone constraint, eq. (6)–(30): `R = r(α,τ)`, its first
+derivatives `R_α, R_τ`, its Hessian `HR`, and the lemniscate frame
+`rhat, rhatp, rhatpp`. Closed form, no automatic differentiation.
+"""
+function _kinematics(α, τ, p)
+    L, _, _ = lmt(p)
+    A = L
+    ELL = L * p.l
+    θ, φ, θp, θpp, φp, φpp = _sph_derivs(τ, p)
+    sψ, cψ = sincos(φ - α)
+    sθ, cθ = sincos(θ)
+    sφ, cφ = sincos(φ)
+
+    p_ = A * sθ * cψ
+    Δ = nm.sqrt(p_^2 + ELL^2 - A^2)
+    R = p_ + Δ
+
+    p_α = A * sθ * sψ
+    p_τ = A * (θp * cθ * cψ - φp * sθ * sψ)
+    p_αα = -p_
+    p_ατ = A * (θp * cθ * sψ + φp * sθ * cψ)
+    p_ττ = A * ((θpp * cθ - (θp^2 + φp^2) * sθ) * cψ -
+                2θp * φp * cθ * sψ - φpp * sθ * sψ)
+
+    Rp = R / Δ
+    R_α = Rp * p_α
+    R_τ = Rp * p_τ
+    Rpp = (ELL^2 - A^2) / Δ^3
+    HR = @SMatrix [Rp*p_αα+Rpp*p_α^2  Rp*p_ατ+Rpp*p_α*p_τ
+                   Rp*p_ατ+Rpp*p_α*p_τ Rp*p_ττ+Rpp*p_τ^2]
+
+    rhat = SA[sθ * cφ, sθ * sφ, cθ]
+    ahat = SA[cos(α), sin(α), zero(α)]
+    rhatp = SA[θp * cθ * cφ - φp * sθ * sφ,
+        θp * cθ * sφ + φp * sθ * cφ,
+        -θp * sθ]
+    nrhatp2 = θp^2 + sθ^2 * φp^2
+    eθ = SA[cθ * cφ, cθ * sφ, -sθ]
+    eφ = SA[-sφ, cφ, zero(θ)]
+    rhatpp = -nrhatp2 * rhat + (θpp - φp^2 * sθ * cθ) * eθ +
+             (φpp * sθ + 2θp * φp * cθ) * eφ
+
+    return (; R, Δ, HR, R_α, R_τ, rhat, ahat, rhatp, rhatpp, nrhatp2,
+        θ, φ, θp, φp, A, ELL)
+end
+
+"Forces: aerodynamics on kite and lines, weight, and the generator torque."
+function _forces(k, dq, p)
+    L, M, T = lmt(p)
+    OK = k.R * k.rhat
+    OA = k.A * k.ahat
+    lhat = (OK - OA) / k.ELL                 # loop closure: ‖OK - OA‖ = ℓ exactly
+
+    F_g = SA[0, 0, -p.g - p.m_l * p.l] * M * L * T^-2
+
+    Rdot = k.R_α * dq[1] + k.R_τ * dq[2]
+    D_OK = @SMatrix [k.rhat[1] k.R*k.rhatp[1]
+                     k.rhat[2] k.R*k.rhatp[2]
+                     k.rhat[3] k.R*k.rhatp[3]]
+    kite_speed = D_OK * SA[Rdot, dq[2]]
+
+    wind = SA[abs(OK[3] / (p.z0 * L))^(1 / p.n_wind), 0, 0] * L * T^-1
+    app_wind = wind - kite_speed
+    perp = app_wind - (lhat ⋅ app_wind) * lhat
+    ew = perp / norm(perp)
+    xw = -app_wind / norm(app_wind)
+    yw = lhat × ew
+    zw = xw × yw
+
+    lift_k = norm(app_wind)^2 * (p.c_L * M * L^-1)
+    drag_k = lift_k / p.f
+    drag_l = (p.c_D_l * M * L^-2) * (p.l * L) * norm(perp)^2
+    F_a = (-drag_k * xw - lift_k * zw) + drag_l * ew
+
+    torque = torque_function(dq[1] * T, p) * M * L^2 * T^-2
+    return F_a, F_g, torque, Rdot
+end
+
+@doc raw"""
+Compute du, the evolution of the state — closed-form implementation (default).
+
+Same model as [`_dynamics_verified`](@ref), with the explicit formulas of
+`applications/jtcam/scratch/pm2-model-derivation-reworked.tex` instead of six
+`ForwardDiff` calls per evaluation: **2.33× cheaper per evaluation**, 2.1× on a
+limit-cycle solve, identical to the verified version to 1e-15 (`test/04a`, run by
+`verify_fast_rhs.jl` in the benchmark).
+
+u = (α, τ, dα, dτ)
+du = (dα, dτ, ddα, ddτ)
+"""
+function dynamics(u, p, t=0)
+    L, M, _ = lmt(p)
+    α, τ = u[1], u[2]
+    dα, dτ = u[3], u[4]
+    dq = SA[dα, dτ]
+
+    k = _kinematics(α, τ, p)
+    F_a, F_g, torque, Rdot = _forces(k, dq, p)
+
+    # + 1e-100 mirrors the guard on `l_tension` in `_dynamics_verified`: μ vanishes on
+    # the section seed (α = 0, τ = TAU0), where the arm balance is a removable singularity
+    mu = k.A * k.R / k.ELL * sin(k.θ) * sin(k.φ - α) + 1e-100
+    κ = p.I * M * L^2 / mu
+    Mmat = @SMatrix [M*k.R_α+κ*k.Δ/k.ELL  M*k.R_τ
+                     -κ*k.Δ/k.ELL*k.R_τ   M*k.R^2*k.nrhatp2]
+
+    h1 = -M * (dot(dq, k.HR * dq) - k.R * dτ^2 * k.nrhatp2) +
+         k.rhat ⋅ F_a + k.rhat ⋅ F_g - torque * k.Δ / (mu * k.ELL)
+    h2 = -M * (k.R * (2Rdot * dτ * k.nrhatp2 + k.R * dτ^2 * (k.rhatp ⋅ k.rhatpp))) +
+         (k.R * k.rhatp) ⋅ F_a + (k.R * k.rhatp) ⋅ F_g +
+         torque * k.Δ * k.R_τ / (mu * k.ELL)
+
+    ddq = Mmat \ SA[h1, h2]
+    return SA[dα, dτ, ddq[1], ddq[2], torque * dα]
+end
+
 
 """
 [For post-processing]
@@ -205,6 +341,11 @@ end
 
 function integrate(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
     return _integrate(dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
+end
+
+"Integrate with the AD reference dynamics ([`_dynamics_verified`](@ref))."
+function integrate_verified(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
+    return _integrate(_dynamics_verified, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
 end
 
 

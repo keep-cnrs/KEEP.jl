@@ -65,7 +65,8 @@ plot!(xlim=(0, 10))
 plot!(title="Convergence of the Poincaré map — zoom")
 display(plot!())
 
-
+@info "Time in between each pass
+$(join([f"{i} {sol.t[i+1] - sol.t[i]}" for i in 1:8], '\n'))"
 
 #=
 If needed:
@@ -110,7 +111,7 @@ end
 # Clustering result
 clusters = dbscan(data, 10sqrt(tol))
 centroids = [mean(shootings[c.core_indices]) for c in clusters.clusters]
-labels = ["dτ " * ifelse(c[3] > 0, ">", "<") * " 0" for c in centroids]
+labels = ["D(τ) " * ifelse(c[3] > 0, ">", "<") * " 0" for c in centroids]
 i = 1:length(centroids)
 prop = clusters.counts / sum(clusters.counts)
 Pavg = [average_power(s, vbp; tol=tol) for s in centroids]

@@ -29,31 +29,31 @@ i_pos = sortperm(τ_pos)
 i_neg = sortperm(τ_neg)
 
 fig = plot(title="α(τ)", xlabel="τ", ylabel="α", legend=:topright)
-plot!(2π .- τ_neg[i_neg], -α_neg[i_neg], label="cycle OK")
-plot!(τ_pos[i_pos], α_pos[i_pos], label="cycle KO")
+plot!(τ_pos[i_pos], α_pos[i_pos], label="D(τ) > 0")
+plot!(2π .- τ_neg[i_neg], -α_neg[i_neg], label="D(τ) < 0")
 display(fig)
 
 dα_pos = lc_pos.(t_pos; idxs=3)
 dα_neg = lc_neg.(t_neg; idxs=3)
 
 fig = plot(title="dα(τ)", xlabel="τ", ylabel="dα", legend=:topright)
-plot!(2π .- τ_neg[i_neg], -dα_neg[i_neg], label="cycle OK")
-plot!(τ_pos[i_pos], dα_pos[i_pos], label="cycle KO")
+plot!(τ_pos[i_pos], dα_pos[i_pos], label="D(τ) > 0")
+plot!(2π .- τ_neg[i_neg], -dα_neg[i_neg], label="D(τ) < 0")
 display(fig)
 
 
 plot_trajectory_4D(lc_pos, points_per_second=300)
-plot!(title="Bad limit cycle")
+plot!(title="Good limit cycle")
 display(plot!())
 
 plot_trajectory_4D(lc_neg, points_per_second=300)
-plot!(title="Good limit cycle")
+plot!(title="Bad limit cycle")
 display(plot!())
 
 
 ## For presentation
 fig = plot(title=raw"2 limit cycles", xlabel=raw"$τ$", ylabel=raw"$α(τ)$", legend=:topright, size=(300, 200))
-plot!(2π .- τ_neg[i_neg], -α_neg[i_neg], lw=3, label=raw"cycle OK $←$")
-plot!(τ_pos[i_pos], α_pos[i_pos], lw=3, label=raw"cycle KO $→$")
+plot!(τ_pos[i_pos], α_pos[i_pos], lw=3, label=raw"D(τ) > 0 $→$")
+plot!(2π .- τ_neg[i_neg], -α_neg[i_neg], lw=3, label=raw"D(τ) < 0 $←$")
 display(fig)
-# savefig(fig, "docs/media/two_limit_cycles_alpha.pdf")
+# savefig(fig, "~/Downloads/two_limit_cycles_alpha.pdf")

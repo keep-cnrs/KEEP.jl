@@ -89,6 +89,50 @@ function update_initial_guess!(target, guess, scales)
 end
 
 """
+Solve `model` with `solver` (`:ipopt`, or `:madnlp` when `using MadNLP`).
+
+`hessian = :auto` keeps the solver's default (exact Hessian, differentiated through
+the ODE). `:lbfgs` uses a limited-memory quasi-Newton Hessian, which costs one
+constraint and one Jacobian evaluation per iteration instead of a full Hessian;
+`:exact` forces the exact Hessian.
+"""
+function solve_nlp(model, solver::Symbol; tol, max_wall_time, linear_solver="mumps",
+    hessian=:auto, print_level=0)
+    solver === :ipopt && return _solve_ipopt(model; tol, max_wall_time, linear_solver,
+        hessian, print_level)
+    solver === :madnlp && return _solve_madnlp(model; tol, max_wall_time, hessian, print_level)
+    throw(ArgumentError("unknown solver `$solver`: use :ipopt or :madnlp"))
+end
+
+function _solve_ipopt(model; tol, max_wall_time, linear_solver="mumps", hessian=:auto, print_level=0)
+    kw = Dict{Symbol,Any}(:tol => tol, :max_wall_time => max_wall_time,
+        :linear_solver => linear_solver, :print_level => print_level)
+    if hessian === :lbfgs
+        kw[:hessian_approximation] = "limited-memory"
+        # Ipopt's default (6) is too short for this problem: the secant pairs are
+        # skipped on curvature failures and the iteration stalls. Two pairs per
+        # variable is the smallest setting that converges on the reference solve.
+        kw[:limited_memory_max_history] = max(20, 2 * length(model.meta.x0))
+    end
+    hessian === :exact && (kw[:hessian_approximation] = "exact")
+    return ipopt(model; kw...)
+end
+
+# The MadNLP backend registers itself here when its package extension loads; a plain
+# method definition would be an illegal method overwrite during precompilation.
+const MADNLP_BACKEND = Ref{Any}(nothing)
+
+"Did the solver report convergence? (Ipopt returns a `Symbol`, MadNLP a SolverCore status.)"
+_solved(status::Symbol) = status === :first_order
+_solved(status) = occursin("SOLVE_SUCCEEDED", string(status))
+
+function _solve_madnlp(model; kwargs...)
+    MADNLP_BACKEND[] === nothing && error("solver=:madnlp requires the MadNLP extension: " *
+        "run `using MadNLP` (and `import KEEP`) first.")
+    return MADNLP_BACKEND[](model; kwargs...)
+end
+
+"""
 Performs optimization to find optimal limit cycle parameters using Ipopt.
 
 # Arguments
@@ -106,6 +150,19 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
   tolerance `tol`.
 - `max_wall_time`: Maximum wall-clock time in seconds for the Ipopt solver.
 - `linear_solver`: The linear solver to use for the Ipopt solver, cf. https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_Linear_Solver. Defaults to "mumps".
+- `solver`: `:ipopt` (default) or `:madnlp`; the latter needs `using MadNLP` (KEEP ships
+  it as a package extension, so Ipopt-only users pay nothing).
+- `hessian`: `:lbfgs` (default) uses a limited-memory quasi-Newton Hessian — one
+  constraint and one Jacobian per iteration instead of a full second-order
+  differentiation through the ODE, ~20x faster on the paper's problem. `:exact` forces
+  the exact Hessian, `:auto` leaves the solver default (exact).
+- `rhs`: `:auto` (default, the closed-form `PointMass4.dynamics`) or `:verified`
+  (the AD reference `_dynamics_verified`). `:fast`/`:ad` are accepted as aliases.
+- `symmetry`: exploit the invariance `S(α,τ,dα,dτ) = (-α, τ+π, -dα, dτ)` and integrate
+  only half a period, imposing `x(tf) = S x(0)`. Returns the full period in `tf`.
+  Faster, but fragile: the symmetric formulation has more than one stationary point and a
+  seed a fraction off the symmetric manifold can settle on the wrong one (measured: 4.2 kW
+  against 12.25 kW). Check the returned power before trusting it.
 - `initial_guess`: A `NamedTuple`, `Dict`, or `ComponentArray` specifying initial starting values in **physical units**. This can partially or fully overwrite the baseline limit cycle guess. Because it accepts and returns physical dimensions, the returned `solution` can be passed directly into this argument for iterative refinements. Defaults to an empty NamedTuple `(;)`.
 
 # Returns
@@ -117,7 +174,8 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 The optimization is performed in a normalized (dimensionless) space to improve solver conditioning.
 The `optim_para_lower`, `optim_para_upper`, and `initial_guess` inputs are expected in physical units and are converted to normalized units internally. While the raw `stats.solution` remains in normalized units, the returned `solution` ComponentArray is automatically scaled back to physical units.
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", initial_guess=(;))
+function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", solver=:ipopt, hessian=:lbfgs,
+    rhs=:auto, symmetry=false, initial_guess=(;))
     @info "To remove logging, use a Logging level below Info"
 
     function integrate(optim_vars::CA, vbp::VBPara)
@@ -126,7 +184,9 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         (; α0, dα0, dτ0, tf, params) = optim_vars
         vbp[keys(params)] .= params
         u0 = SA[α0, TAU0, dα0, dτ0, 0]
-        return PM4.integrate(u0, tf, vbp, tol=tol / 10)
+        return (rhs === :verified || rhs === :ad) ?
+               PM4.integrate_verified(u0, tf, vbp; tol=tol / 10) :
+               PM4.integrate(u0, tf, vbp, tol=tol / 10)   # closed form (default)
     end
 
     # convert optim_vars to CA
@@ -140,10 +200,17 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         ode_sol = integrate(optim_vars, vbp)
         α0, dα0, dτ0, tf, P, _ = optim_vars
         αf, τf, dαf, dτf, Wf = ode_sol.u[end]
-        c[1] = αf - α0
-        c[2] = τf - TAU0 - sense(2π)
-        c[3] = dαf - dα0
-        c[4] = dτf - dτ0
+        if symmetry   # half period, x(tf) = S x(0) with S = (-α, τ+π, -dα, dτ)
+            c[1] = αf + α0
+            c[2] = τf - TAU0 - sense(π)
+            c[3] = dαf + dα0
+            c[4] = dτf - dτ0
+        else
+            c[1] = αf - α0
+            c[2] = τf - TAU0 - sense(2π)
+            c[3] = dαf - dα0
+            c[4] = dτf - dτ0
+        end
         c[5] = 2(Wf - P * tf) / (Wf + P * tf + eps(Wf))
         return c
     end
@@ -158,17 +225,21 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     # Initialisation d'un état sur le cycle limite
     @info "Computing limit cycle for the initial guess"
     limit_cycle = compute_limit_cycle(vbp; sense=sense, tol=tol / 10)
-    tf = limit_cycle.t[end]
+    # `tf` is the integration horizon: the half period when the symmetry is used
+    tf = symmetry ? limit_cycle.t[end] / 2 : limit_cycle.t[end]
     α0, _, dα0, dτ0, Wf = limit_cycle.u[end]
 
     params = vbp[optim_para_syms]
-    optim_vars = CA(α0=α0, dα0=dα0, dτ0=dτ0, tf=tf, P=Wf / tf, params=params)
+    # average power over the *full* cycle, whatever the integration horizon
+    optim_vars = CA(α0=α0, dα0=dα0, dτ0=dτ0, tf=tf, P=Wf / limit_cycle.t[end], params=params)
     OPT_VARS_AXES = getaxes(optim_vars)
 
     # Use initial guess provided by user
     _, _, scales_vec, _ = compute_dims(p, optim_para_syms)
     scales = CA(scales_vec, OPT_VARS_AXES)
     update_initial_guess!(optim_vars, initial_guess, scales)
+    # a user guess gives the period; convert it to the integration horizon
+    symmetry && (:tf in keys(initial_guess)) && (optim_vars.tf /= 2)
 
     @info "Checking that constraints are satisfied for the initial guess"
     guess_error = norm(cons(optim_vars, vbp))
@@ -209,12 +280,29 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     model = ADNLPModel!(
         x -> obj(x, vbp), collect(optim_vars), collect(lb), collect(ub), (c, x) -> cons!(c, x, vbp), collect(lc), collect(uc); minimize=false, backend=:generic)
     @info "Starting solve"
-    stats = ipopt(model; tol=tol, max_wall_time=max_wall_time, linear_solver=linear_solver, print_level=ifelse(should_verbose(), 5, 0))
+    stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
+        linear_solver=linear_solver, hessian=hessian, print_level=ifelse(should_verbose(), 5, 0))
+
+    # A limited-memory Hessian is ~20x cheaper per iteration but can wander on badly
+    # scaled starts (the sweep re-optimizations of `paper.jl` reach 3000 iterations and
+    # non-physical parameters). Fall back to the exact Hessian when the cheap attempt
+    # does not reach a feasible point, so the default can never return something worse
+    # than what the exact Hessian would have given from the same start.
+    if hessian === :lbfgs
+        fast = CA(stats.solution, OPT_VARS_AXES)
+        residual = norm(cons(fast, vbp))
+        if !_solved(stats.status) || residual > max(100tol, 1e-3)
+            @warn "optimize: limited-memory Hessian did not reach a feasible point, retrying with the exact Hessian" status = stats.status residual
+            stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
+                linear_solver=linear_solver, hessian=:exact, print_level=ifelse(should_verbose(), 5, 0))
+        end
+    end
 
     ## Post-processing dimensions
     @info "Post-processing the solution into a ComponentArray"
     solution_dimless = CA(stats.solution, OPT_VARS_AXES)
     solution = solution_dimless .* scales
+    symmetry && (solution.tf *= 2)   # report the full period, as without the symmetry
 
     return solution, stats, model
 end

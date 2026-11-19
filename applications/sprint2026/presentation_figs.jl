@@ -7,11 +7,13 @@
 #     then loads them. Reproducible from a fresh clone (~2.5 min).
 #   USE_SERIALIZED = true: loads those scratch/*.jls caches only (a few seconds).
 #
-# Produces (applications/sprint2026/):
-#   fig_fold_zoom.png      two-fold branch (overview + fold-1 + fold-2 zooms)
-#   fig_full_scale.png     the same branch at full scale, w0 ∈ [0, 25]
-#   fig_phase_planes.png   6 pairwise phase-space projections, the 3 cycles
-#   fig_timeseries.png     4 state components vs physical time, the 3 cycles
+# Produces (applications/sprint2026/), each as .png AND .pdf:
+#   fig_full_scale      the whole continuation path, w0 ∈ [0, 25]
+#   fig_fold_overview   the two-fold branch, both folds in view
+#   fig_fold1           zoom on fold 1 (stable + saddle)
+#   fig_fold2           zoom on fold 2 (saddle + saddle)
+#   fig_phase_planes    6 pairwise phase-space projections, the 3 cycles
+#   fig_timeseries      4 state components vs physical time, the 3 cycles
 #
 # Dotted convention: a curve is dotted where it leaves the "solid window" set
 # for its panel (see dot_end). Windows are chosen so the short branch is dotted
@@ -21,18 +23,27 @@
 #
 # Run: julia --project=applications/sprint2026 applications/sprint2026/presentation_figs.jl
 
+using Pkg; Pkg.activate(@__DIR__)
+
 using Plots
 using Serialization
-using Printf
+using PyFormattedStrings
 using LinearAlgebra
 import BifurcationKit              # only to resolve RecursiveArrayTools on deserialize
+
+# Presentation canvas: 800x600 for the branch figures (the phase-plane and
+# timeseries layouts set their own size). `thickness_scaling` scales lines,
+# markers and fonts together; 1.5 keeps an 800x600 panel readable on a slide.
+# It is set per branch figure rather than globally so the two layout figures
+# keep their previous look.
+default(size=(800, 600), widen=true)
 
 const HERE = @__DIR__
 const SCRATCH = joinpath(HERE, "scratch")
 
 # Turn ON only while iterating on plotting code: reuse the scratch/*.jls caches
 # instead of recomputing the branch and cycles. Off = full reproducible run.
-const USE_SERIALIZED = false
+const USE_SERIALIZED = true
 
 const M_FIG = 40
 const VREF_FIG = 2.48
@@ -40,6 +51,7 @@ const VREF_FIG = 2.48
 const C_SHORT = :royalblue
 const C_LONG = :crimson
 const C_LL = :darkorange
+const C_CONT = :gray25        # the dotted "continues" tail / its legend entry
 
 ## ===================================================================== ##
 ## Data                                                                    ##
@@ -47,7 +59,7 @@ const C_LL = :darkorange
 "Run the two pipeline generators (each writes its scratch/*.jls)."
 function generate_caches()
     julia = Base.julia_cmd()
-    for (script, args) in (("_branch_fulltol.jl", ["$(M_FIG)"]),
+    for (script, args) in (("_branch_fulltol.jl", [f"{M_FIG}"]),
                            ("_three_cycles_248.jl", String[]))
         println("running scratch/", script, " ...")
         run(`$julia --project=$HERE $(joinpath(SCRATCH, script)) $args`)
@@ -58,7 +70,7 @@ USE_SERIALIZED || generate_caches()
 "Full-tol branch for arc count M, preferring the deepest (largest-budget) run."
 function load_branch(M)
     for tag in ("_fulltol_max800", "_fulltol_max3000", "_fulltol")
-        f = joinpath(SCRATCH, "brS_shoot_M$(M)$(tag).jls")
+        f = joinpath(SCRATCH, f"brS_shoot_M{M}{tag}.jls")
         isfile(f) && return deserialize(f)
     end
     return deserialize(joinpath(SCRATCH, "brS_shoot.jls"))   # legacy archive
@@ -159,7 +171,7 @@ function plot_end!(sp, x, y, where::Symbol, window::NTuple{4,Real};
 end
 
 ## ===================================================================== ##
-## Fig 1 — the branch and the coexisting flow attractor                    ##
+## Fig 1 — the branch: overview, one figure per fold, full scale          ##
 ## ===================================================================== ##
 "Fold indices of the M=40 branch: fold 1 = p MIN, fold 2 = p MAX on the long branch."
 function branch_layout(M=M_FIG)
@@ -177,46 +189,49 @@ const X_SHORT_FULL = 24.0      # short branch dotted beyond this on the full-sca
 const TF_LONG_DOT = 27.0      # long branch dotted above this on the fold-1 zoom
 const TF_LL_DOT = 105.0        # long-long branch dotted above this period
 
-function fig_fold_zoom(M=M_FIG)
+## ===================================================================== ##
+## Fig 1 — the two folds: overview + one figure per fold                   ##
+## ===================================================================== ##
+function fig_fold_overview(M=M_FIG)
     p, tf, i0, i2 = branch_layout(M)
     p1f, tf1f = p[i0], tf[i0]
     p2f, tf2f = p[i2], tf[i2]
 
-    plt = plot(layout=(3, 1), size=(900, 1420), legend=:topright,
-        plot_title="Limit-cycle branch: two folds ⇒ three periods in (w0*₁, w0*₂)")
-
-    ## panel 1 — overview ---------------------------------------------------
-    sp = plt[1]
     xl, yl = (2.44, 2.54), (0.0, 120.0)
-    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title="Overview: S-curve with both folds", left_margin=11Plots.mm)
+    sp = plot(; xlabel="Wind speed (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        xticks=[2.44, 2.46, 2.48, 2.50, 2.52], yticks=0:20:120,
+        title="S-curve with both folds", legend=:topright, legendfontsize=8,
+        thickness_scaling=1.5, left_margin=8Plots.mm)
     plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
-        color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
+        color=C_SHORT, lw=2.5, label="short, stable")
     plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="long, saddle")
     plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
         color=C_LL, lw=2.5, label="long-long, saddle")
+    plot!(sp, [], []; color=C_CONT, lw=2.5, ls=:dot, label="continues")
     vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5,
-        label="fold 1  w0*₁ = $(round(p1f, digits=4))")
+        label=f"fold 1  w0*₁ = {p1f:.4f}")
     vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5,
-        label="fold 2  w0*₂ = $(round(p2f, digits=4))")
+        label=f"fold 2  w0*₂ = {p2f:.4f}")
     scatter!(sp, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
         markerstrokecolor=:white, label="")
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  w0 = %.4f", TWO_P))
-    annotate!(sp, p1f + 0.0035, 0.40 * yl[2],
-        text("fold 1\n(tf=$(round(tf1f, digits=1)) s)", :left, 8, :gray30))
-    annotate!(sp, p2f + 0.0010, 0.66 * yl[2],
-        text("fold 2\n(tf=$(round(tf2f, digits=1)) s)", :left, 8, :gray30))
+        label=f"anchor  w0 = {TWO_P:.4f}")
     annotate!(sp, 2.492, 20.0, text("short, stable\n(continues →)", :left, 8, C_SHORT))
-    annotate!(sp, 2.4455, 0.93 * yl[2],
-        text("long-long continues ↑\n(past tf=$(round(TF_LL_DOT, digits=0)) s, budget)", :left, 8, C_LL))
+    annotate!(sp, 2.4405, 0.93 * yl[2],
+        text(f"long-long\ncontinues ↑", :left, 8, C_LL))
+    return sp
+end
 
-    ## panel 2 — fold 1 zoom -------------------------------------------------
-    sp = plt[2]
+"Fold-1 zoom: the stable short cycle meets the long saddle."
+function fig_fold1(M=M_FIG)
+    p, tf, i0, i2 = branch_layout(M)
+    p1f, tf1f = p[i0], tf[i0]
+
     xl, yl = (2.44, 2.54), (0.0, 30.0)
-    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title=@sprintf("fold 1 — stable + saddle  (w0 = %.3f, tf = %.1f s)", p1f, tf1f),
-        left_margin=11Plots.mm)
+    sp = plot(; xlabel="Wind speed (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        xticks=[2.44, 2.46, 2.48, 2.50, 2.52], yticks=0:10:30,
+        title=f"fold 1: stable + saddle\n(w0, tf) = ({p1f:.3f} m/s, {tf1f:.1f} s)",
+        thickness_scaling=1.5, left_margin=8Plots.mm)
     plot_end!(sp, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_ZOOM, yl[2]);
         color=C_SHORT, lw=2.5)
     plot_end!(sp, p[i2:i0], tf[i2:i0], :begin, (xl[1], yl[1], xl[2], TF_LONG_DOT);
@@ -224,13 +239,19 @@ function fig_fold_zoom(M=M_FIG)
     vline!(sp, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="")
     scatter!(sp, [p1f], [tf1f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2, label="")
+    return sp
+end
 
-    ## panel 3 — fold 2 zoom -------------------------------------------------
-    sp = plt[3]
+"Fold-2 zoom: the long and long-long saddles merge."
+function fig_fold2(M=M_FIG)
+    p, tf, i0, i2 = branch_layout(M)
+    p2f, tf2f = p[i2], tf[i2]
+
     xl, yl = (2.4755, 2.4835), (40.0, 120.0)
-    plot!(sp; xlabel="w0 (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
-        title=@sprintf("fold 2 — saddle + saddle  (w0 = %.3f, tf = %.1f s)", p2f, tf2f),
-        left_margin=11Plots.mm)
+    sp = plot(; xlabel="Wind speed (m/s)", ylabel="Period (s)", xlims=xl, ylims=yl,
+        xticks=[2.476, 2.478, 2.480, 2.482], yticks=40:20:120,
+        title=f"fold 2: saddle + saddle\n(w0, tf) = ({p2f:.3f} m/s, {tf2f:.1f} s)",
+        thickness_scaling=1.5, left_margin=8Plots.mm)
     plot!(sp, p[i0:end], tf[i0:end]; color=C_SHORT, lw=2.5, label="")
     plot!(sp, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="")
     plot_end!(sp, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
@@ -238,8 +259,7 @@ function fig_fold_zoom(M=M_FIG)
     vline!(sp, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="")
     scatter!(sp, [p2f], [tf2f]; color=:black, ms=6, msw=1.2, markerstrokecolor=:white, label="")
     vline!(sp, [TWO_P]; color=:black, ls=:solid, lw=1.2, label="")
-
-    return plt
+    return sp
 end
 
 ## ===================================================================== ##
@@ -247,27 +267,25 @@ end
 ## ===================================================================== ##
 function fig_full_scale(M=M_FIG)
     p, tf, i0, i2 = branch_layout(M)
-    p1f, tf1f = p[i0], tf[i0]
-    p2f, tf2f = p[i2], tf[i2]
     xl, yl = (0.0, 25.0), (0.0, 120.0)
-    plt = plot(size=(1050, 600), legend=:topright,
-        xlims=xl, ylims=yl,
-        xlabel="w0 (m/s)", ylabel="Period (s)",
-        title="Full-scale limit-cycle branch  (w0 in [0, 25])", titlelocation=:center,
-        left_margin=12Plots.mm, bottom_margin=7Plots.mm)
-    plot_end!(plt, p[i0:end], tf[i0:end], :end, (xl[1], yl[1], X_SHORT_FULL, yl[2]);
-        color=C_SHORT, lw=2.5, label="short, stable", dotted_label="continues")
+    plt = plot(legend=:topright, legendfontsize=8,
+        xlims=xl, ylims=yl, thickness_scaling=1.5, yticks=0:20:120,
+        xlabel="Wind speed (m/s)", ylabel="Period (s)",
+        title="Whole continuation path  (w0 in [0, 25])", titlelocation=:center,
+        left_margin=8Plots.mm, bottom_margin=7Plots.mm)
+    # Only the path: no fold/anchor rules or markers here. Each branch is solid
+    # inside the frame and dotted in its own colour past the window; the grey
+    # "continues" swatch in the legend is a dummy series (see below).
+    win = (xl[1], yl[1], X_SHORT_FULL, yl[2])
+    sx, sy, dx, dy = dot_end(p[i0:end], tf[i0:end], :end, win)
+    plot!(plt, sx, sy; color=C_SHORT, lw=2.5, label="short, stable")
     plot!(plt, p[i2:i0], tf[i2:i0]; color=C_LONG, lw=2.5, label="long, saddle")
-    plot_end!(plt, p[1:i2], tf[1:i2], :begin, (xl[1], yl[1], xl[2], TF_LL_DOT);
-        color=C_LL, lw=2.5, label="long-long, saddle")
-    vline!(plt, [p1f]; color=C_SHORT, ls=:dash, lw=1.5, label="fold 1")
-    vline!(plt, [p2f]; color=C_LONG, ls=:dash, lw=1.5, label="fold 2")
-    vline!(plt, [TWO_P]; color=:black, ls=:solid, lw=1.2,
-        label=@sprintf("anchor  w0 = %.4f", TWO_P))
-    scatter!(plt, [p1f, p2f], [tf1f, tf2f]; color=:black, ms=6, msw=1.2,
-        markerstrokecolor=:white, label="")
-    annotate!(plt, 8.0, 0.80 * yl[2],
-        text("no prograde cycle\nfor w0 below fold 1", :left, 9, :gray30))
+    lx, ly, ldx, ldy = dot_end(p[1:i2], tf[1:i2], :begin,
+        (xl[1], yl[1], xl[2], TF_LL_DOT))
+    plot!(plt, lx, ly; color=C_LL, lw=2.5, label="long-long, saddle")
+    plot!(plt, [], []; color=C_CONT, lw=2.5, ls=:dot, label="continues")
+    plot!(plt, dx, dy; color=C_SHORT, lw=2.5, ls=:dot, label="")
+    plot!(plt, ldx, ldy; color=C_LL, lw=2.5, ls=:dot, label="")
     return plt
 end
 
@@ -280,11 +298,11 @@ const PAIRS = [(1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
 function fig_phase_planes()
     ncyc = longlong === nothing ? 2 : 3
     plt = plot(layout=(2, 3), size=(1250, 760), legend=:topright,
-        plot_title="$(ncyc) prograde limit cycles at w0 = $TWO_P — phase projections")
+        plot_title=f"{ncyc} prograde limit cycles at w0 = {TWO_P} m/s — phase projections")
     for (k, (i, j)) in enumerate(PAIRS)
         plot!(plt[k], Ushort[i, :], Ushort[j, :];
             xlabel=LABELS[i], ylabel=LABELS[j],
-            title="$(LABELS[j]) vs $(LABELS[i])",
+            title=f"{LABELS[j]} vs {LABELS[i]}",
             color=C_SHORT, lw=2, label="short, stable",
             left_margin=6Plots.mm, bottom_margin=5Plots.mm)
         plot!(plt[k], Ulong[i, :], Ulong[j, :];
@@ -301,24 +319,29 @@ end
 function fig_timeseries()
     ncyc = longlong === nothing ? 2 : 3
     plt = plot(layout=(2, 2), size=(1150, 700), legend=:topright,
-        plot_title="Prograde BVP solutions vs physical time at w0 = $TWO_P ($ncyc cycles)")
+        plot_title=f"Prograde BVP solutions vs physical time at w0 = {TWO_P} m/s ({ncyc} cycles)")
     for i in 1:4
         plot!(plt[i], tshort, Ushort[i, :];
             xlabel="t (s)", ylabel=LABELS[i], title=LABELS[i],
-            color=C_SHORT, lw=2, label="short, stable  (tf=$(round(short.tf, digits=1)) s)",
+            color=C_SHORT, lw=2, label=f"short, stable  (tf={short.tf:.1f} s)",
             left_margin=6Plots.mm, bottom_margin=5Plots.mm)
         plot!(plt[i], tlong, Ulong[i, :];
-            color=C_LONG, lw=2.2, label="long, saddle  (tf=$(round(long.tf, digits=1)) s)")
+            color=C_LONG, lw=2.2, label=f"long, saddle  (tf={long.tf:.1f} s)")
         longlong === nothing || plot!(plt[i], tlonglong, Ulonglong[i, :];
-            color=C_LL, lw=2.2, label="long-long, saddle  (tf=$(round(longlong.tf, digits=1)) s)")
+            color=C_LL, lw=2.2, label=f"long-long, saddle  (tf={longlong.tf:.1f} s)")
     end
     return plt
 end
 
-for (f, fn) in (("fig_fold_zoom.png", fig_fold_zoom),
-                ("fig_full_scale.png", fig_full_scale),
-                ("fig_phase_planes.png", fig_phase_planes),
-                ("fig_timeseries.png", fig_timeseries))
-    savefig(fn(), joinpath(HERE, f))
-    println("saved ", f)
+for (f, fn) in (("fig_full_scale", fig_full_scale),
+                ("fig_fold_overview", fig_fold_overview),
+                ("fig_fold1", fig_fold1),
+                ("fig_fold2", fig_fold2),
+                ("fig_phase_planes", fig_phase_planes),
+                ("fig_timeseries", fig_timeseries))
+    plt = fn()
+    for ext in ("png", "pdf")
+        savefig(plt, joinpath(HERE, f"{f}.{ext}"))
+    end
+    println("saved ", f, ".png/.pdf")
 end

@@ -355,7 +355,7 @@ Note that peak tension at the optimum (**$(round(m_opt.Tmax / 1000; digits=2)) k
 
 # ### Local Landscape, Shape Sensitivity ($\Delta\theta, \Delta\varphi$), and Wind Robustness
 
-clamp_guess(::Nothing) = (;)
+clamp_guess(::Nothing) = (;) #hide
 clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6), dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6), #hide
     dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6), tf=clamp(s.tf, 1.1e-3, 99.0), P=clamp(s.P, 1.1e-3, 9.9e4)) #hide
 nothing #hide
