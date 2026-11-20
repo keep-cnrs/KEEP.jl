@@ -5,7 +5,7 @@ using KEEP: PointMass4 as PM4
 using KEEP.PointMassPara
 
 p = build_vbpara(build_para())
-u0 = PM4.build_u(α=0.3, τ=0.5, dα=0.4, dτ=1.0)
+u0 = PM4.build_u(; α=0.3, τ=0.5, dα=0.4, dτ=1.0)
 h = 1e-4
 
 # Central difference of the Cartesian kite position along the true flow.
@@ -20,9 +20,11 @@ a_fd = (pos(sol(2h)) - 2pos(sol(h)) + pos(sol(0.0))) / h^2
 ## Appended here because this file already validates the same right-hand side.
 import KEEP: TAU0
 @testset "closed-form dynamics == _dynamics_verified" begin
-    states = vec([PM4.build_u(α, τ, dα, dτ, 0.0)
-                  for α in (-π, -1.0, 0.0, 1.0, 2.5), τ in (0.0, 0.7, 1.9, 3.5),
-                  dα in (-2.0, -0.3, 0.8), dτ in (-1.5, 0.4, 2.0)])
+    states = vec([
+        PM4.build_u(α, τ, dα, dτ, 0.0) for α in (-π, -1.0, 0.0, 1.0, 2.5),
+        τ in (0.0, 0.7, 1.9, 3.5), dα in (-2.0, -0.3, 0.8),
+        dτ in (-1.5, 0.4, 2.0)
+    ])
     # μ = 0 (sin(φ−α) = 0) is a removable singularity of the arm balance: there the AD
     # reference divides by `l_tension + 1e-100` and returns O(1e83) while the closed form
     # returns 0. No trajectory reaches that line, so equivalence is asserted off it, plus

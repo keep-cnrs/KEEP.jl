@@ -2,7 +2,7 @@ using Test
 using SafeTestsets
 using Underscores
 using Logging
-import Plots
+using Plots: Plots
 using ProgressMeter
 
 struct PlotSilencer <: AbstractDisplay end
@@ -18,8 +18,6 @@ function with_no_plots(f)
         popdisplay(silencer)
     end
 end
-
-
 
 const exclude = [
     "05_steady_states.jl",  # SteadyState.all_steady_states throws a mysterious exception, cf. file
@@ -75,10 +73,9 @@ function main()
         end
     end
     popdisplay(silencer)
-    nothing
+    return nothing
 end
 
 with_no_plots() do
-    main()
+    return main()
 end
-

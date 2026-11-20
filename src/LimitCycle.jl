@@ -52,7 +52,7 @@ end
 """
 The Poincaré section is defined as {x | poincare_section(x) = 0}."""
 function poincare_section(τ)
-    sin((τ - TAU0) / 2)
+    return sin((τ - TAU0) / 2)
 end
 
 """
@@ -76,9 +76,9 @@ Let tol_int be the tolerance used for integration. Then tol > max(10 * tol_int, 
 function build_affect(tol=10DEFAULT_TOLERANCE)
     function affect!(integrator)
         u = integrator.sol.u
-        length(u) < 2 && return
-        distance_on_section(u[end-1], u[end]) > tol && return
-        terminate!(integrator)
+        length(u) < 2 && return nothing
+        distance_on_section(u[end - 1], u[end]) > tol && return nothing
+        return terminate!(integrator)
     end
 end
 
@@ -89,9 +89,14 @@ function build_poincare_callback(tol=DEFAULT_TOLERANCE; section=poincare_section
     # DiffEqBase.nudge_tprev. Below ~eps(t) the guard stops working, the same crossing
     # is saved twice, and the shooting then has T = 0. It must stay finite: `tol = Inf`
     # means "stop at the first crossing" and must not become an infinite tolerance.
-    ContinuousCallback((τ, t, integrator) -> section(τ), build_affect(tol); save_positions=(true, false), idxs=2, abstol=clamp(tol / 10, 1e-12, 1e-3))
+    return ContinuousCallback(
+        (τ, t, integrator) -> section(τ),
+        build_affect(tol);
+        save_positions=(true, false),
+        idxs=2,
+        abstol=clamp(tol / 10, 1e-12, 1e-3),
+    )
 end
-
 
 """
 shooting = [α0, dα0, dτ0, T] -> u0, T"""
@@ -126,7 +131,6 @@ end
 default_sense(shooting) = ifelse(shooting[3] > 0, +, -)
 default_sense(u0, u1) = ifelse(u1[2] > u0[2], +, -)
 
-
 """
 Sense is either `+` or `-`, the expected sign of dτ."""
 function endpoint_residuals(u0, u1; sense=default_sense(u0, u1))
@@ -134,13 +138,17 @@ function endpoint_residuals(u0, u1; sense=default_sense(u0, u1))
     Δτ = u1[2] - u0[2] - sense(2π)
     return SA[Δα, Δτ, Δdα, Δdτ]
 end
-endpoint_residuals(sol; sense=default_sense(build_shooting(sol))) = endpoint_residuals(sol.u[1], sol.u[end]; sense)
+function endpoint_residuals(sol; sense=default_sense(build_shooting(sol)))
+    return endpoint_residuals(sol.u[1], sol.u[end]; sense)
+end
 
 """
 Compute the residuals of a limit cycle from a shooting by integrating. Specify
 
 Sense is either `+` or `-`, the expected sign of dτ."""
-function shooting_residuals(shooting, vbp; sense=default_sense(shooting), tol=DEFAULT_TOLERANCE)
+function shooting_residuals(
+    shooting, vbp; sense=default_sense(shooting), tol=DEFAULT_TOLERANCE
+)
     u0, T = unpack_shooting(shooting)
     res = endpoint_residuals(PM4.integrate(u0, T, vbp; tol=tol / 10); sense=sense)
     if maximum(abs, res) < tol
@@ -170,7 +178,8 @@ function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, kwargs...)
     sense = shooting[3] > 0 ? (+) : (-)
     res = maximum(abs, endpoint_residuals(lc; sense=sense))
     if res > max(100tol, 1e-6)
-        @error "compute_limit_cycle: the trajectory is not a limit cycle" res T = lc.t[end] Δτ = lc.u[end][2] - lc.u[1][2] dτ0 = shooting[3] tol
+        @error "compute_limit_cycle: the trajectory is not a limit cycle" res T = lc.t[end] Δτ =
+            lc.u[end][2] - lc.u[1][2] dτ0 = shooting[3] tol
         return nothing
     end
     return lc
@@ -186,12 +195,13 @@ for an inventory of every cycle in a box; the two calls are independent."""
 function compute_limit_cycle(vbp; sense, tol=DEFAULT_TOLERANCE, kwargs...)
     u0 = PM4.build_u(; dτ=sense(1.0))
     lc = compute_limit_cycle(u0, vbp; tol=tol, kwargs...)
-    lc === nothing &&
-        error("compute_limit_cycle: no closed limit cycle with dτ = $(sense(1.0)) (never settled, or not periodic)")
-    sense(lc.u[1][4]) > 0 || error("compute_limit_cycle: converged to a cycle with dτ of the wrong sign")
+    lc === nothing && error(
+        "compute_limit_cycle: no closed limit cycle with dτ = $(sense(1.0)) (never settled, or not periodic)",
+    )
+    sense(lc.u[1][4]) > 0 ||
+        error("compute_limit_cycle: converged to a cycle with dτ of the wrong sign")
     return lc
 end
-
 
 """
 shooting -> average power"""
@@ -205,7 +215,9 @@ Comptue all limit cycles by sampling `N` initial conditions within a region of t
  - A rough integration with low precision (sqrt(tol))
  - Clusterize and take centroids
  - Integrate each centroid with high precision (tol)"""
-function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=10, N=100, tol=DEFAULT_TOLERANCE, kwargs...)
+function all_limit_cycles(
+    vbp; αmin=0.0, αmax=1π, vmax=10, N=100, tol=DEFAULT_TOLERANCE, kwargs...
+)
     dαmin, dαmax = dτmin, dτmax = -vmax, vmax
 
     samples = sample(N, [αmin, dαmin, dτmin], [αmax, dαmax, dτmax], HaltonSample())
@@ -213,14 +225,21 @@ function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=10, N=100, tol=DEFAULT_
     # A seed that diverges, or whose trajectory does not close, returns `nothing` and
     # the clustering cannot use it.
     rough = [compute_limit_cycle(u0, vbp; tol=sqrt(tol)) for u0 in u0s]
-    rough_shootings = filter(!isnothing, [lc === nothing ? nothing : build_shooting(lc) for lc in rough])
+    rough_shootings = filter(
+        !isnothing, [lc === nothing ? nothing : build_shooting(lc) for lc in rough]
+    )
     isempty(rough_shootings) && error("no limit cycle seed converged")
 
     clusters = dbscan(reduce(hcat, rough_shootings), 100sqrt(tol))
     rough_centroids = [mean(rough_shootings[c.core_indices]) for c in clusters.clusters]
 
-    return filter(!isnothing,
-        [compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for s in rough_centroids])
+    return filter(
+        !isnothing,
+        [
+            compute_limit_cycle(unpack_shooting(s)[1], vbp; tol=tol, kwargs...) for
+            s in rough_centroids
+        ],
+    )
 end
 
 end  # module

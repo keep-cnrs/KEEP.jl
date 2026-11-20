@@ -22,7 +22,6 @@ using KEEP.LimitCycle: compute_limit_cycle
 
 export make_bounds, compute_dims, optimize
 
-
 const MIN_TF = 1e-3
 const MAX_TF = 1e2
 const MIN_POWER = 1e-3
@@ -68,7 +67,7 @@ Recursively updates `target` (dimensionless) with the keys present in `guess` (d
 Automatically scales the guess using `scales` to make it dimensionless.
 """
 function update_initial_guess!(target, guess, scales)
-    isempty(guess) && return
+    isempty(guess) && return nothing
 
     for k in keys(guess)
         if k in keys(target)
@@ -96,17 +95,31 @@ the ODE). `:lbfgs` uses a limited-memory quasi-Newton Hessian, which costs one
 constraint and one Jacobian evaluation per iteration instead of a full Hessian;
 `:exact` forces the exact Hessian.
 """
-function solve_nlp(model, solver::Symbol; tol, max_wall_time, linear_solver="mumps",
-    hessian=:auto, print_level=0)
-    solver === :ipopt && return _solve_ipopt(model; tol, max_wall_time, linear_solver,
-        hessian, print_level)
-    solver === :madnlp && return _solve_madnlp(model; tol, max_wall_time, hessian, print_level)
-    throw(ArgumentError("unknown solver `$solver`: use :ipopt or :madnlp"))
+function solve_nlp(
+    model,
+    solver::Symbol;
+    tol,
+    max_wall_time,
+    linear_solver="mumps",
+    hessian=:auto,
+    print_level=0,
+)
+    solver === :ipopt &&
+        return _solve_ipopt(model; tol, max_wall_time, linear_solver, hessian, print_level)
+    solver === :madnlp &&
+        return _solve_madnlp(model; tol, max_wall_time, hessian, print_level)
+    return throw(ArgumentError("unknown solver `$solver`: use :ipopt or :madnlp"))
 end
 
-function _solve_ipopt(model; tol, max_wall_time, linear_solver="mumps", hessian=:auto, print_level=0)
-    kw = Dict{Symbol,Any}(:tol => tol, :max_wall_time => max_wall_time,
-        :linear_solver => linear_solver, :print_level => print_level)
+function _solve_ipopt(
+    model; tol, max_wall_time, linear_solver="mumps", hessian=:auto, print_level=0
+)
+    kw = Dict{Symbol,Any}(
+        :tol => tol,
+        :max_wall_time => max_wall_time,
+        :linear_solver => linear_solver,
+        :print_level => print_level,
+    )
     if hessian === :lbfgs
         kw[:hessian_approximation] = "limited-memory"
         # Ipopt's default (6) is too short for this problem: the secant pairs are
@@ -127,8 +140,10 @@ _solved(status::Symbol) = status === :first_order
 _solved(status) = occursin("SOLVE_SUCCEEDED", string(status))
 
 function _solve_madnlp(model; kwargs...)
-    MADNLP_BACKEND[] === nothing && error("solver=:madnlp requires the MadNLP extension: " *
-        "run `using MadNLP` (and `import KEEP`) first.")
+    MADNLP_BACKEND[] === nothing && error(
+        "solver=:madnlp requires the MadNLP extension: " *
+        "run `using MadNLP` (and `import KEEP`) first.",
+    )
     return MADNLP_BACKEND[](model; kwargs...)
 end
 
@@ -174,8 +189,21 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 The optimization is performed in a normalized (dimensionless) space to improve solver conditioning.
 The `optim_para_lower`, `optim_para_upper`, and `initial_guess` inputs are expected in physical units and are converted to normalized units internally. While the raw `stats.solution` remains in normalized units, the returned `solution` ComponentArray is automatically scaled back to physical units.
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", solver=:ipopt, hessian=:lbfgs,
-    rhs=:auto, symmetry=false, initial_guess=(;))
+function optimize(
+    p,
+    optim_para_syms,
+    optim_para_lower,
+    optim_para_upper;
+    sense=(+),
+    tol=10DEFAULT_TOLERANCE,
+    max_wall_time=120.0,
+    linear_solver="mumps",
+    solver=:ipopt,
+    hessian=:lbfgs,
+    rhs=:auto,
+    symmetry=false,
+    initial_guess=(;),
+)
     @info "To remove logging, use a Logging level below Info"
 
     function integrate(optim_vars::CA, vbp::VBPara)
@@ -184,9 +212,11 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         (; α0, dα0, dτ0, tf, params) = optim_vars
         vbp[keys(params)] .= params
         u0 = SA[α0, TAU0, dα0, dτ0, 0]
-        return (rhs === :verified || rhs === :ad) ?
-               PM4.integrate_verified(u0, tf, vbp; tol=tol / 10) :
-               PM4.integrate(u0, tf, vbp, tol=tol / 10)   # closed form (default)
+        return if (rhs === :verified || rhs === :ad)
+            PM4.integrate_verified(u0, tf, vbp; tol=tol / 10)
+        else
+            PM4.integrate(u0, tf, vbp; tol=tol / 10)   # closed form (default)
+        end   # closed form (default)
     end
 
     # convert optim_vars to CA
@@ -214,7 +244,8 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         c[5] = 2(Wf - P * tf) / (Wf + P * tf + eps(Wf))
         return c
     end
-    cons(optim_vars::AbstractArray{T}, vbp) where {T} = cons!(Array{T}(undef, 5), optim_vars, vbp)  # wrapper used O(1) times
+    cons(optim_vars::AbstractArray{T}, vbp) where {T} =
+        cons!(Array{T}(undef, 5), optim_vars, vbp)  # wrapper used O(1) times
 
     vbp0 = build_vbpara(p)
 
@@ -231,7 +262,9 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
 
     params = vbp[optim_para_syms]
     # average power over the *full* cycle, whatever the integration horizon
-    optim_vars = CA(α0=α0, dα0=dα0, dτ0=dτ0, tf=tf, P=Wf / limit_cycle.t[end], params=params)
+    optim_vars = CA(;
+        α0=α0, dα0=dα0, dτ0=dτ0, tf=tf, P=Wf / limit_cycle.t[end], params=params
+    )
     OPT_VARS_AXES = getaxes(optim_vars)
 
     # Use initial guess provided by user
@@ -253,8 +286,28 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     ## Contraintes en boite
     # Boite arbitraire pour α, dα, dτ, tf, P
     min_d_tau, max_d_tau = minmax(sense(MIN_ABS_D_TAU), sense(MAX_ABS_D_TAU))
-    lb = CA([MIN_ALPHA, MIN_D_ALPHA, min_d_tau, MIN_TF, MIN_POWER, lower_vbp[optim_para_syms]...], OPT_VARS_AXES)
-    ub = CA([MAX_ALPHA, MAX_D_ALPHA, max_d_tau, MAX_TF, MAX_POWER, upper_vbp[optim_para_syms]...], OPT_VARS_AXES)
+    lb = CA(
+        [
+            MIN_ALPHA,
+            MIN_D_ALPHA,
+            min_d_tau,
+            MIN_TF,
+            MIN_POWER,
+            lower_vbp[optim_para_syms]...,
+        ],
+        OPT_VARS_AXES,
+    )
+    ub = CA(
+        [
+            MAX_ALPHA,
+            MAX_D_ALPHA,
+            max_d_tau,
+            MAX_TF,
+            MAX_POWER,
+            upper_vbp[optim_para_syms]...,
+        ],
+        OPT_VARS_AXES,
+    )
 
     # Boite à ±10% de l'Initialisation
     # ε = .1
@@ -278,10 +331,26 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
 
     @info "Creating model"
     model = ADNLPModel!(
-        x -> obj(x, vbp), collect(optim_vars), collect(lb), collect(ub), (c, x) -> cons!(c, x, vbp), collect(lc), collect(uc); minimize=false, backend=:generic)
+        x -> obj(x, vbp),
+        collect(optim_vars),
+        collect(lb),
+        collect(ub),
+        (c, x) -> cons!(c, x, vbp),
+        collect(lc),
+        collect(uc);
+        minimize=false,
+        backend=:generic,
+    )
     @info "Starting solve"
-    stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
-        linear_solver=linear_solver, hessian=hessian, print_level=ifelse(should_verbose(), 5, 0))
+    stats = solve_nlp(
+        model,
+        solver;
+        tol=tol,
+        max_wall_time=max_wall_time,
+        linear_solver=linear_solver,
+        hessian=hessian,
+        print_level=ifelse(should_verbose(), 5, 0),
+    )
 
     # A limited-memory Hessian is ~20x cheaper per iteration but can wander on badly
     # scaled starts (the sweep re-optimizations of `paper.jl` reach 3000 iterations and
@@ -292,9 +361,17 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
         fast = CA(stats.solution, OPT_VARS_AXES)
         residual = norm(cons(fast, vbp))
         if !_solved(stats.status) || residual > max(100tol, 1e-3)
-            @warn "optimize: limited-memory Hessian did not reach a feasible point, retrying with the exact Hessian" status = stats.status residual
-            stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
-                linear_solver=linear_solver, hessian=:exact, print_level=ifelse(should_verbose(), 5, 0))
+            @warn "optimize: limited-memory Hessian did not reach a feasible point, retrying with the exact Hessian" status =
+                stats.status residual
+            stats = solve_nlp(
+                model,
+                solver;
+                tol=tol,
+                max_wall_time=max_wall_time,
+                linear_solver=linear_solver,
+                hessian=:exact,
+                print_level=ifelse(should_verbose(), 5, 0),
+            )
         end
     end
 
@@ -306,6 +383,5 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
 
     return solution, stats, model
 end
-
 
 end  # module

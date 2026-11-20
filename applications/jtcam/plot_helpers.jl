@@ -3,7 +3,7 @@
 # dimensions, palette, margins), the axis-tick helper `edge_ticks`, and the
 # time-series panels with their hand-drawn legends. Merged from jtcam_theme.jl
 # and time_series.jl so a section only includes one file.
-import Plots
+using Plots: Plots
 using Plots
 using Plots.PlotMeasures
 using PyFormattedStrings: @f_str
@@ -20,7 +20,7 @@ function setup_font(font_filename="LinLibertine_R.ttf")
     paths = [
         joinpath(@__DIR__, font_filename),
         joinpath(expanduser("~/Library/Fonts"), font_filename),
-        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename)
+        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename),
     ]
 
     idx = findfirst(isfile, paths)
@@ -110,11 +110,10 @@ const PALETTE = Plots.palette(:auto)
 #     RGB(90/255, 110/255, 195/255),  # 8. Cornflower Indigo
 # ]
 
-
 # --- Publication Defaults ---
 function my_defaults()
     Plots.default()
-    Plots.default(
+    return Plots.default(;
         thickness_scaling=0.5,
         dpi=DPI,
         fontfamily=FONT,
@@ -147,7 +146,7 @@ function my_defaults()
         margin=0Plots.mm, # 4Plots.mm,
         legend=:topright,
         legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85),
-        widen=true
+        widen=true,
     )
 end
 
@@ -182,8 +181,9 @@ time twice, values π and -π) to be drawn dashed.
 """
 function tau_wrap(ts, τm)
     Δt = Base.step(ts)
-    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
-              for i in findall(diff(τm) .< -π)]
+    tcross = [
+        ts[i] + Δt * (π - τm[i]) / (τm[i + 1] + 2π - τm[i]) for i in findall(diff(τm) .< -π)
+    ]
     t_jump, y_jump = Float64[], Float64[]
     for tc in tcross
         append!(t_jump, (tc, tc, NaN))
@@ -203,9 +203,9 @@ function plot_avg_power_kW(sol, ts)
     p = sol.prob.p
     L, M, T = PMP.lmt(p)
     t0, tf = first(ts), last(ts)
-    dα = sol.(ts, idxs=3)
+    dα = sol.(ts; idxs=3)
     power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
-    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    avg_power = sol(tf; idxs=5) / (tf - t0) / 1000
     plt = plot(ts, power; c=:black, xlabel="t (s)", ylabel="Power (kW)", yticks=0:10:100)
     plot!([t0, tf], [avg_power, avg_power]; c=:red)
     return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
@@ -227,13 +227,21 @@ function time_series_panels(sol; N=500)
 
     t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
     q_deg = rad2deg.(q_ts[:, [1, 3, 4]])
-    p_wts = plot(ts, q_deg; c=[1 3 4], ylabel="x (deg, deg/s)", xlabel="", xformatter=x -> "", yticks=-720:180:720)
+    p_wts = plot(
+        ts,
+        q_deg;
+        c=[1 3 4],
+        ylabel="x (deg, deg/s)",
+        xlabel="",
+        xformatter=x -> "",
+        yticks=-720:180:720,
+    )
     plot!(t_main, rad2deg.(y_main); c=2)
     one_period || plot!(t_jump, rad2deg.(y_jump); c=2, ls=:dot, label=false)
 
     pw_stats = plot_avg_power_kW(sol, ts)
     pw = pw_stats.plt
-    plot!(pw, xlabel="", xformatter=x -> "")
+    plot!(pw; xlabel="", xformatter=x -> "")
 
     # Line tension; the ticks are the two extrema and zero. Skip samples where
     # the geometry degenerates (aligned arm and kite), which give a NaN tension
@@ -242,13 +250,30 @@ function time_series_panels(sol; N=500)
     ok = isfinite.(tension)
     tmin, tmax = extrema(tension[ok])
     tmin = min(0.0, tmin)
-    p_t = plot(ts[ok], tension[ok]; c=5, ylabel="Tension (kN)", xlabel="t (s)", yticks=-100:5:100, ylim=(tmin, tmax), widen=true)
+    p_t = plot(
+        ts[ok],
+        tension[ok];
+        c=5,
+        ylabel="Tension (kN)",
+        xlabel="t (s)",
+        yticks=-100:5:100,
+        ylim=(tmin, tmax),
+        widen=true,
+    )
 
-    y_wts = vcat(vec(q_deg), rad2deg.(filter(isfinite, y_main)),
-        one_period ? Float64[] : rad2deg.(filter(isfinite, y_jump)))
-    return (; wts=p_wts, pw, tension=p_t,
-        ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
-            tension=(tmin, tmax)))
+    y_wts = vcat(
+        vec(q_deg),
+        rad2deg.(filter(isfinite, y_main)),
+        one_period ? Float64[] : rad2deg.(filter(isfinite, y_jump)),
+    )
+    return (;
+        wts=p_wts,
+        pw,
+        tension=p_t,
+        ylims=(
+            states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi), tension=(tmin, tmax)
+        ),
+    )
 end
 
 """
@@ -261,27 +286,52 @@ would instead size the box from its labels and the handle from the subplot
 width, which is why the entries are drawn by hand.
 """
 function time_series_legend(names, styles, row_px)
-    p = plot(; framestyle=:none, showaxis=false, grid=false,
-        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], margin=0Plots.mm)
+    p = plot(;
+        framestyle=:none,
+        showaxis=false,
+        grid=false,
+        xlims=(0, 1),
+        ylims=(0, 1),
+        xticks=[],
+        yticks=[],
+        margin=0Plots.mm,
+    )
     n = length(names)
     dy = 1.25 * LEGENDFONTSIZE / row_px
     ys = 0.5 .+ dy .* ((n + 1) / 2 .- (1:n))
     pad = 0.65dy
-    plot!(p, Shape([(0.02, last(ys) - pad), (0.98, last(ys) - pad),
-        (0.98, first(ys) + pad), (0.02, first(ys) + pad)]); c=:black, lw=1, fillcolor=:white)
+    plot!(
+        p,
+        Shape([
+            (0.02, last(ys) - pad),
+            (0.98, last(ys) - pad),
+            (0.98, first(ys) + pad),
+            (0.02, first(ys) + pad),
+        ]);
+        c=:black,
+        lw=1,
+        fillcolor=:white,
+    )
     for (y, style, name) in zip(ys, styles, names)
         plot!(p, [0.08, 0.28], [y, y]; style...)
-        annotate!(p, 0.32, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+        annotate!(
+            p, 0.32, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left)
+        )
     end
     return p
 end
 
 "One hand-drawn legend per row: states, power, tension."
 function time_series_legends(row_px)
-    return (states=time_series_legend(("α", "τ mod 360°", "D(α)", "D(τ)"),
-        ((; c=1), (; c=2), (; c=3), (; c=4)), row_px),
+    return (
+        states=time_series_legend(
+            ("α", "τ mod 360°", "D(α)", "D(τ)"),
+            ((; c=1), (; c=2), (; c=3), (; c=4)),
+            row_px,
+        ),
         power=time_series_legend(("P", "Avg(P)"), ((; c=:black), (; c=:red)), row_px),
-        tension=time_series_legend(("T",), ((; c=5),), row_px))
+        tension=time_series_legend(("T",), ((; c=5),), row_px),
+    )
 end
 
 "Time series of one simulation `sol`, one hand-drawn legend per row."
@@ -305,25 +355,27 @@ function plot_time_series_grid(sols; N=500, legend_width=0.22, titles=false)
     panels = [time_series_panels(sol; N) for sol in sols]
 
     # one y range per row, common to every column
-    states_lims = (minimum(first(q.ylims.states) for q in panels),
-        maximum(last(q.ylims.states) for q in panels))
+    states_lims = (
+        minimum(first(q.ylims.states) for q in panels),
+        maximum(last(q.ylims.states) for q in panels),
+    )
     power_lims = (0.0, maximum(last(q.ylims.power) for q in panels))
     tension_lims = (0.0, maximum(last(q.ylims.tension) for q in panels))
     for q in panels
-        plot!(q.wts, ylims=states_lims, widen=true)
-        plot!(q.pw, ylims=power_lims, widen=true)
-        plot!(q.tension, ylims=tension_lims, widen=true)
+        plot!(q.wts; ylims=states_lims, widen=true)
+        plot!(q.pw; ylims=power_lims, widen=true)
+        plot!(q.tension; ylims=tension_lims, widen=true)
     end
 
     for q in panels[2:end], p in (q.wts, q.pw, q.tension)
-        plot!(p, ylabel="", yformatter=x -> "")  # ticks stay, for the gridlines
+        plot!(p; ylabel="", yformatter=x -> "")  # ticks stay, for the gridlines
     end
     for (j, q) in enumerate(panels)
         for p in (q.wts, q.pw, q.tension)
             # the leftmost column carries the y labels, the others only ticks
-            plot!(p, leftmargin=(j == 1 ? 20 : 3)Plots.mm)
+            plot!(p; leftmargin=(j == 1 ? 20 : 3)Plots.mm)
         end
-        plot!(q.tension, bottommargin=6Plots.mm)
+        plot!(q.tension; bottommargin=6Plots.mm)
     end
 
     sz = plot_size(4 / 3, 2)
@@ -336,14 +388,28 @@ function plot_time_series_grid(sols; N=500, legend_width=0.22, titles=false)
     heights ./= sum(heights)
 
     # title row: one hidden panel per column and an empty legend cell
-    header = titles === false ? () :
-             (map(t -> plot(; title=t, framestyle=:none, showaxis=false, margin=-10Plots.mm),
-        titles)..., plot(; framestyle=:none, showaxis=false))
+    header = if titles === false
+        ()
+    else
+        (
+        map(
+            t -> plot(; title=t, framestyle=:none, showaxis=false, margin=-10Plots.mm),
+            titles,
+        )...,
+        plot(; framestyle=:none, showaxis=false),
+    )
+    end
 
-    return plot(header...,
-        [q.wts for q in panels]..., leg.states,
-        [q.pw for q in panels]..., leg.power,
-        [q.tension for q in panels]..., leg.tension;
+    return plot(
+        header...,
+        [q.wts for q in panels]...,
+        leg.states,
+        [q.pw for q in panels]...,
+        leg.power,
+        [q.tension for q in panels]...,
+        leg.tension;
         layout=grid(length(heights), n + 1; heights=heights, widths=widths),
-        link=:x, size=sz)
+        link=:x,
+        size=sz,
+    )
 end
