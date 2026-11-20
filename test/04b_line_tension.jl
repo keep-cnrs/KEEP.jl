@@ -17,11 +17,19 @@ using KEEP.Visualization: plot_trajectory_4D
 # w0 = 11.6896: le bras a une petite amplitude
 
 w0 = 11.6897
-p = build_vbpara(build_para(w0=w0))
+p = build_vbpara(build_para(; w0=w0))
 
 lc = compute_limit_cycle(SA[0, TAU0, 0, 0, 0], p)
 
-t = range(extrema(lc.t)..., length=1001)
+t = range(extrema(lc.t)...; length=1001)
 tension = PM4.compute_line_tension.(lc.(t), Ref(p))
-display(plot(t, tension, label="", xlabel="t (s)", ylabel="Line tension (N)", title="Line tension as a function of time"))
-
+display(
+    plot(
+        t,
+        tension;
+        label="",
+        xlabel="t (s)",
+        ylabel="Line tension (N)",
+        title="Line tension as a function of time",
+    ),
+)

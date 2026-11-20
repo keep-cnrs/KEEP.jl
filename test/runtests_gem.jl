@@ -50,7 +50,7 @@ function get_test_files(folders, pattern)
                 push!(candidates, TestFile(
                     joinpath(folder_path, file), # Full path for include()
                     file,                        # Filename for filtering
-                    m[:testname]                 # Captured group for @testset name
+                    m[:testname],                 # Captured group for @testset name
                 ))
             end
         end

@@ -12,7 +12,7 @@ using LinearAlgebra: norm
 import KEEP.PointMassPara as PMP
 using KEEP.SteadyState: ddq_partial, all_steady_states
 
-default(formatter=:plain, label="")
+default(; formatter=:plain, label="")
 
 vbp = PMP.build_vbpara()
 
@@ -33,7 +33,9 @@ equilibria.
 Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
 and seed positions / unit field directions for the arrows.
 """
-function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+function streamlines(
+    f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0
+)
     gx, gy = gridsize
     xmin, xmax = xlims
     ymin, ymax = ylims
@@ -59,8 +61,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
         k3 === nothing && return nothing
         k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
         k4 === nothing && return nothing
-        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
-            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+        return (
+            x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]),
+        )
     end
     line_x, line_y = Float32[], Float32[]
     ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
@@ -93,7 +97,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
                 x = step_rk4(x, d, stepsize)
                 x === nothing && break
                 (xmin ≤ x[1] ≤ xmax && ymin ≤ x[2] ≤ ymax) || break
-                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                idx = (
+                    clamp(searchsortedlast(rx, x[1]), 1, gx),
+                    clamp(searchsortedlast(ry, x[2]), 1, gy),
+                )
                 if idx != ccur
                     mask[idx...] || break
                     mask[idx...] = false
@@ -141,9 +148,17 @@ f = q -> ddq_partial(q, vbp)
 
 # Canvas & Layout
 δ = 0
-plot(xlims=(-π - δ, π + δ), ylims=(-π - δ, π + δ), aspect_ratio=:equal,
-    xticks=([-π, 0, π], ["-π", "α = 0", "π"]), yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+plot(;
+    xlims=(-π - δ, π + δ),
+    ylims=(-π - δ, π + δ),
+    aspect_ratio=:equal,
+    xticks=([-π, 0, π], ["-π", "α = 0", "π"]),
+    yticks=([-π, 0, π], ["-π", "τ = 0", "π"]),
+    grid=false,
+    framestyle=:semi,
+    legend=:outerright,
+    colorbar=false,
+)
 # Background wind spans
 vspan!([-π, -π / 2]; theme.upwind..., label="Upwind arm")
 vspan!([π / 2, π]; theme.upwind...)
@@ -154,10 +169,13 @@ line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
 plot!(line_x, line_y; theme.streamlines...)
 
 L, W = 0.2, 0.06
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
-    (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
-    (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
-         for (s, u, v) in zip(zip(ax, ay), au, av)]
+heads = [
+    Shape([
+        (s[1] + L / 2 * u, s[2] + L / 2 * v),
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u),
+    ]) for (s, u, v) in zip(zip(ax, ay), au, av)
+]
 plot!(heads; theme.heads...)
 
 # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
@@ -175,13 +193,16 @@ plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 ss = all_steady_states(vbp)
 
 styles = ss_style.(ss)
-scatter!(first.(ss), last.(ss);
+scatter!(
+    first.(ss),
+    last.(ss);
     c=getproperty.(styles, :c),
     markerstrokecolor=getproperty.(styles, :markerstrokecolor),
     shape=getproperty.(styles, :shape),
     ms=getproperty.(styles, :ms),
-    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+    markerstrokewidth=getproperty.(styles, :markerstrokewidth),
+)
 scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
-plot!(widen=1.06)
+plot!(; widen=1.06)
 
 display(current())

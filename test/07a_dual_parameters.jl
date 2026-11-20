@@ -20,16 +20,18 @@ function obj(optim_vars::AbstractArray, vbp::VBPara)
     return obj(tf, vbp)
 end
 
-optim_vars = ComponentArray(tf=2, optim_params=(l=π, I=exp(1)))
+optim_vars = ComponentArray(; tf=2, optim_params=(l=π, I=exp(1)))
 vbp = build_vbpara()
 
 # Tests des fonctions (valeur)
 tf = 5
 @test obj(tf, vbp) == tf * vbp.I * vbp.l^2 * vbp.w0^2
-@test obj(optim_vars, vbp) == optim_vars.tf * optim_vars.optim_params.I * optim_vars.optim_params.l^2 * vbp.w0^2
+@test obj(optim_vars, vbp) ==
+    optim_vars.tf * optim_vars.optim_params.I * optim_vars.optim_params.l^2 * vbp.w0^2
 
 # Test de la dérivée
 ∇obj = ForwardDiff.gradient(x -> obj(x, vbp), optim_vars)
 @test ∇obj.tf == optim_vars.optim_params.I * optim_vars.optim_params.l^2 * vbp.w0^2
-@test ∇obj.optim_params.l == 2 * optim_vars.tf * optim_vars.optim_params.I * optim_vars.optim_params.l * vbp.w0^2
+@test ∇obj.optim_params.l ==
+    2 * optim_vars.tf * optim_vars.optim_params.I * optim_vars.optim_params.l * vbp.w0^2
 @test ∇obj.optim_params.I == optim_vars.tf * optim_vars.optim_params.l^2 * vbp.w0^2

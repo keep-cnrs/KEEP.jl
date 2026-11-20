@@ -1,6 +1,5 @@
 module KEEP
 
-
 # Value of τ at the start of the cycle
 const TAU0 = 0  # Can be changed to 3π/4
 const DEFAULT_TOLERANCE = 1e-9
