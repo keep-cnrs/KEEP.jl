@@ -152,10 +152,11 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 - `linear_solver`: The linear solver to use for the Ipopt solver, cf. https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_Linear_Solver. Defaults to "mumps".
 - `solver`: `:ipopt` (default) or `:madnlp`; the latter needs `using MadNLP` (KEEP ships
   it as a package extension, so Ipopt-only users pay nothing).
-- `hessian`: `:lbfgs` (default) uses a limited-memory quasi-Newton Hessian — one
-  constraint and one Jacobian per iteration instead of a full second-order
-  differentiation through the ODE, ~20x faster on the paper's problem. `:exact` forces
-  the exact Hessian, `:auto` leaves the solver default (exact).
+- `hessian`: `:exact` (default) uses the exact Hessian. `:lbfgs` uses a limited-memory
+  quasi-Newton Hessian — cheaper per iteration but it wanders on bad starts, so it retries
+  with the exact Hessian when the cheap attempt fails or throws. `:auto` leaves the solver
+  default (exact). On the whole `paper.jl` the exact Hessian is 1.9x faster (154 s against
+  287 s), because failed L-BFGS attempts dominate the sweeps.
 - `rhs`: `:auto` (default, the closed-form `PointMass4.dynamics`) or `:verified`
   (the AD reference `_dynamics_verified`). `:fast`/`:ad` are accepted as aliases.
 - `symmetry`: exploit the invariance `S(α,τ,dα,dτ) = (-α, τ+π, -dα, dτ)` and integrate
@@ -174,7 +175,7 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 The optimization is performed in a normalized (dimensionless) space to improve solver conditioning.
 The `optim_para_lower`, `optim_para_upper`, and `initial_guess` inputs are expected in physical units and are converted to normalized units internally. While the raw `stats.solution` remains in normalized units, the returned `solution` ComponentArray is automatically scaled back to physical units.
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", solver=:ipopt, hessian=:lbfgs,
+function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", solver=:ipopt, hessian=:exact,
     rhs=:auto, symmetry=false, initial_guess=(;))
     @info "To remove logging, use a Logging level below Info"
 
@@ -280,22 +281,32 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     model = ADNLPModel!(
         x -> obj(x, vbp), collect(optim_vars), collect(lb), collect(ub), (c, x) -> cons!(c, x, vbp), collect(lc), collect(uc); minimize=false, backend=:generic)
     @info "Starting solve"
-    stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
-        linear_solver=linear_solver, hessian=hessian, print_level=ifelse(should_verbose(), 5, 0))
+    solve = h -> solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
+        linear_solver=linear_solver, hessian=h, print_level=ifelse(should_verbose(), 5, 0))
 
     # A limited-memory Hessian is ~20x cheaper per iteration but can wander on badly
     # scaled starts (the sweep re-optimizations of `paper.jl` reach 3000 iterations and
     # non-physical parameters). Fall back to the exact Hessian when the cheap attempt
-    # does not reach a feasible point, so the default can never return something worse
-    # than what the exact Hessian would have given from the same start.
-    if hessian === :lbfgs
-        fast = CA(stats.solution, OPT_VARS_AXES)
-        residual = norm(cons(fast, vbp))
-        if !_solved(stats.status) || residual > max(100tol, 1e-3)
-            @warn "optimize: limited-memory Hessian did not reach a feasible point, retrying with the exact Hessian" status = stats.status residual
-            stats = solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
-                linear_solver=linear_solver, hessian=:exact, print_level=ifelse(should_verbose(), 5, 0))
+    # does not reach a feasible point, so `hessian = :lbfgs` can never return something
+    # worse than what the exact Hessian would have given from the same start. The attempt
+    # is also wrapped: a non-physical iterate can reach the ODE and throw (NaN horizon),
+    # and that exception would escape callers such as `paper.jl`'s wind sweeps.
+    stats = if hessian === :lbfgs
+        fast = try
+            solve(:lbfgs)
+        catch err
+            @warn "optimize: limited-memory Hessian attempt failed, retrying with the exact Hessian" exception = sprint(showerror, err)
+            nothing
         end
+        residual = fast === nothing ? Inf : norm(cons(CA(fast.solution, OPT_VARS_AXES), vbp))
+        if fast !== nothing && _solved(fast.status) && residual <= max(100tol, 1e-3)
+            fast
+        else
+            fast === nothing || @warn "optimize: limited-memory Hessian did not reach a feasible point, retrying with the exact Hessian" status = fast.status residual
+            solve(:exact)
+        end
+    else
+        solve(hessian)
     end
 
     ## Post-processing dimensions
