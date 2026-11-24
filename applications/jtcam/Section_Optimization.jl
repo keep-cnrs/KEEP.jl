@@ -690,7 +690,7 @@ function plot_dtheta(dtheta, dopt, guides, mark)
 
     # power relative to its value at the nominal Δθ with Θ fixed, so the nominal
     # sits at 1 on both curves and the axis runs from 0 to the peak
-    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, msw=LEGEND_MSW,
+    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, legend_marker(4)...,
         label="Θ fixed", ylabel="P / P*", xlabel="Δθ (deg)",
         ylims=(0, 1.03max(1, maximum(Pn_opt))),
         yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright)

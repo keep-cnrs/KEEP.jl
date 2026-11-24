@@ -221,7 +221,7 @@ my_theme = (;
     heads           = (; c=:black, alpha=0.5, lw=0),
     nullcline_tau   = (; c=1, ls=:solid),
     nullcline_alpha = (; c=2, ls=:solid),
-    eq_legend       = (; c=:black, shape=:circle, ms=default(:ms), msw=20),
+    eq_legend       = (; c=:black, shape=:circle, ms=default(:ms), legend_marker(default(:ms))...),
 )
 
 # Equilibrium characteristics: the symmetry (α, τ) -> (-α, τ+π) flips the kite
@@ -447,7 +447,7 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol
     end
 
     annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
-    distance_style = (; c=color, ls=:dot, marker=:circle)
+    distance_style = (; c=color, ls=:dot, marker=:circle, legend_marker()...)
     plot!(distances .+ 1e-16; distance_style...)
 
     if legend

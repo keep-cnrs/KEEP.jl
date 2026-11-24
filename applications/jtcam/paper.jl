@@ -133,11 +133,11 @@ btime4 = @belapsed PM4.integrate($u0_4, $tf_drift, $vbp_nom; save_everystep=true
 btime10 = @belapsed PM10.integrate($u0_10, $tf_drift, $p_nom; save_everystep=true, tol=$tol_drift) seconds = 1
 btime10_cb = @belapsed PM10.integrate($u0_10, $tf_drift, $p_nom; save_everystep=true, tol=$tol_drift, callback=$cb_10_save) seconds = 1
 
-fig_conv = plot(tols_conv, err10; marker=:circle, label="10D", xscale=:log10, yscale=:log10, #hide
+fig_conv = plot(tols_conv, err10; marker=:circle, legend_marker()..., label="10D", xscale=:log10, yscale=:log10, #hide
     xflip=true, ymirror=true, xlabel="Tolerance", ylabel="Max position error (m)", #hide
     xticks=exp10.(-12:3:-3), yticks=exp10.(-15:3:0), legend=:topright, size=SIZE_HALF) #hide
-plot!(fig_conv, tols_conv, err10cb; marker=:square, label="10D + callback") #hide
-plot!(fig_conv, tols_conv, err4; marker=:diamond, label="4D") #hide
+plot!(fig_conv, tols_conv, err10cb; marker=:square, legend_marker()..., label="10D + callback") #hide
+plot!(fig_conv, tols_conv, err4; marker=:diamond, legend_marker()..., label="4D") #hide
 plot!(fig_conv; bottommargin=4Plots.mm, rightmargin=6Plots.mm) #hide
 save_fig(fig_conv, "three_models_convergence") #hide
 
@@ -493,7 +493,7 @@ for i in eachindex(winds) #hide
 end #hide
 
 # Figures of this subsection
-f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, msw=LEGEND_MSW, label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
+f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, legend_marker(4)..., label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
 plot!(f_dtheta_p, dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_reopt]; c=:black, marker=:none, label="Θ re-optimized") #hide
 f_dtheta_t = plot(dtheta_angles, [d.Tmax / 1000 for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="", xlabel="Δθ (deg)", ylabel="Line tension (kN)") #hide
 scatter!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_fixed]; c=:black, ms=4, label="") #hide

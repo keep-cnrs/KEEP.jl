@@ -95,9 +95,9 @@ err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, s
 err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol, saveat)), pref)) for tol in tols]
 
 plot(xlabel="Tolerance (relative and absolute)", ylabel="Norm of error (m)", legend=:bottomright)
-plot!(tols, err10, marker=:circle, label="10D")
-plot!(tols, err10cb, marker=:square, label="10D + callback")
-plot!(tols, err4, marker=:diamond, label="4D")
+plot!(tols, err10, marker=:circle, legend_marker()..., label="10D")
+plot!(tols, err10cb, marker=:square, legend_marker()..., label="10D + callback")
+plot!(tols, err4, marker=:diamond, legend_marker()..., label="4D")
 plot!(xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15))
 fig = plot!(xflip=true, ymirror=true, legend=:topright, size=SIZE_HALF)
 plot!(bottommargin=4Plots.mm, rightmargin=6Plots.mm)

@@ -74,9 +74,16 @@ const SIZE_FULL = plot_size(1, 2)
 const SIZE_HALF = plot_size(1, 1)
 
 # GR's legend marker is sized from `legendfontsize` and ignores the theme's
-# `thickness_scaling = 0.5`; this stroke width brings a marker legend entry back
-# to the size of the plotted markers. Use only where a legend shows a marker.
-const LEGEND_MSW = 24
+# `thickness_scaling`, while plotted markers are scaled by it (Plots.jl #2592,
+# #2620, #2655, #4621). Compensate with a stroke width of the marker's own
+# colour: it shrinks the legend entry without changing the plotted marker or
+# turning coloured markers black. Splat into any series whose legend shows a
+# marker, e.g. `scatter!(...; legend_marker()...)`.
+function legend_marker(ms=Plots.default(:ms))
+    lf = Plots.default(:legendfontsize)
+    ts = Plots.default(:thickness_scaling)
+    return (; msw=max(0, 2 * (0.8 * lf / ts - ms)), msc=:auto)
+end
 
 # --- Palette ---
 const PALETTE = Plots.palette(:auto)

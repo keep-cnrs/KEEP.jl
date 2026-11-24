@@ -72,7 +72,7 @@ plot!(fig, (a + l * cos(β0)) .* cos.(θc), (a + l * cos(β0)) .* sin.(θc), fil
 kite_pars = (; c=:red, ms=7, label="Kite")
 scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label="")
 
-scatter!([]; kite_pars..., msw=20, msc=:red)
+scatter!([]; kite_pars..., legend_marker(kite_pars.ms)...)
 plot!([]; arm_and_lines_pars..., lw=default(:lw))
 plot!([]; arm_tip_pars..., lw=default(:lw))
 plot!([]; longitude_pars..., lw=default(:lw))
