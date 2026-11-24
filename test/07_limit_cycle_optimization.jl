@@ -258,8 +258,8 @@ end
 
 fps = 15
 if true  # creating the animations somehow opens a window at each frame
-    flat_anim_init = anim_2d(initial_guess_sim, fps=fps)
-    flat_anim_sol = anim_2d(solution_sim)
+    flat_anim_init = anim_2d(initial_guess_sim, fps=fps, lw=1)
+    flat_anim_sol = anim_2d(solution_sim, lw=1)
     display(gif(flat_anim_init, fps=fps))
     display(gif(flat_anim_sol, fps=fps))
 end
