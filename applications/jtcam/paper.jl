@@ -55,7 +55,7 @@ end
 
 function cycle_metrics(sol; n=1001)
     sol === nothing && return (; P=NaN, period=NaN, Tmin=NaN, Tmax=NaN, αmax=NaN, # no orbit: NaN, do not crash
-        amax=NaN, κmax=NaN, Rmin=NaN)
+        amax=NaN, vmax=NaN, κmax=NaN, Rmin=NaN)
     ts = range(sol.t[1], sol.t[end], n)
     us = sol.(ts)
     p = sol.prob.p
@@ -71,6 +71,7 @@ function cycle_metrics(sol; n=1001)
         Tmax = maximum(tension[ok]),
         αmax = maximum(u -> abs(rem2pi(u[1], RoundNearest)), us),
         amax = maximum(norm, acc),
+        vmax = maximum(norm, vel),
         κmax = maximum(κ),
         Rmin = 1 / maximum(κ),
     )
@@ -346,6 +347,7 @@ Ipopt converges in **$(stats_opt.iter) iterations** (**$(round(t_opt_wall; digit
 | \$T_{\\min}\$–\$T_{\\max}\$ (kN) | $(round(m_kin.Tmin / 1000; digits=2))–$(round(m_kin.Tmax / 1000; digits=2)) | $(round(m_opt.Tmin / 1000; digits=2))–**$(round(m_opt.Tmax / 1000; digits=2))** | — |
 | \$\\max\\lvert\\alpha\\rvert\$ (deg) | $(round(rad2deg(m_kin.αmax); digits=1)) | **$(round(rad2deg(m_opt.αmax); digits=1))** | — |
 | \$a_{\\max}\$ (m/s²) | $(round(m_kin.amax; digits=0)) | **$(round(m_opt.amax; digits=0))** | — |
+| Max kite speed (m/s) | $(round(m_kin.vmax; digits=1)) | **$(round(m_opt.vmax; digits=1))** | — |
 | \$R_{\\min}\$ (m) | $(round(m_kin.Rmin; digits=2)) | **$(round(m_opt.Rmin; digits=2))** | — |
 
 Note that peak tension at the optimum (**$(round(m_opt.Tmax / 1000; digits=2)) kN**) exceeds the 1D wing-loading limit \$F_s = T_s S = 10\\,\\text{kN}\$ (\$T_s = 1000\\,\\text{N/m}^2\$), and peak acceleration reaches **$(round(m_opt.amax; digits=0)) m/s²** with a minimum turning radius \$R_{\\min} = $(round(m_opt.Rmin; digits=2))\\,\\text{m}\$; enforcing explicit tension and load constraints is left for future work.
@@ -491,13 +493,19 @@ for i in eachindex(winds) #hide
 end #hide
 
 # Figures of this subsection
-f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
-plot!(f_dtheta_p, dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_reopt]; c=:black, label="Θ re-optimized") #hide
+f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, msw=LEGEND_MSW, label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
+plot!(f_dtheta_p, dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_reopt]; c=:black, marker=:none, label="Θ re-optimized") #hide
 f_dtheta_t = plot(dtheta_angles, [d.Tmax / 1000 for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="", xlabel="Δθ (deg)", ylabel="Line tension (kN)") #hide
 scatter!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_fixed]; c=:black, ms=4, label="") #hide
 plot!(f_dtheta_t, dtheta_angles, [d.Tmax / 1000 for d in dtheta_reopt]; c=:black, label="", fillrange=[d.Tmin / 1000 for d in dtheta_reopt], fillalpha=0.1) #hide
 plot!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_reopt]; c=:black, label="") #hide
-save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=6Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
+# the translucent band marks the nominal Δθ under the data; a thin line on top
+for f in (f_dtheta_p, f_dtheta_t) #hide
+    vline!(f, [rad2deg(p_opt.Δθ)]; c=:black, lw=5, alpha=0.3) #hide
+    pushfirst!(f[1].series_list, pop!(f[1].series_list)) #hide
+    vline!(f, [rad2deg(p_opt.Δθ)]; c=:black, lw=0.8, alpha=0.7) #hide
+end #hide
+save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=14Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
 x_map = 100 .* (shape_factors .- 1) #hide
 p_s1 = heatmap(x_map, shape_dphi, P_map; c=:viridis, title="P (kW)", xlabel="Δθ dev (%)", ylabel="Δφ (deg)") #hide
 p_s2 = heatmap(x_map, shape_dphi, Tmax_map; c=:viridis, title="Tmax (kN)", xlabel="Δθ dev (%)") #hide

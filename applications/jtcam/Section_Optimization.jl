@@ -85,20 +85,23 @@ const UNITS = Dict(:l => "m", :I => "kg m²", :b => "N m deg s⁻¹",
 
 ## Helpers
 """
-Average power, line-tension extrema, peak kite acceleration and period of a cycle."""
+Average power, line-tension extrema, peak kite speed and acceleration, and period
+of a cycle."""
 function cycle_stats(sol; n=2001)
     # `compute_limit_cycle` returns `nothing` when no periodic orbit was found: report
     # NaN instead of crashing, so the caller treats the point as a failure.
-    sol === nothing && return (; P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, period=NaN)
+    sol === nothing && return (; P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, vmax=NaN, period=NaN)
     ts = range(sol.t[1], sol.t[end], n)
     us = sol.(ts)
     p = sol.prob.p
     tension = PM4.compute_line_tension.(us, Ref(p))
     ok = isfinite.(tension)
     acceleration = norm.(PM4.kite_acceleration.(us, Ref(p)))
+    velocity(u) = PM4.jacobian(q -> PM4.compute_OK(PM4.compute_Rτ(q, p), p), u[1:2]) * u[3:4]
+    vmax = maximum(norm.(velocity.(us)))
     return (; P=sol.u[end][5] / sol.t[end],
         Tmin=minimum(tension[ok]), Tmax=maximum(tension[ok]),
-        amax=maximum(acceleration), period=sol.t[end])
+        amax=maximum(acceleration), vmax=vmax, period=sol.t[end])
 end
 
 # Limit cycle, optimization, and limit cycle of the optimized system, for one
@@ -448,6 +451,7 @@ function print_final_table()
     row("min tension (kN)", c -> fmt(c[2].Tmin / 1000))
     row("max tension (kN)", c -> fmt(c[2].Tmax / 1000))
     row("max acceleration (m/s²)", c -> fmt(c[2].amax))
+    row("max kite speed (m/s)", c -> fmt(c[2].vmax))
     println()
 
     println("wind sweep over Θ (reference at $(round(Int, WIND_REF)) m/s)")
@@ -550,6 +554,7 @@ function print_latex_tables(p_init, p_opt, lower, upper)
     push!(results_rows, f"    Period (\\si{{\\second}}) & {s0.period:.2f} & {s1.period:.2f} \\\\ ")
     push!(results_rows, f"    Min line tension (\\si{{\\kilo\\newton}}) & {s0.Tmin / 1000:.2f} & {s1.Tmin / 1000:.2f} \\\\ ")
     push!(results_rows, f"    Max line tension (\\si{{\\kilo\\newton}}) & {s0.Tmax / 1000:.2f} & {s1.Tmax / 1000:.2f} \\\\ ")
+    push!(results_rows, f"    Max kite speed (\\si{{\\meter\\per\\second}}) & {s0.vmax:.2f} & {s1.vmax:.2f} \\\\ ")
     push!(results_rows, "    Norm of residual & {" * latex_sci(s0.residual) * "} & {" *
         latex_sci(s1.residual) * "} \\\\ ")
 
@@ -668,7 +673,8 @@ normalized by its value at the nominal with Θ fixed, so the two conditions meet
 at 1 there and the gap between them is what holding Θ costs. Θ held at the
 optimum is drawn as black points, Θ re-optimized at each angle as a black line;
 the tension panel draws both min–max envelopes, the fixed one as points and the
-re-optimized one filled. A `guides.line` band marks the nominal angle.
+re-optimized one filled. A `guides.line` band and a thin line mark the nominal
+angle.
 """
 function plot_dtheta(dtheta, dopt, guides, mark)
     ang = [d.Δθ for d in dtheta]
@@ -684,10 +690,11 @@ function plot_dtheta(dtheta, dopt, guides, mark)
 
     # power relative to its value at the nominal Δθ with Θ fixed, so the nominal
     # sits at 1 on both curves and the axis runs from 0 to the peak
-    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, label="Θ fixed",
-        ylabel="P / P*", xlabel="Δθ (deg)", ylims=(0, 1.03max(1, maximum(Pn_opt))),
+    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, msw=LEGEND_MSW,
+        label="Θ fixed", ylabel="P / P*", xlabel="Δθ (deg)",
+        ylims=(0, 1.03max(1, maximum(Pn_opt))),
         yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright)
-    plot!(f1, ang, Pn_opt; style..., label="Θ re-optimized")
+    plot!(f1, ang, Pn_opt; style..., marker=:none, label="Θ re-optimized")
 
     f2 = plot(ang, Tmax0; style..., seriestype=:scatter, ms=4, label="",
         ylabel="Line tension (kN)", xlabel="Δθ (deg)")
@@ -702,11 +709,13 @@ function plot_dtheta(dtheta, dopt, guides, mark)
     for f in (f1, f2)
         pushfirst!(f[1].series_list, pop!(f[1].series_list))
     end
+    # a thin line on top makes the nominal unambiguous under the translucent band
+    foreach(f -> vline!(f, [mark]; c=:black, lw=0.8, alpha=0.7), (f1, f2))
 
     # the margins are per panel (the theme sets margin = 0): only the left one
     # carries a y label and y tick labels
-    plot!(f1, leftmargin=18Plots.mm, bottommargin=10Plots.mm)
-    plot!(f2, leftmargin=6Plots.mm, bottommargin=10Plots.mm)
+    plot!(f1, leftmargin=18Plots.mm, bottommargin=14Plots.mm)
+    plot!(f2, leftmargin=6Plots.mm, bottommargin=14Plots.mm)
     return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2))
 end
 

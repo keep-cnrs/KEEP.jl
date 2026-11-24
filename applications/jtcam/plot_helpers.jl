@@ -73,6 +73,11 @@ end
 const SIZE_FULL = plot_size(1, 2)
 const SIZE_HALF = plot_size(1, 1)
 
+# GR's legend marker is sized from `legendfontsize` and ignores the theme's
+# `thickness_scaling = 0.5`; this stroke width brings a marker legend entry back
+# to the size of the plotted markers. Use only where a legend shows a marker.
+const LEGEND_MSW = 24
+
 # --- Palette ---
 const PALETTE = Plots.palette(:auto)
 # Standard 8-color Okabe-Ito (Wong) palette
