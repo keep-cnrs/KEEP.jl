@@ -9,7 +9,7 @@
 
 % ---- parameters (angles in degrees; exaggerated for readability) ----
 \def\thetaZero{55} \def\DeltaTheta{16} \def\DeltaPhi{42}
-\def\ell{1.9} \def\a{0.55} \def\Rmax{2.7}
+\def\ell{1.9} \def\a{0.7} \def\Rmax{2.9}
 
 \pgfmathdeclarefunction{thf}{1}{\pgfmathparse{\thetaZero + \DeltaTheta*sin(2*#1)}}
 \pgfmathdeclarefunction{phf}{1}{\pgfmathparse{\DeltaPhi*sin(#1)}}
@@ -17,7 +17,7 @@
 \pgfmathdeclarefunction{uy}{1}{\pgfmathparse{sin(thf(#1))*sin(phf(#1))}}
 \pgfmathdeclarefunction{uz}{1}{\pgfmathparse{cos(thf(#1))}}
 % arm angle along the orbit (any smooth law; only the shape of r matters here)
-\pgfmathdeclarefunction{alf}{1}{\pgfmathparse{50 + 70*sin(#1)}}
+\pgfmathdeclarefunction{alf}{1}{\pgfmathparse{40 + 60*sin(#1) + 0.14*#1}}
 \pgfmathdeclarefunction{pf}{1}{\pgfmathparse{\a*sin(thf(#1))*cos(phf(#1)-alf(#1))}}
 \pgfmathdeclarefunction{rf}{1}{\pgfmathparse{pf(#1) + sqrt(pf(#1)*pf(#1) + \ell*\ell - \a*\a)}}
 
@@ -26,30 +26,43 @@
 \draw[->,gray] (0,0,0) -- (0,1.5,0) node[right,black]{$y$};
 \draw[->,gray] (0,0,0) -- (0,0,1.6) node[above,black]{$z$};
 
-% ---- cone: translucent patches between neighbouring generators ----
-\foreach \t in {0,4,...,356}{
-  \pgfmathsetmacro{\tb}{\t+4}
-  \fill[SkyBlue,opacity=0.16]
-    (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)})
-            -- ({\Rmax*ux(\tb)},{\Rmax*uy(\tb)},{\Rmax*uz(\tb)}) -- cycle;
+% ---- the unit sphere carrying the eight (very light) ----
+\begin{scope}[tdplot_screen_coords]
+  \shade[ball color=gray!35,opacity=0.28] (0,0) circle (1);
+  \draw[gray!55,opacity=0.5,thin] (0,0) circle (1);
+\end{scope}
+\foreach \p in {-60,-30,...,60}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\p)*cos(\t)},{cos(\p)*sin(\t)},{sin(\p)});
+}
+\foreach \m in {0,30,...,150}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\t)*cos(\m)},{cos(\t)*sin(\m)},{sin(\t)});
+}
+
+% ---- cone: one translucent fill (no seams) and generators ----
+\foreach \ta/\tb in {0/180,180/360}{
+  \fill[SkyBlue,opacity=0.22]
+    (0,0,0) -- plot[domain=\ta:\tb,samples=361,variable=\t]
+    ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)}) -- cycle;
 }
 % generators
-\foreach \t in {0,12,...,348}{
-  \draw[SkyBlue!80!black,opacity=0.45,thin]
+\foreach \t in {0,6,...,354}{
+  \draw[SkyBlue!80!black,opacity=0.5,very thin]
     (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
 }
 % rim of the cone at r = Rmax
 \draw[SkyBlue!80!black,opacity=0.7]
-  plot[domain=0:360,samples=181,variable=\t] ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+  plot[domain=0:360,samples=721,variable=\t] ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
 
 % ---- the eight on the unit sphere ----
 \draw[very thick,black]
-  plot[domain=0:360,samples=181,variable=\t] ({ux(\t)},{uy(\t)},{uz(\t)});
-\node[black] at ({1.0*ux(305)},{1.0*uy(305)},{1.0*uz(305)+0.13}) {$\mathscr{E}$};
+  plot[domain=0:360,samples=721,variable=\t] ({ux(\t)},{uy(\t)},{uz(\t)});
+\node[black] at ({ux(270)},{uy(270)},{uz(270)-0.13}) {$\mathscr{E}$};
 
 % ---- kite trajectory on the cone ----
-\draw[very thick,BrickRed]
-  plot[domain=0:360,samples=241,variable=\t] ({rf(\t)*ux(\t)},{rf(\t)*uy(\t)},{rf(\t)*uz(\t)});
+\draw[very thick,BrickRed,-latex]
+  plot[domain=0:500,samples=1001,variable=\t] ({rf(\t)*ux(\t)},{rf(\t)*uy(\t)},{rf(\t)*uz(\t)});
 
 % one generator highlighted: eight point, kite position
 \def\tk{62}
@@ -60,6 +73,6 @@
 \fill (0,0,0) circle (0.8pt) node[below left]{$O$};
 
 % label of the cone
-\node[SkyBlue!60!black] at ({0.97*\Rmax*ux(215)},{0.97*\Rmax*uy(215)},{0.97*\Rmax*uz(215)}) {$\mathscr{C}$};
+\node[SkyBlue!60!black] at ({1.04*\Rmax*ux(120)},{1.04*\Rmax*uy(120)},{1.04*\Rmax*uz(120)}) {$\mathscr{C}$};
 \end{tikzpicture}
 \end{document}
