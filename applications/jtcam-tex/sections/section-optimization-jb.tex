@@ -157,7 +157,7 @@ Recall that the kite position is \(\OK = r\,\vu r(\tau)\), where \(\vu r\) is th
 \end{equation}
 so that \(\ell-a\le r\le\ell+a\), and \(r\equiv\ell\) when \(a=0\).
 We write \(\varepsilon = a/\ell\) and \(\varepsilon' = a/\sqrt{\ell^2-a^2}\).
-The kite trajectory is drawn on the \emph{cone} \(\mathcal C = \{r\,\vu r(\tau) : r>0,\ \tau\in\mathbb S^1\}\), the conical hull of the spherical eight.
+The kite trajectory is drawn on the \emph{cone} \(\mathscr C = \{r\,\vu r(\tau) : r>0,\ \tau\in\mathbf{S}^1\}\), the conical hull of the spherical eight.
 Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\OK'\times\OK''}/\norm{\OK'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
 It depends on \(\ell\), \(\Delta\theta\), \(\Delta\phi\), \(\theta_0\), \(a\), and on the arm law through \(\alpha,\alpha',\alpha''\); for \(a=0\), only on \(\ell,\Delta\theta,\Delta\phi,\theta_0\).
 
@@ -175,10 +175,10 @@ For every \(\tau\),
 \begin{equation} \label{eq:curv-formula}
     r\,\kappa = \frac{\sqrt{\kappa_g^2\,(1+u_\sigma^2) + (1+u_\sigma^2-u_{\sigma\sigma})^2}}{(1+u_\sigma^2)^{3/2}}.
 \end{equation}
-The cone \(\mathcal C\) is a developable surface, with principal curvatures \(0\) along the generators and \(\kappa_g/r\) across them.
-Formula \eqref{eq:curv-formula} is the decomposition \(\kappa^2 = \kappa_n^2 + (\kappa_g^{\mathcal C})^2\) of the curvature of a curve drawn on \(\mathcal C\) into its normal and geodesic parts:
+The cone \(\mathscr C\) is a developable surface, with principal curvatures \(0\) along the generators and \(\kappa_g/r\) across them.
+Formula \eqref{eq:curv-formula} is the decomposition \(\kappa^2 = \kappa_n^2 + (\kappa_g^{\mathscr C})^2\) of the curvature of a curve drawn on \(\mathscr C\) into its normal and geodesic parts:
 \begin{equation}
-    \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathcal C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
+    \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathscr C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
 \end{equation}
 where \(\beta\) is the angle between the trajectory and the generator.
 The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\OK}\) along the cycle.
@@ -200,10 +200,10 @@ Indeed, exactly,
 so that, for \(a=0\), \(\max\kappa\to\infty\) as \(\Delta\theta\to0\) or as \(\Delta\phi\to0\), the other parameters being fixed.
 
 \paragraph{Upper bound.}
-Consider a box of parameters: let \(\ell\ge\ell_->a\), \(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\), \(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\) with \(\Delta\theta_->0\), \(\Delta\phi_->0\), and \(\theta_0\in[\theta_{0-},\theta_{0+}]\) with \(\mathcal J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\).
+Consider a box of parameters: let \(\ell\ge\ell_->a\), \(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\), \(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\) with \(\Delta\theta_->0\), \(\Delta\phi_->0\), and \(\theta_0\in[\theta_{0-},\theta_{0+}]\) with \(\mathscr J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\).
 Set
 \begin{equation}
-    m = \min_{\mathcal J}\sin, \qquad M = \max_{\mathcal J}\sin, \qquad C = \max_{\mathcal J}\abs{\cos},
+    m = \min_{\mathscr J}\sin, \qquad M = \max_{\mathscr J}\sin, \qquad C = \max_{\mathscr J}\abs{\cos},
 \end{equation}
 \begin{equation}
     v_* = \begin{cases}
@@ -227,7 +227,7 @@ Then, for all parameters in the box, every such arm law, and every \(\tau\),
 \end{equation}
 and, without arm (\(a=0\), \(U=0\)), \(1/\ell\le\kappa\le\sqrt{1+\bar\kappa_g^2}/\ell_-\).
 Since \(U = O(\varepsilon)\), the bound is \(\sqrt{1+\bar\kappa_g^2}/\ell_- + O(\varepsilon)\), uniformly on the box.
-The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathcal J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
+The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathscr J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
 In the optimization above, the lower bound on \(\ell\) in Table~\ref{tab:opt_descr} plays the role of \(\ell_-\), while \(A_1\) and \(A_2\) can be evaluated on the computed periodic orbits.
 
 \paragraph{First order in the arm length.}
