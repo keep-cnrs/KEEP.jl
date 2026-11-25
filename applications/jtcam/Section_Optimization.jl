@@ -1,4 +1,4 @@
-# Optimization section.
+# Optimization section — compute only.
 #
 # The optimization variables are Θ = (ℓ, I, b, Δφ): the tether length, the arm
 # inertia, the braking coefficient and the lemniscate half-width. The
@@ -14,38 +14,30 @@
 #    fixed. ℓ spans 15–200 m and b 1–1e6; the Δφ box is (10°, 90°), and the
 #    inertia floor is set by sizing the aluminium arm (see `I_BOUNDS`).
 #  - Δθ: sweep it from 2° to 20° at the optimum with Θ fixed, then re-optimize
-#    Θ at each angle, and plot the power and the line-tension envelope with and
-#    without re-optimization.
+#    Θ at each angle, and compare the power and the line-tension envelope with
+#    and without re-optimization.
 #  - SHAPE: 10×10 map of the same quantities over (Δθ, Δφ) at the optimal
 #    (ℓ, I, b), again without re-optimizing anything.
 #
-# Numerical sections and plot sections are separated by `##` markers: run the
-# file once, then re-run a plot section to iterate on a figure without
-# recomputing the optimizations.
-#
-# Run from the repo root:
-#   julia --project=applications/jtcam applications/jtcam/Section_Optimization.jl
-using Pkg
-Pkg.activate(@__DIR__)
+# All numerical results (including the arrays needed for the figures) are
+# returned by `compute_optimization()`. Plot styling, figure notes and all
+# figure writes live in `paper.jl`, which is the only runner.
 
 using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
 using KEEP: LimitCycle as LC
 using KEEP: Optimization as OPT
 
-using Plots
 using PyFormattedStrings: @f_str
 using SplitApplyCombine: invert
 using Logging: with_logger, NullLogger
 using LinearAlgebra: norm
 
-include(joinpath(@__DIR__, "plot_helpers.jl"))
-
 ## Settings
 const TOL = 1e-5
 const MAX_WALL_TIME = 120.0
 const SWEEP_WALL_TIME = 30.0  # a converged wind-sweep solve takes about a second
-const WIND_REF = 9.0
+# `WIND_REF` is a shared optimization setting defined in `paper_core.jl`.
 const SENSE = +
 const SYMS = [:l, :I, :b, :Δφ]  # ℓ, I, b and the half-width
 const L_BOUNDS = (15.0, 200.0)               # tether length ℓ (m)
@@ -62,13 +54,6 @@ const DTHETA_RANGE = (2.0, 20.0)              # Δθ sweep, in degrees
 const SHAPE_WINDOW = 0.2                      # ±20 % for the shape map
 const GRID_N = 10
 
-# Marks shared by the wind sweep, the landscape and the Δθ plots: the floor of
-# the landscape's y axis, the translucent band that marks the reference
-# condition (the same as at the reference wind speed) and the thin line of the
-# horizontal floor. Built here and passed to the plot functions.
-const GUIDES = (; ymin=0.9, line=(; c=:black, lw=5, alpha=0.3),
-    floor=(; c=:black, lw=1, alpha=1))
-
 # Parameter names, units and scales from the stored value to the displayed one.
 # An angle is rad2deg; a per-angle unit is the inverse, so that b·dα stays a
 # torque when dα is read in deg/s.
@@ -77,7 +62,7 @@ const TEX = Dict(:l => (raw"$\ell$", raw"\si{\meter}", identity),
     :b => (raw"$b$", raw"\si{\newton\meter\second\per\degree}", x -> x / rad2deg(1)),
     :Δφ => (raw"$\Delta\varphi$", raw"\si{\degree}", rad2deg))
 
-# Parameter names and units for the axis titles and the legends
+# Parameter names and units for the console tables
 const LABELS = Dict(:l => "ℓ", :I => "I", :b => "b",
     :Δθ => "Δθ", :Δφ => "Δφ")
 const UNITS = Dict(:l => "m", :I => "kg m²", :b => "N m deg s⁻¹",
@@ -207,17 +192,6 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref; rtol=1e-3)
 end
 
 maxnormalize(x) = x ./ maximum(x)
-
-"""
-Neighbour solution as an Ipopt initial guess. The cycle states are clamped just
-inside the box `OPT.optimize` asserts on: a cycle that starts at α = ±π puts the
-guess on the bound, which `optimize` rejects.
-"""
-clamp_guess(::Nothing) = (;)
-clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6),
-    dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6),
-    dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6),
-    tf=clamp(s.tf, 1.1e-3, 99.0), P=clamp(s.P, 1.1e-3, 9.9e4))
 
 """
 One optimization step with the compilation warm-up: the first solve with a
@@ -392,119 +366,6 @@ function landscape(p, syms; lower, upper, window=0.1, npoints=21, tol=TOL)
         box=[(lo / p[sym], up / p[sym]) for (sym, lo, up) in zip(syms, lower, upper)])
 end
 
-## Numerical: 9 m/s reference, one optimization over Θ
-p_start = PMP.build_para(w0=WIND_REF)
-p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
-lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
-upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
-
-@info "opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, ", ")))"
-opt_ref = opt_step(p_start, SYMS, lower, upper)
-p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
-
-## Numerical: wind sweep over Θ, from the 9 m/s optimum
-winds = range(5, 15, length=11)
-i_ref = findfirst(x -> x >= WIND_REF, winds)
-@info "opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s"
-sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref)
-
-## Numerical: Δθ sensitivity at the optimum, with the nominal angle included
-# 2° to 20° in steps of 2°, which already contains the nominal (6°)
-dtheta_angles = collect(range(DTHETA_RANGE..., length=10))
-@info "opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles"
-dtheta = dtheta_study(p_ref, dtheta_angles)
-
-## Numerical: Δθ sweep with Θ re-optimized at each angle
-@info "opt: Δθ sweep with Θ re-optimized, $(length(dtheta_angles)) angles"
-dtheta_opt = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
-    i0=argmin(abs.(dtheta_angles .- rad2deg(p_ref.Δθ))))
-
-## Numerical: 10×10 shape map at the optimal ℓ, I, b
-@info "opt: shape map $(GRID_N)×$(GRID_N) at the optimal ℓ, I, b"
-shape = shape_grid(p_ref,
-    range(1 - SHAPE_WINDOW, 1 + SHAPE_WINDOW, length=GRID_N),
-    range(rad2deg.(DPHI_BOUNDS)..., length=GRID_N))  # shape_grid takes degrees
-
-## Numerical: objective landscape around the Θ optimum
-@info "opt: objective landscape around the Θ optimum"
-LANDSCAPE = landscape(p_ref, SYMS; lower, upper)
-
-## Numerical: report
-function print_final_table()
-    stats = (init=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_start);
-        sense=SENSE, tol=TOL, save_everystep=true)),
-        opt=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_ref);
-            sense=SENSE, tol=TOL, save_everystep=true)))
-    cols = ((p_start, stats.init), (p_ref, stats.opt))
-    fmt(x) = string(round(x; sigdigits=6))
-    row(name, f) = println(rpad(name, 30), join([lpad(f(c), 14) for c in cols]))
-
-    println("\nfinal parameters")
-    println(rpad("", 30), join(lpad.(["init", "Θ"], 14)))
-    for sym in SYMS
-        row("$(LABELS[sym]) ($(UNITS[sym]))", c -> fmt(TEX[sym][3](c[1][sym])))
-    end
-    row("Δθ (deg, fixed)", c -> fmt(rad2deg(c[1].Δθ)))
-    println()
-    row("period (s)", c -> fmt(c[2].period))
-    row("objective P (kW)", c -> fmt(c[2].P / 1000))
-    row("min tension (kN)", c -> fmt(c[2].Tmin / 1000))
-    row("max tension (kN)", c -> fmt(c[2].Tmax / 1000))
-    row("max acceleration (m/s²)", c -> fmt(c[2].amax))
-    row("max kite speed (m/s)", c -> fmt(c[2].vmax))
-    println()
-
-    println("wind sweep over Θ (reference at $(round(Int, WIND_REF)) m/s)")
-    println(rpad("v (m/s)", 8), rpad("fixed P", 10), rpad("opt P", 10), rpad("gain", 8),
-        rpad("Tmax opt", 10), rpad("ℓ (m)", 9), rpad("I", 9), rpad("b", 9), "Δφ (deg)")
-    for k in eachindex(winds)
-        P0, P = sweep.no_opt[k].P / 1000, sweep.opt[k].P / 1000
-        θ = sweep.theta[k]
-        println(rpad(round(Int, winds[k]), 8), rpad(round(P0; digits=3), 10),
-            rpad(round(P; digits=3), 10), rpad(f"{(P / P0 - 1) * 100:+.1f} %", 8),
-            rpad(round(sweep.opt[k].Tmax / 1000; digits=2), 10),
-            rpad(round(θ[1]; digits=2), 9), rpad(round(θ[2]; digits=1), 9),
-            rpad(round(TEX[:b][3](θ[3]); digits=1), 9), round(rad2deg(θ[4]); digits=2))
-    end
-    println()
-
-    println("Δθ sweep: Θ fixed against re-optimized (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
-    println(rpad("Δθ (deg)", 10), rpad("P0 (kW)", 9), rpad("P (kW)", 9), rpad("gain", 8),
-        rpad("Tmax0 (kN)", 12), rpad("Tmax (kN)", 11), rpad("amax0", 9), "amax")
-    for (d0, d) in zip(dtheta, dtheta_opt)
-        gain = (d.P / d0.P - 1) * 100
-        println(rpad(f"{d0.Δθ:.1f}", 10), rpad(f"{d0.P / 1000:.2f}", 9),
-            rpad(f"{d.P / 1000:.2f}", 9),
-            rpad(abs(gain) < 0.5 ? "—" : f"{gain:+.0f} %", 8),
-            rpad(f"{d0.Tmax / 1000:.2f}", 12), rpad(f"{d.Tmax / 1000:.2f}", 11),
-            rpad(f"{d0.amax:.0f}", 9), f"{d.amax:.0f}")
-    end
-    println()
-
-    println("shape map (no re-optimization, $(GRID_N)×$(GRID_N) limit cycles)")
-    finite(Z) = filter(isfinite, Z)
-    println("  valid: ", count(isfinite, shape.P), " of ", length(shape.P), " cells")
-    for (name, Z, unit) in (("P", shape.P, "kW"), ("Tmax", shape.Tmax, "kN"),
-        ("Tmin", shape.Tmin, "kN"))
-        lo, hi = extrema(finite(Z))
-        println("  ", rpad(name, 5), round(lo; digits=2), " … ", round(hi; digits=2), " ", unit)
-    end
-    k = argmax(ifelse.(isfinite.(shape.amax), shape.amax, -Inf))
-    println("  max a: ", round(shape.amax[k]; digits=0), " m/s² at Δθ = ",
-        round((shape.factors[k[2]] - 1) * 100; digits=0), " %, Δφ = ",
-        round(shape.dphi_deg[k[1]]; digits=1), " deg")
-    println()
-
-    println("landscape at the Θ optimum (power relative to the optimum)")
-    println(rpad("parameter", 12), rpad("at -10 %", 12), rpad("at +10 %", 12), "box (÷/×)")
-    for (i, sym) in enumerate(SYMS)
-        println(rpad(LABELS[sym], 12), rpad(round(LANDSCAPE.ys[i][1]; digits=4), 12),
-            rpad(round(LANDSCAPE.ys[i][end]; digits=4), 12),
-            round.(LANDSCAPE.box[i]; digits=3))
-    end
-end
-
-## Numerical: LaTeX tables for the paper
 "One optimized parameter, in the units shown in the table."
 struct OptVar
     sym::String
@@ -593,318 +454,167 @@ function print_latex_tables(p_init, p_opt, lower, upper)
     println(join(["%% BEGIN TABLE 2", table_descr, table_opt, "%% END TABLE 2"], "\n\n"))
 end
 
-## Plot: wind sweep over Θ
 """
-Three half-width panels of the wind sweep: average power, line tension (min–max
-envelope), and the re-optimized parameters normalized by their maximum over the
-wind range. The dotted black curve is the 9 m/s reference held fixed, and a
-translucent black band marks that reference wind speed in every panel. The
-parameter panel has no legend: the braking coefficient is annotated at the lower
-left, where its curve is, and the other three are stacked on the right in their
-vertical order at the last wind speed.
+Run every numerical study of the optimization section and print the console
+and LaTeX tables. Every array needed by the figures in `paper.jl` is returned.
+
+Returned fields:
+- `p_start`: initial parameter set (the 9 m/s PTO-sizing point, b = I ω).
+- `lower`: lower box bounds of Θ = (ℓ, I, b, Δφ), in physical units.
+- `upper`: upper box bounds of Θ, in physical units.
+- `opt_ref`: reference optimization result `(p, P, iter, t_wall)` at 9 m/s.
+- `p_ref`: optimized parameter set at the reference wind speed (the Θ optimum).
+- `winds`: wind speeds (m/s) of the wind sweep, 5 to 15 in 11 steps.
+- `i_ref`: index in `winds` of the reference wind speed.
+- `sweep`: wind-sweep data `(; syms, no_opt, opt, theta)`; each entry is a cycle
+  statistics NamedTuple and `theta[k]` is the optimized Θ at that wind speed.
+- `dtheta_angles`: absolute Δθ angles (deg) of the Δθ sweeps, 2 to 20 in 10 steps.
+- `dtheta`: cycle statistics with Θ held at the optimum, one per Δθ angle.
+- `dtheta_opt`: cycle statistics with Θ re-optimized at each Δθ angle.
+- `shape`: shape-map data `(; P, Tmin, Tmax, amax, factors, dphi_deg)`, 10×10,
+  rows Δφ, columns Δθ factors; powers in kW, tensions in kN, acceleration m/s².
+- `P_map`: average power (kW) of the 10×10 shape map (`shape.P`).
+- `Tmin_map`: minimum line tension (kN) of the shape map (`shape.Tmin`).
+- `Tmax_map`: maximum line tension (kN) of the shape map (`shape.Tmax`).
+- `amax_map`: peak kite acceleration (m/s²) of the shape map (`shape.amax`).
+- `x_map`: Δθ deviation (%) on the shape heatmaps, `100 .* (factors .- 1)`.
+- `shape_dphi`: Δφ axis (deg) of the shape heatmaps (`shape.dphi_deg`).
+- `LANDSCAPE`: objective landscape `(; xs, syms, ys, window, center, box)`, one
+  row of normalized powers per optimized parameter around the Θ optimum.
+- `sols`: the two limit-cycle solutions at (`p_start`, `p_ref`) for time series.
+- `names`: the series names `(:init, :opt)` matching `sols`.
 """
-function plot_wind_sweep(winds, sweep, i_ref, guides)
-    (; syms, no_opt, opt, theta) = sweep
-    power_vec = [s.P for s in opt]
-    min_tension_vec = [s.Tmin for s in opt]
-    max_tension_vec = [s.Tmax for s in opt]
-    power0 = [s.P for s in no_opt]
-    min_tension0 = [s.Tmin for s in no_opt]
-    max_tension0 = [s.Tmax for s in no_opt]
-    theta_norm = [maxnormalize(θ) for θ in invert(theta)]
-    ref = "Fixed at $(round(Int, WIND_REF)) m/s"
-    ref_style = (; ls=:dot, c=:black)
+function compute_optimization()
+    ## Numerical: 9 m/s reference, one optimization over Θ
+    p_start = PMP.build_para(w0=WIND_REF)
+    p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
+    lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
+    upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
 
-    # Average power
-    f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 60), yticks=0:20:100, widen=true)
-    plot!(f1, winds, power0 ./ 1000; ref_style...)
-    plot!(f1, winds, power_vec ./ 1000; c=1)
+    @info "opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, ", ")))"
+    opt_ref = opt_step(p_start, SYMS, lower, upper)
+    p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
 
-    # Line tension, min–max envelope (lower is better for wearing the lines out)
-    f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", ylims=(0, 40), yticks=0:20:100, widen=true)
-    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style...)
-    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1)
-    plot!(f2, winds, min_tension_vec ./ 1000; c=1)
+    ## Numerical: wind sweep over Θ, from the 9 m/s optimum
+    winds = range(5, 15, length=11)
+    i_ref = findfirst(x -> x >= WIND_REF, winds)
+    @info "opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s"
+    sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref)
 
-    # Optimized parameters, normalized by their maximum over the wind range
-    n = length(syms)
-    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(0, 1), ylabel="Parameters", xformatter=:plain, xlabel="Wind speed (m/s)", legend=false, widen=true)
-    # plot!(f3, winds, [[p for _ in winds] for p in invert(theta_norm)[i_ref]]; lw=1.5, ref_style...)
-    plot!(f3, winds, theta_norm; c=permutedims(collect(1:n)))
+    ## Numerical: Δθ sensitivity at the optimum, with the nominal angle included
+    # 2° to 20° in steps of 2°, which already contains the nominal (6°)
+    dtheta_angles = collect(range(DTHETA_RANGE..., length=10))
+    @info "opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles"
+    dtheta = dtheta_study(p_ref, dtheta_angles)
 
-    # the reference wind speed is marked by the same band as the other guide
-    # lines; the backend draws series in list order, so moving it in front of
-    # the data keeps the band under the curves
-    for f in (f1, f2, f3)
-        vline!(f, [WIND_REF]; guides.line...)
-        pushfirst!(f[1].series_list, pop!(f[1].series_list))
+    ## Numerical: Δθ sweep with Θ re-optimized at each angle
+    @info "opt: Δθ sweep with Θ re-optimized, $(length(dtheta_angles)) angles"
+    dtheta_opt = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
+        i0=argmin(abs.(dtheta_angles .- rad2deg(p_ref.Δθ))))
+
+    ## Numerical: 10×10 shape map at the optimal ℓ, I, b
+    @info "opt: shape map $(GRID_N)×$(GRID_N) at the optimal ℓ, I, b"
+    shape = shape_grid(p_ref,
+        range(1 - SHAPE_WINDOW, 1 + SHAPE_WINDOW, length=GRID_N),
+        range(rad2deg.(DPHI_BOUNDS)..., length=GRID_N))  # shape_grid takes degrees
+
+    ## Numerical: objective landscape around the Θ optimum
+    @info "opt: objective landscape around the Θ optimum"
+    LANDSCAPE = landscape(p_ref, SYMS; lower, upper)
+
+    ## Numerical: time-series cycles, initial guess against optimum
+    names = (:init, :opt)
+    sols = map((p_start, p_ref)) do p
+        LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
     end
 
-    # annotations instead of a legend: the braking coefficient at the lower
-    # left (its curve is the lowest there), then the other three stacked on the
-    # right below the curves, in their vertical order at the last wind speed
-    names = Dict(:l => "Line length", :I => "Arm inertia",
-        :b => "Arm braking coefficient", :Δφ => "Lemniscate width")
-    ib = findfirst(==(:b), syms)
-    annotate!(f3, first(winds) + 0.25, theta_norm[ib][1] - 0.14,
-        (names[:b], ANNOTATIONFONTSIZE, :left, PALETTE[ib]))
-    y = 0.62
-    for i in sortperm([theta_norm[i][end] for i in eachindex(syms)]; rev=true)
-        i == ib && continue
-        annotate!(f3, last(winds) - 0.25, y,
-            (names[syms[i]], ANNOTATIONFONTSIZE, :right, PALETTE[i]))
-        y -= 0.10
+    ## Console report
+    print_final_table(p_start, p_ref, winds, sweep, dtheta, dtheta_opt, shape, LANDSCAPE)
+    print_latex_tables(p_start, p_ref, lower, upper)
+
+    # Heatmap axes, precomputed for `paper.jl` (see `plot_shape_grid`)
+    x_map = 100 .* (shape.factors .- 1)  # Δθ deviation (%) on the shape heatmaps
+    return (; p_start, lower, upper, opt_ref, p_ref, winds, i_ref, sweep,
+        dtheta_angles, dtheta, dtheta_opt, shape,
+        P_map=shape.P, Tmin_map=shape.Tmin, Tmax_map=shape.Tmax,
+        amax_map=shape.amax, x_map, shape_dphi=shape.dphi_deg,
+        LANDSCAPE, sols, names)
+end
+
+"""
+Print the console tables of the optimization section: final parameters and
+limit-cycle statistics, the wind sweep, the Δθ sweep, the shape map and the
+objective landscape."""
+function print_final_table(p_start, p_ref, winds, sweep, dtheta, dtheta_opt, shape, LANDSCAPE)
+    stats = (init=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_start);
+        sense=SENSE, tol=TOL, save_everystep=true)),
+        opt=cycle_stats(LC.compute_limit_cycle(PMP.build_vbpara(p_ref);
+            sense=SENSE, tol=TOL, save_everystep=true)))
+    cols = ((p_start, stats.init), (p_ref, stats.opt))
+    fmt(x) = string(round(x; sigdigits=6))
+    row(name, f) = println(rpad(name, 30), join([lpad(f(c), 14) for c in cols]))
+
+    println("\nfinal parameters")
+    println(rpad("", 30), join(lpad.(["init", "Θ"], 14)))
+    for sym in SYMS
+        row("$(LABELS[sym]) ($(UNITS[sym]))", c -> fmt(TEX[sym][3](c[1][sym])))
     end
+    row("Δθ (deg, fixed)", c -> fmt(rad2deg(c[1].Δθ)))
+    println()
+    row("period (s)", c -> fmt(c[2].period))
+    row("objective P (kW)", c -> fmt(c[2].P / 1000))
+    row("min tension (kN)", c -> fmt(c[2].Tmin / 1000))
+    row("max tension (kN)", c -> fmt(c[2].Tmax / 1000))
+    row("max acceleration (m/s²)", c -> fmt(c[2].amax))
+    row("max kite speed (m/s)", c -> fmt(c[2].vmax))
+    println()
 
-    # three panels of a third of the text height, half text width; the margins
-    # leave room for the axis labels (the theme sets margin = 0)
-    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(2, 1),
-        leftmargin=10Plots.mm, bottommargin=4Plots.mm)
-    # the three panels share one x axis: only the bottom panel labels it
-    foreach(i -> plot!(fig, subplot=i, xformatter=x -> "", xlabel=""), (1, 2))
-    return (; fig, panels=(f1, f2, f3))
-end
-
-## Plot: Δθ sensitivity (justifies holding Δθ fixed)
-"""
-The power and line-tension panels of the Δθ sweep, side by side: Δθ in degrees,
-2° to 20° in steps of 2°, which includes the nominal angle. The power is
-normalized by its value at the nominal with Θ fixed, so the two conditions meet
-at 1 there and the gap between them is what holding Θ costs. Θ held at the
-optimum is drawn as black points, Θ re-optimized at each angle as a black line;
-the tension panel draws both min–max envelopes, the fixed one as points and the
-re-optimized one filled. A `guides.line` band and a thin line mark the nominal
-angle.
-"""
-function plot_dtheta(dtheta, dopt, guides, mark)
-    ang = [d.Δθ for d in dtheta]
-    i0 = argmin(abs.(ang .- mark))
-    style = (; c=:black)
-
-    Pn = [d.P for d in dtheta] ./ dtheta[i0].P
-    Pn_opt = [d.P for d in dopt] ./ dtheta[i0].P
-    Tmin0 = [d.Tmin / 1000 for d in dtheta]
-    Tmax0 = [d.Tmax / 1000 for d in dtheta]
-    Tmin1 = [d.Tmin / 1000 for d in dopt]
-    Tmax1 = [d.Tmax / 1000 for d in dopt]
-
-    # power relative to its value at the nominal Δθ with Θ fixed, so the nominal
-    # sits at 1 on both curves and the axis runs from 0 to the peak
-    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, legend_marker(4)...,
-        label="Θ fixed", ylabel="P / P*", xlabel="Δθ (deg)",
-        ylims=(0, 1.03max(1, maximum(Pn_opt))),
-        yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright)
-    plot!(f1, ang, Pn_opt; style..., marker=:none, label="Θ re-optimized")
-
-    f2 = plot(ang, Tmax0; style..., seriestype=:scatter, ms=4, label="",
-        ylabel="Line tension (kN)", xlabel="Δθ (deg)")
-    scatter!(f2, ang, Tmin0; style..., ms=4, label="")
-    plot!(f2, ang, Tmax1; style..., label="", fillrange=Tmin1, fillalpha=0.1)
-    plot!(f2, ang, Tmin1; style..., label="")
-
-    foreach(f -> vline!(f, [mark]; guides.line...), (f1, f2))
-    foreach(f -> plot!(f, xticks=2:2:20, xlim=extrema(ang)), (f1, f2))
-    # the backend draws the series in list order, so moving the band in front of
-    # the data keeps it under the curves
-    for f in (f1, f2)
-        pushfirst!(f[1].series_list, pop!(f[1].series_list))
+    println("wind sweep over Θ (reference at $(round(Int, WIND_REF)) m/s)")
+    println(rpad("v (m/s)", 8), rpad("fixed P", 10), rpad("opt P", 10), rpad("gain", 8),
+        rpad("Tmax opt", 10), rpad("ℓ (m)", 9), rpad("I", 9), rpad("b", 9), "Δφ (deg)")
+    for k in eachindex(winds)
+        P0, P = sweep.no_opt[k].P / 1000, sweep.opt[k].P / 1000
+        θ = sweep.theta[k]
+        println(rpad(round(Int, winds[k]), 8), rpad(round(P0; digits=3), 10),
+            rpad(round(P; digits=3), 10), rpad(f"{(P / P0 - 1) * 100:+.1f} %", 8),
+            rpad(round(sweep.opt[k].Tmax / 1000; digits=2), 10),
+            rpad(round(θ[1]; digits=2), 9), rpad(round(θ[2]; digits=1), 9),
+            rpad(round(TEX[:b][3](θ[3]); digits=1), 9), round(rad2deg(θ[4]); digits=2))
     end
-    # a thin line on top makes the nominal unambiguous under the translucent band
-    foreach(f -> vline!(f, [mark]; c=:black, lw=0.8, alpha=0.7), (f1, f2))
+    println()
 
-    # the margins are per panel (the theme sets margin = 0): only the left one
-    # carries a y label and y tick labels
-    plot!(f1, leftmargin=18Plots.mm, bottommargin=7Plots.mm)
-    plot!(f2, leftmargin=6Plots.mm, bottommargin=7Plots.mm)
-    return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2))
-end
-
-## Plot: shape map over Δθ and Δφ
-"""
-Three heatmaps of the 10×10 shape map at the optimal ℓ, I, b: average power
-(kW), maximum line tension (kN) and peak kite acceleration (m/s²). The white
-dashed lines mark the nominal Δθ and the optimal Δφ.
-"""
-function plot_shape_grid(g, dphi_opt)
-    x = 100 .* (g.factors .- 1)
-    y = g.dphi_deg
-    function pane(Z, title)
-        plt = heatmap(x, y, Z; c=:viridis, title=title, titlefontsize=TICKFONTSIZE,
-            xticks=-20:10:20, yticks=10:10:90, xlim=extrema(x), ylim=extrema(y),
-            xlabel="Δθ deviation (%)", ylabel="Δφ (deg)")
-        vline!(plt, [0]; c=:white, ls=:dash, lw=1)
-        hline!(plt, [dphi_opt]; c=:white, ls=:dash, lw=1)
-        scatter!(plt, [0], [dphi_opt]; c=:white, markerstrokecolor=:black, ms=5)
-        return plt
+    println("Δθ sweep: Θ fixed against re-optimized (nominal Δθ = $(round(rad2deg(p_ref.Δθ); digits=1)) deg)")
+    println(rpad("Δθ (deg)", 10), rpad("P0 (kW)", 9), rpad("P (kW)", 9), rpad("gain", 8),
+        rpad("Tmax0 (kN)", 12), rpad("Tmax (kN)", 11), rpad("amax0", 9), "amax")
+    for (d0, d) in zip(dtheta, dtheta_opt)
+        gain = (d.P / d0.P - 1) * 100
+        println(rpad(f"{d0.Δθ:.1f}", 10), rpad(f"{d0.P / 1000:.2f}", 9),
+            rpad(f"{d.P / 1000:.2f}", 9),
+            rpad(abs(gain) < 0.5 ? "—" : f"{gain:+.0f} %", 8),
+            rpad(f"{d0.Tmax / 1000:.2f}", 12), rpad(f"{d.Tmax / 1000:.2f}", 11),
+            rpad(f"{d0.amax:.0f}", 9), f"{d.amax:.0f}")
     end
+    println()
 
-    p1 = pane(g.P, "P (kW)")
-    p2 = pane(g.Tmax, "Tmax (kN)")
-    p3 = pane(g.amax, "max a (m/s²)")
-    plot!(p2, ylabel="")
-    plot!(p3, ylabel="")
-    return plot(p1, p2, p3; layout=(1, 3), size=plot_size(4 / 3, 2),
-        leftmargin=6Plots.mm, bottommargin=5Plots.mm, topmargin=4Plots.mm)
-end
+    println("shape map (no re-optimization, $(GRID_N)×$(GRID_N) limit cycles)")
+    finite(Z) = filter(isfinite, Z)
+    println("  valid: ", count(isfinite, shape.P), " of ", length(shape.P), " cells")
+    for (name, Z, unit) in (("P", shape.P, "kW"), ("Tmax", shape.Tmax, "kN"),
+        ("Tmin", shape.Tmin, "kN"))
+        lo, hi = extrema(finite(Z))
+        println("  ", rpad(name, 5), round(lo; digits=2), " … ", round(hi; digits=2), " ", unit)
+    end
+    k = argmax(ifelse.(isfinite.(shape.amax), shape.amax, -Inf))
+    println("  max a: ", round(shape.amax[k]; digits=0), " m/s² at Δθ = ",
+        round((shape.factors[k[2]] - 1) * 100; digits=0), " %, Δφ = ",
+        round(shape.dphi_deg[k[1]]; digits=1), " deg")
+    println()
 
-## Plot: objective landscape around the Θ optimum
-"""
-Plot a normalized landscape from `landscape`: one row of four panels, one per
-parameter, with a single `P / P*` label on the left. Each panel is drawn in the
-colour of its parameter in the wind-sweep parameter panel. The x axis is the
-parameter in its own units, spanning ±`window` around the optimum, whose value
-is the middle tick (`-10%`, value, `+10%`). The y axis is the same in every
-panel, `(guides.ymin, 1)`, labelled on the leftmost panel only, with ticks at
-`guides.ymin` and 1 (the power curve of a parameter that loses more than 10 % is
-clipped at the floor). The cost function (still normalized by its optimum) is a
-line, solid inside the box constraint and dotted outside it, the crossing
-interpolated linearly between the two samples that bracket the bound. Each box
-constraint is a black double vertical line, always drawn (clipped when it falls
-outside the window) and on top of the line. A `guides.line` band marks the
-optimum vertically and a `guides.floor` line the power floor horizontally; both
-are drawn under the data.
-"""
-function plot_landscape(land, guides)
-    (; xs, syms, ys, window, box, center) = land
-    lo, hi = 1 - window, 1 + window
-
-    # the margins are per panel (the theme sets margin = 0) and leave room for
-    # the tick labels, which sit outside the axis in every panel
-    panels = [
-        begin
-            x0 = TEX[syms[i]][3](center[i])  # the optimum, in display units
-            ticks = ([x0 * lo, x0, x0 * hi],
-                [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"])
-            plt = plot(; xlims=(x0 * lo, x0 * hi), ylims=(guides.ymin, 1),
-                xticks=ticks, title="$(LABELS[sym])",
-                ylabel=(i == 1 ? "P / P*" : ""),
-                # only the leftmost panel labels its two ticks
-                yticks=(i == 1 ? ([guides.ymin, 1], [plain_tick(guides.ymin), "1"]) :
-                        ([guides.ymin, 1], ["", ""])),
-                leftmargin=(i == 1 ? 18 : 3)Plots.mm, rightmargin=4Plots.mm,
-                bottommargin=5Plots.mm, topmargin=2.5Plots.mm)
-            # value of the sampled curve at a factor x, linearly interpolated
-            interp(x) = begin
-                k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1)
-                ys[i][k] + (x - xs[k]) / (xs[k+1] - xs[k]) * (ys[i][k+1] - ys[i][k])
-            end
-            # factors from a to b, with the ends inserted (they need not be samples)
-            piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b)
-            xa, xb = max(box[i][1], lo), min(box[i][2], hi)  # box ∩ window
-            xa < xb && plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb));
-                c=i, ls=:solid)
-            for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi))
-                a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=i, ls=:dot)
-            end
-            for edge in box[i], k in (-1, 1)  # box constraint: double line, on top
-                vline!(plt, [x0 * (edge + k * window / 40)]; c=:black, lw=1.2)
-            end
-            # every panel draws the shared floor and the optimum line
-            hline!([guides.ymin]; guides.floor...)
-            vline!([x0]; guides.line...)
-            # the backend draws the series in list order, so move the two guide
-            # lines in front of the data to keep them underneath it
-            series = plt[1].series_list
-            pushfirst!(series, pop!(series), pop!(series))
-            plt
-        end for (i, sym) in enumerate(syms)
-    ]
-
-    return plot(panels...; layout=(1, length(syms)), size=plot_size(1/2, 2),
-        framestyle=:grid, grid=false)
-end
-
-## Plot: wind sweep, Δθ, shape map, landscape, time series
-my_defaults()
-
-(; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
-display(fig)
-savefig(fig, joinpath(OUTPATH, "optimization_wind_sweep_all.pdf"))
-for (f, panel) in zip(panels, ("power", "tension", "params"))
-    plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
-    display(f)
-    savefig(f, joinpath(OUTPATH, "optimization_wind_sweep_$(panel).pdf"))
-end
-
-#= Observation:
-Re-optimizing Θ gains +13.5 % at 5 m/s and +8.6 % at 15 m/s, and nothing at
-9 m/s by construction. ℓ shortens (30.3 → 26.1 m) and I falls (451 → 326 kg m²)
-with wind, while b rises (498 → 1151) and Δφ closes slightly (17.6° → 16.3°).
-At 15 m/s Tmax falls from 33.2 to 29.7 kN while Tmin rises from 12.2 to 16.1 kN;
-at 5 m/s Tmax rises from 3.34 to 3.49 kN and Tmin falls from 1.99 to 1.72 kN.
-=#
-
-## Varying Δθ
-my_defaults()
-fig_dtheta = plot_dtheta(dtheta, dtheta_opt, GUIDES, rad2deg(p_ref.Δθ))
-display(fig_dtheta)
-savefig(fig_dtheta, joinpath(OUTPATH, "optimization_dtheta.pdf"))
-
-#= Observation:
-Holding Θ costs almost everything away from the nominal: the power falls from
-12.25 kW at 6° to 3.96 kW at 2° and 0.75 kW at 20°, while Tmax rises to 13.8 kN
-at both ends and the peak acceleration reaches 5499 m/s² at 2° and 5115 at 20°.
-Re-optimizing Θ at each angle recovers nearly all of it: 12.82 kW at 2° and
-8.27 kW at 20° (+223 % and +1010 % over the fixed optimum), 8.3–12.8 kW over the
-whole sweep. The re-optimized power peaks at 2–4° (12.8 kW, 4.6 % above the
-nominal), so 6° is not power-optimal once Θ follows.
-The re-optimized loads are lower and flatter: Tmax stays at 9.9–10.8 kN and the
-peak acceleration at 831–1730 m/s², against 13.8 kN and 5499 m/s² with Θ fixed.
-The optimum slides from a light, weakly braked arm at 2° (ℓ = 28.1 m,
-I = 96 kg m², b = 240, Δφ on its 10° bound) to a heavy one at 20° (ℓ = 25.6 m,
-I = 1489 kg m², b = 2312, Δφ = 28.5°); ℓ stays within 25.6–28.1 m.
-=#
-
-## Δθ/Δφ heatmap
-# my_defaults()
-# fig_shape = plot_shape_grid(shape, rad2deg(p_ref.Δφ))
-# display(fig_shape)
-# savefig(fig_shape, joinpath(OUTPATH, "optimization_shape_grid.pdf"))
-
-##
-#= Observation:
-At the fixed optimal ℓ, I, b the shape map peaks at Δθ = −20 %, Δφ = 18.9°
-with 12.46 kW and collapses away from it: 6.44 kW at Δθ = +20 %, Δφ = 10°,
-1.2 kW at Δθ = −20 %, Δφ = 10°, and 2–3 kW for Δφ ≥ 36.7°. Tmax peaks at
-14.96 kN at Δθ = −20 %, Δφ = 10° and has a secondary ridge near 12.6 kN at
-Δφ = 36.7°; Tmin ranges from 10.5 kN there down to 0.13 kN at Δθ = +20 %,
-Δφ = 81°. The peak acceleration reaches 4731 m/s² at Δθ = +20 %, Δφ = 10° and
-falls to 129 m/s² at Δθ = +20 %, Δφ = 81°. Δφ = 90° has no pumping cycle at any
-Δθ at these fixed ℓ, I, b, so the last row of the map is empty.
-=#
-
-my_defaults()
-fig_land = plot_landscape(LANDSCAPE, GUIDES)
-display(fig_land)
-savefig(fig_land, joinpath(OUTPATH, "optimization_landscape.pdf"))
-
-##
-#= Observation:
-ℓ is the stiffest direction (−11.5 % at −10 %, −8.1 % at +10 %), I is about
-four times flatter (−2.6 %), and b more than twenty times flatter (−0.4 %). The
-Δφ optimum (16.6°) is interior now: the objective loses 5.4 % at 15.0° and 2.9 %
-at 18.3 %. The box lower bounds on ℓ, I and b sit far from the optimum, so none
-of them binds.
-=#
-
-my_defaults()
-names = (:init, :opt)
-sols = map((p_start, p_ref)) do p
-    LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
-end
-# savefig only: a second render of the same figure fails Plots' layout pass
-for (name, sol) in zip(names, sols)
-    let fig = plot_time_series(sol)
-        display(fig)
-        savefig(fig, joinpath(OUTPATH, "optimization_timeseries_$name.pdf"))
+    println("landscape at the Θ optimum (power relative to the optimum)")
+    println(rpad("parameter", 12), rpad("at -10 %", 12), rpad("at +10 %", 12), "box (÷/×)")
+    for (i, sym) in enumerate(SYMS)
+        println(rpad(LABELS[sym], 12), rpad(round(LANDSCAPE.ys[i][1]; digits=4), 12),
+            rpad(round(LANDSCAPE.ys[i][end]; digits=4), 12),
+            round.(LANDSCAPE.box[i]; digits=3))
     end
 end
-# "PTO optimum" is the initial guess (the power-take-off sizing point);
-# "Dynamic optimum" is the same system optimized for average power.
-fig_ts = plot_time_series_grid(sols; titles=("PTO optimum", "Dynamic optimum"))
-display(fig_ts)
-savefig(fig_ts, joinpath(OUTPATH, "optimization_timeseries_all.pdf"))
-
-## Console report
-print_final_table()
-print_latex_tables(p_start, p_ref, lower, upper)

@@ -27,13 +27,14 @@ if abspath(PROGRAM_FILE) == (@__FILE__) && get(ENV, "PAPER_LITERATE_EXEC", "0") 
     exit(0) #src
 end #src
 
-# # Rocking-Arm Kite Power Generation (KEEP): Compact Analysis
+# # Rocking-Arm Kite Power Generation (KEEP): Compact Numerical Analysis
 #
 # **Research question:** *Given a kite tethered to a rotating ground-level arm that is pulled left and right across the wind window, how much average power can we expect, and how robust is the design?*
+#
+# Structure follows the finished ECC paper (model, equilibria and limit cycles, limit-cycle optimization) in a condensed form; the full derivations live in the JTCAM draft. Every figure below is accompanied by the numerical data needed to write the final prose without re-running any computation. Plot styling is local to each section so it can be iterated on by hand.
 
 using Pkg #hide
 Pkg.activate(@__DIR__) #hide
-
 using KEEP: PointMass10 as PM10 #hide
 using KEEP: PointMass4 as PM4 #hide
 using KEEP: PointMassPara as PMP #hide
@@ -42,11 +43,8 @@ using KEEP: LimitCycle as LC #hide
 using KEEP: Optimization as OPT #hide
 using KEEP: Visualization as VIZ #hide
 using KEEP: DEFAULT_TOLERANCE, TAU0 #hide
-
 using OrdinaryDiffEqVerner: Vern9, ODEProblem #hide
 using OrdinaryDiffEqTsit5: Tsit5 #hide
-using BifurcationKit #hide
-const BK = BifurcationKit #hide
 using QuasiMonteCarlo: sample, HaltonSample #hide
 using SplitApplyCombine: invert #hide
 using BenchmarkTools: @belapsed #hide
@@ -57,499 +55,545 @@ using Plots #hide
 using PyFormattedStrings: @f_str #hide
 using Markdown #hide
 import ForwardDiff #hide
-
 include(joinpath(@__DIR__, "plot_helpers.jl")) #hide
+include(joinpath(@__DIR__, "paper_core.jl")) #hide
+include(joinpath(@__DIR__, "Section_10D.jl")) #hide
+include(joinpath(@__DIR__, "Section_Modelling.jl")) #hide
+include(joinpath(@__DIR__, "Section_Numerical_analysis.jl")) #hide
+include(joinpath(@__DIR__, "Section_Optimization.jl")) #hide
+include(joinpath(@__DIR__, "paper_cache.jl")) #hide
+include(joinpath(@__DIR__, "paper_output.jl")) #hide
 my_defaults() #hide
 
-function save_fig(fig, name) #hide
-    savefig(fig, joinpath(OUTPATH, "$(name).pdf")) #hide
-    savefig(fig, joinpath(OUTPATH, "$(name).png")) #hide
-    return nothing #hide
+# Shared guide lines for the optimization panels. Kept here, next to the plots
+# that use it, because it is pure styling.
+const GUIDES = (; ymin=0.9, line=(; c=:black, lw=5, alpha=0.3), floor=(; c=:black, lw=1, alpha=1)) #hide
+
+# One call site for every numerical study. FORCE_RECOMPUTE=1 recomputes all;
+# otherwise a single hash of all compute inputs decides. See paper_cache.jl.
+function compute_all() #hide
+    (D10=compute_10D(), MOD=compute_modelling(), NUM=compute_numerical(), OPT=compute_optimization()) #hide
 end #hide
-
-function kite_velocity(u, p)
-    pos(q_) = PM4.compute_OK(PM4.compute_Rτ(q_, p), p)
-    return ForwardDiff.jacobian(pos, u[1:2]) * u[3:4]
-end
-
-function cycle_metrics(sol; n=1001)
-    sol === nothing && return (; P=NaN, period=NaN, Tmin=NaN, Tmax=NaN, αmax=NaN, # no orbit: NaN, do not crash
-        amax=NaN, vmax=NaN, κmax=NaN, Rmin=NaN)
-    ts = range(sol.t[1], sol.t[end], n)
-    us = sol.(ts)
-    p = sol.prob.p
-    tension = PM4.compute_line_tension.(us, Ref(p))
-    ok = isfinite.(tension)
-    vel = kite_velocity.(us, Ref(p))
-    acc = PM4.kite_acceleration.(us, Ref(p))
-    κ = [norm(v × a) / max(norm(v)^3, 1e-12) for (v, a) in zip(vel, acc)]
-    return (;
-        P = sol.u[end][5] / sol.t[end],
-        period = sol.t[end],
-        Tmin = minimum(tension[ok]),
-        Tmax = maximum(tension[ok]),
-        αmax = maximum(u -> abs(rem2pi(u[1], RoundNearest)), us),
-        amax = maximum(norm, acc),
-        vmax = maximum(norm, vel),
-        κmax = maximum(κ),
-        Rmin = 1 / maximum(κ),
-    )
-end
+results = load_or_compute() #hide
 nothing #hide
 
-# ## 1. Mathematical Model & 10D-to-4D Validation
+# ## 1. Model and Geometry
 #
-# The KEEP system couples a horizontal arm $\mathbf{OA} = a\,\hat{\mathbf{a}}(\alpha)$ rotating about $\hat{\mathbf{z}}$ (inertia $I$, generator braking torque $T(\dot\alpha) = -b\dot\alpha$) to a kite $K$ via tethers of fixed length $\ell > a$.
-# The kite is passively guided on a conical lemniscate $\mathbf{OK} = r(\alpha,\tau)\,\hat{\mathbf{r}}(\tau)$ with $\theta(\tau) = \theta_0 + \Delta\theta\sin 2\tau$ and $\phi(\tau) = \phi_0 + \Delta\phi\sin\tau$.
-# Solving the loop closure $\norm{\mathbf{OK} - \mathbf{OA}} = \ell$ gives $r(\alpha,\tau) = p + \sqrt{p^2 + \ell^2 - a^2}$ ($p = \hat{\mathbf{r}}\cdot\mathbf{OA}$), reducing the 5-DoF (10D) DAE to a 2-DoF (4D) pure ODE $M(\mathbf{q})\ddot{\mathbf{q}} = \mathbf{h}(\mathbf{q},\dot{\mathbf{q}})$ in $\mathbf{q} = (\alpha,\tau)$, augmented with generator work $\dot W = b\dot\alpha^2 \ge 0$ so average cycle power is $\bar P = W(t_f)/t_f$.
+# The kite is constrained to a lemniscate on a cone; the arm rotates in the horizontal plane. The two figures below fix the geometry and the meaning of the shape parameters $(\theta_0, \Delta\theta, \Delta\varphi)$ and of the phase $\tau$.
 
-p_nom = PMP.build_para()
-vbp_nom = PMP.build_vbpara(p_nom)
+# Geometry of the reachable set. `a = 2 m`, `ℓ = 3 m` are illustrative, not the optimized values.
+function plot_spindle_torus(r) #hide
+    m = r.MOD #hide
+    fig = plot(m.xs, m.ys, m.zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal, #hide
+        xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", #hide
+        title="Spindle torus, not to scale", label="", legend=:outerright) #hide
+    plot!(fig, m.a * cos.(m.θc), m.a * sin.(m.θc), zero(m.θc); c=:blue, lw=3, label="") #hide
+    plot!(fig, [0, m.a], [0, 0], [0, 0]; c=:black, lw=3, label="") #hide
+    plot!(fig, [m.a, m.kite_pos[1]], [0, 0], [0, m.kite_pos[3]]; c=:black, lw=3, label="") #hide
+    plot!(fig, m.a .+ m.l .* cos.(m.θc), zero(m.θc), m.l .* sin.(m.θc); c=:orange, lw=2, label="") #hide
+    plot!(fig, (m.a + m.l * cos(m.β0)) .* cos.(m.θc), (m.a + m.l * cos(m.β0)) .* sin.(m.θc), #hide
+        fill(m.l * sin(m.β0), length(m.θc)); c=:green, lw=2, label="") #hide
+    scatter!(fig, [m.kite_pos[1]], [0], [m.kite_pos[3]]; c=:red, ms=7, label="") #hide
+    scatter!([]; c=:red, ms=7, legend_marker(7)...) #hide
+    plot!([]; c=:black, lw=3, label="Arm and lines") #hide
+    plot!([]; c=:blue, lw=3, label="Arm-tip locus") #hide
+    plot!([]; c=:orange, lw=2, label="Kite longitude") #hide
+    plot!([]; c=:green, lw=2, label="Kite latitude") #hide
+    plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm) #hide
+    plot!(size=plot_size(1, 1.06)) #hide
+    plot!(fig, xticks=edge_ticks(fig[1], :x; include_zero=true), #hide
+        yticks=edge_ticks(fig[1], :y; include_zero=true), #hide
+        zticks=edge_ticks(fig[1], :z; include_zero=true)) #hide
+    return fig #hide
+end #hide
 
-#Nominal parameter table #hide
+function plot_eight_plot(r) #hide
+    m = r.MOD #hide
+    plot(xmirror=true) #hide
+    plot!(xticks=([-1, 0, 1], (raw"$-Δφ$", raw"$φ = 0$", raw"$Δφ$")), #hide
+        yticks=([-1, 0, 1], (raw"$θ_0 + Δθ$", raw"$θ = θ_0$", raw"$θ_0 - Δθ$"))) #hide
+    plot!(m.phi_vals, m.theta_vals; c=:grey) #hide
+    plot!(sind.([0, m.τ_φ]), sind.(2 .* [m.τ_φ, m.τ_φ]); color=:black) #hide
+    annotate!(sum(sind.([0, m.τ_φ])) / 2, sum(sind.(2 .* [m.τ_φ, m.τ_φ])) / 2 - 0.1, #hide
+        (raw"$Δφ$", ANNOTATIONFONTSIZE, :black, :top)) #hide
+    plot!(sind.([m.τ_θ, m.τ_θ]), sind.(2 .* [m.τ_θ, 0]); color=:black) #hide
+    annotate!(sum(sind.([m.τ_θ, m.τ_θ])) / 2 + 0.05, sum(sind.(2 .* [m.τ_θ, 0])) / 2, #hide
+        (raw"$Δθ$", ANNOTATIONFONTSIZE, :black, :left)) #hide
+    quiver!([0], [0]; quiver=([m.dx], [-m.dy]), c=m.up_col) #hide
+    quiver!([0], [0]; quiver=([-m.dx], [m.dy]), c=m.down_col) #hide
+    annotate!(m.dx - 0.05, -m.dy - 0.25, (raw"$\dot{\tau} > 0$", ANNOTATIONFONTSIZE, :center, PALETTE[m.up_col])) #hide
+    annotate!(-m.dx + 0.05, m.dy + 0.25, (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[m.down_col])) #hide
+    plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm) #hide
+    return current() #hide
+end #hide
+
+save_fig(plot_spindle_torus(results), "spindle_torus") #hide
+save_fig(plot_eight_plot(results), "eight_plot") #hide
+
 Markdown.parse("""
-| Symbol | Description | Value | Unit |
-| :--- | :--- | ---: | :--- |
-| \$a\$ | Arm length | $(p_nom.a) | m |
-| \$\\ell\$ | Line length | $(p_nom.l) | m |
-| \$m\$ | Kite mass | $(p_nom.m) | kg |
-| \$I\$ | Arm inertia | $(p_nom.I) | kg m² |
-| \$S\$ | Kite surface | $(p_nom.S) | m² |
-| \$C_L / C_D\$ | Glide ratio (\$C_L = $(p_nom.C_L)\$) | $(round(p_nom.C_L / p_nom.C_D; digits=1)) | — |
-| \$w_0\$ | Reference wind speed (at \$z_0 = $(p_nom.z0)\$ m) | $(p_nom.w0) | m/s |
-| \$\\theta_0, \\Delta\\theta, \\Delta\\phi\$ | Lemniscate angles | $(round(rad2deg(p_nom.θ0); digits=1))°, $(round(rad2deg(p_nom.Δθ); digits=1))°, $(round(rad2deg(p_nom.Δφ); digits=1))° | deg |
+**Figure data — geometry.** Arm \$a = $(results.MOD.a)\$ m, tether \$\\ell = $(results.MOD.l)\$ m; the sampled elevation is \$\\beta_0 = $(round(rad2deg(results.MOD.β0); digits=0))^\\circ\$, so the kite sits at $([round(x; digits=2) for x in results.MOD.kite_pos]) m. The reachable set is a spindle torus because \$\\ell > a\$; the arm-tip locus is the blue circle. The lemniscate uses \$\\tau_\\varphi = $(results.MOD.τ_φ)^\\circ\$ and \$\\tau_\\theta = $(results.MOD.τ_θ)^\\circ\$ as illustration angles; increasing \$\\dot\\tau\$ climbs in the middle, decreasing \$\\dot\\tau\$ climbs on the sides.
+
+**Prose hint:** these two panels replace the configuration sketch and the lemniscate sketch of the ECC paper; cite them when introducing \$(\\alpha, \\tau)\$ and \$(\\theta_0, \\Delta\\theta, \\Delta\\varphi)\$.
+
+![Spindle torus](figs/spindle_torus.svg)
+
+![Lemniscate parametrisation](figs/eight_plot.svg)
 """) #hide
 
-# ### Equivalence with the 10D DAE Reference
+# ## 2. Equilibria and Limit Cycles
 #
-# We compare the 4D ODE against the raw 10D index-2 DAE and 10D with a manifold-projection callback (`Vern9` across tolerances $10^{-2}\dots 10^{-12}$ against a $10^{-14}$ reference, plus `Tsit5` runtime at $\text{tol}=10^{-3}, t_f=100\text{ s}$).
+# All computations use the kinetic baseline $b = I\\omega$ (`PMP.optimal_torque_slope`), which gives one limit cycle per iteration. The phase-space picture, the two attracting cycles and their convergence rate are the ingredients needed for the dynamics section of the final paper.
 
-τ0_val, dτ0_val = 1e-10, 10.0 #hide
-u0_10 = PM10.init_u(τ0_val, dτ0_val, p_nom) #hide
-u0_4 = PM4.build_u(α=0, dα=0, dτ=dτ0_val; τ=τ0_val) #hide
-cb_10_save = PM10.build_manifold_projection(u0_10; save=true, tol=1e-10) #hide
-cb_10_nosave = PM10.build_manifold_projection(u0_10; save=false, tol=1e-10) #hide
+my_theme = (; #hide
+    downwind=(; c=plot_color(:grey, 0.08)), #hide
+    upwind=(; c=plot_color(:red, 0.08)), #hide
+    streamlines=(; c=:black, alpha=0.7, lw=Plots.default(:lw) / 6), #hide
+    heads=(; c=:black, alpha=0.5, lw=0), #hide
+    nullcline_tau=(; c=1, ls=:solid), #hide
+    nullcline_alpha=(; c=2, ls=:solid), #hide
+    eq_legend=(; c=:black, shape=:circle, ms=Plots.default(:ms), legend_marker(Plots.default(:ms))...), #hide
+) #hide
+theme = my_theme #hide
 
-tf_drift, tol_drift = 100.0, 1e-3
-sol10_drift = PM10.integrate(u0_10, tf_drift, p_nom, Tsit5(); save_everystep=true, tol=tol_drift)
-sol10_cb_drift = PM10.integrate(u0_10, tf_drift, p_nom, Tsit5(); save_everystep=true, tol=tol_drift, callback=cb_10_nosave)
+"Marker style from the equilibrium characteristics: fill = arm wind, shape = zone, stroke = kite side." #hide
+ss_style(q, vbp) = ( #hide
+    c = is_down(q) ? :white : :black, #hide
+    markerstrokecolor = is_down(q) ? :black : :white, #hide
+    shape = is_center(q, vbp) ? :circle : :diamond, #hide
+    ms = Plots.default(:ms), #hide
+    markerstrokewidth = is_down(q) ? 8 : 10, #hide
+) #hide
 
-pos10(sol) = [PM10.compute_pos1(u[1:5], sol.prob.p) for u in sol.u]
-pos4(sol) = [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
+function plot_equilibria_phase_space(r) #hide
+    d = r.NUM #hide
+    plot(; xlims=(-180, 180), ylims=(-180, 180), aspect_ratio=:equal, #hide
+        xticks=([-180, 0, 180], ["-180", "0", "180"]), #hide
+        yticks=([-180, 0, 180], ["-180", "0", "180"]), #hide
+        xlabel="α (deg)", ylabel="τ (deg)", grid=false, framestyle=:semi, legend=:outerright, colorbar=false) #hide
+    vspan!([-180, -90]; theme.upwind..., label="Upwind arm") #hide
+    vspan!([90, 180]; theme.upwind...) #hide
+    vspan!([-90, 90]; theme.downwind...) #hide
+    plot!(rad2deg.(d.line_x), rad2deg.(d.line_y); theme.streamlines...) #hide
+    ax, ay = rad2deg.(d.ax), rad2deg.(d.ay) #hide
+    L, W = rad2deg(0.2), rad2deg(0.06) #hide
+    heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v), #hide
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u), #hide
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)]) #hide
+        for (s, u, v) in zip(zip(ax, ay), d.au, d.av)] #hide
+    plot!(heads; theme.heads...) #hide
+    contour!(rad2deg.(d.αs), rad2deg.(d.τs), last.(d.dd); levels=[0], theme.nullcline_tau...) #hide
+    contour!(rad2deg.(d.αs), rad2deg.(d.τs), first.(d.dd); levels=[0], theme.nullcline_alpha...) #hide
+    plot!([NaN], [NaN]; theme.nullcline_tau..., label="D²(τ) = 0") #hide
+    plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0") #hide
+    styles = map(q -> ss_style(q, d.vbp), d.ss) #hide
+    scatter!(rad2deg.(first.(d.ss)), rad2deg.(last.(d.ss)); #hide
+        c=getproperty.(styles, :c), markerstrokecolor=getproperty.(styles, :markerstrokecolor), #hide
+        shape=getproperty.(styles, :shape), ms=getproperty.(styles, :ms), #hide
+        markerstrokewidth=getproperty.(styles, :markerstrokewidth)) #hide
+    scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium") #hide
+    plot!(widen=1.06) #hide
+    plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm, topmargin=5Plots.mm, size=plot_size(1, 1.14)) #hide
+    return current() #hide
+end #hide
 
-tf_conv = 20.0 #hide
-saveat_conv = range(0, tf_conv, 1001) #hide
-tols_conv = exp10.(-2:-1:-12) #hide
-pref_conv = pos4(PM4.integrate(u0_4, tf_conv, vbp_nom, Vern9(); tol=1e-14, saveat=saveat_conv)) #hide
-err10 = [maximum(norm.(pos10(PM10.integrate(u0_10, tf_conv, p_nom, Vern9(); tol, saveat=saveat_conv)) .- pref_conv)) for tol in tols_conv] #hide
-err10cb = [maximum(norm.(pos10(PM10.integrate(u0_10, tf_conv, p_nom, Vern9(); tol, saveat=saveat_conv, callback=cb_10_nosave)) .- pref_conv)) for tol in tols_conv] #hide
-err4 = [maximum(norm.(pos4(PM4.integrate(u0_4, tf_conv, vbp_nom, Vern9(); tol, saveat=saveat_conv)) .- pref_conv)) for tol in tols_conv] #hide
+function plot_equilibria_eight_circle(r) #hide
+    d = r.NUM #hide
+    p_downwind = VIZ.plot_eight_circle(d.ss_downwind, d.vbp; plot_kwargs=(; color=:black, lw=2), #hide
+        marker_kwargs=map(q -> ss_style(q, d.vbp), d.ss_downwind), project_eight=true) #hide
+    plot!(title="Downwind arm", background_color_subplot=theme.downwind.c) #hide
+    p_upwind = VIZ.plot_eight_circle(d.ss_upwind, d.vbp; plot_kwargs=(; color=:black, lw=2), #hide
+        marker_kwargs=map(q -> ss_style(q, d.vbp), d.ss_upwind), project_eight=true) #hide
+    plot!(title="Upwind arm", background_color_subplot=theme.upwind.c) #hide
+    return plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2)) #hide
+end #hide
 
-drift_pos_10 = norm(PM10.manifold_residuals!(similar(u0_10, 6), sol10_drift.u[end], p_nom)[1:3]) #hide
-drift_pos_cb = norm(PM10.manifold_residuals!(similar(u0_10, 6), sol10_cb_drift.u[end], p_nom)[1:3]) #hide
+function plot_eigvals(r) #hide
+    d = r.NUM #hide
+    hline([0], c=:black) #hide
+    for (k, q) in enumerate(d.ss_) #hide
+        local style = is_down(q) ? theme.downwind : theme.upwind #hide
+        vspan!([k - 1/4, k + 1/4]; style...) #hide
+        scatter!(fill(k, length(d.evs[k])), real.(d.evs[k]); ss_style(q, d.vbp)...) #hide
+    end #hide
+    annotate!([2.5, 2.5], [7.5, -1.5], ["Repulsive", "Attractive"]) #hide
+    plot!(xlabel="Equilibrium", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false) #hide
+    plot!(xticks=(1:4, ["" for _ in 1:4])) #hide
+    plot!(leftmargin=5Plots.mm, bottommargin=2Plots.mm) #hide
+    return current() #hide
+end #hide
 
-btime4 = @belapsed PM4.integrate($u0_4, $tf_drift, $vbp_nom; save_everystep=true, tol=$tol_drift) seconds = 1
-btime10 = @belapsed PM10.integrate($u0_10, $tf_drift, $p_nom; save_everystep=true, tol=$tol_drift) seconds = 1
-btime10_cb = @belapsed PM10.integrate($u0_10, $tf_drift, $p_nom; save_everystep=true, tol=$tol_drift, callback=$cb_10_save) seconds = 1
+function plot_equilibrium_trajectories(r) #hide
+    d = r.NUM #hide
+    plot(; xlims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)), #hide
+        ylims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)), aspect_ratio=:equal, #hide
+        xticks=([-180, 0, 180], ["-180", "0", "180"]), #hide
+        yticks=([-180, 0, 180], ["-180", "0", "180"]), #hide
+        xlabel="α (deg)", ylabel="τ (deg)", grid=false, framestyle=:semi, legend=:outerright, colorbar=false) #hide
+    vspan!([-180, -90]; theme.upwind..., label="Arm upwind") #hide
+    vspan!([90, 180]; theme.upwind...) #hide
+    vspan!([-90, 90]; theme.downwind..., label="Arm downwind") #hide
+    contour!(rad2deg.(d.αs), rad2deg.(d.τs), last.(d.dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="") #hide
+    contour!(rad2deg.(d.αs), rad2deg.(d.τs), first.(d.dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="") #hide
+    styles = map(q -> ss_style(q, d.vbp), d.ss) #hide
+    scatter!(rad2deg.(first.(d.ss)), rad2deg.(last.(d.ss)); #hide
+        c=getproperty.(styles, :c), markerstrokecolor=getproperty.(styles, :markerstrokecolor), #hide
+        shape=getproperty.(styles, :shape), ms=getproperty.(styles, :ms), #hide
+        markerstrokewidth=getproperty.(styles, :markerstrokewidth)) #hide
+    scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium") #hide
+    for qs in d.traj_qs #hide
+        plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="") #hide
+    end #hide
+    plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm, topmargin=5Plots.mm, size=plot_size(1, 1.22)) #hide
+    return current() #hide
+end #hide
 
-fig_conv = plot(tols_conv, err10; marker=:circle, legend_marker()..., label="10D", xscale=:log10, yscale=:log10, #hide
-    xflip=true, ymirror=true, xlabel="Tolerance", ylabel="Max position error (m)", #hide
-    xticks=exp10.(-12:3:-3), yticks=exp10.(-15:3:0), legend=:topright, size=SIZE_HALF) #hide
-plot!(fig_conv, tols_conv, err10cb; marker=:square, legend_marker()..., label="10D + callback") #hide
-plot!(fig_conv, tols_conv, err4; marker=:diamond, legend_marker()..., label="4D") #hide
-plot!(fig_conv; bottommargin=4Plots.mm, rightmargin=6Plots.mm) #hide
-save_fig(fig_conv, "three_models_convergence") #hide
+function plot_convergence_panel(c; legend=true) #hide
+    (; dτ, distances, slope, i1) = c #hide
+    plt = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:100, #hide
+        ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), #hide
+        xlabel=f"""Lemniscate revolutions, D(τ) $(dτ>0 ? ">" : "<") 0""") #hide
+    plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black) #hide
+    annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black"))) #hide
+    distance_style = (; c=dτ > 0 ? 1 : 2, ls=:dot, marker=:circle, legend_marker()...) #hide
+    plot!(distances .+ 1e-16; distance_style...) #hide
+    if legend #hide
+        plot!([NaN]; distance_style..., label=raw"$|| x_i - x_\infty  ||$") #hide
+    end #hide
+    return plt #hide
+end #hide
+
+function plot_limit_cycle_convergence(r) #hide
+    d = r.NUM #hide
+    p_conv_p = plot_convergence_panel(d.conv.p; legend=false) #hide
+    p_conv_m = plot_convergence_panel(d.conv.m; legend=true) #hide
+    plot!(p_conv_p, leftmargin=11Plots.mm) #hide
+    plot!(p_conv_m, leftmargin=5Plots.mm) #hide
+    plot!(p_conv_p, ylabel="Distance to limit") #hide
+    conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL) #hide
+    plot!(bottommargin=7Plots.mm) #hide
+    return conv_two #hide
+end #hide
+
+function plot_yz_limit_cycles(r) #hide
+    d = r.NUM #hide
+    plot(; aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20) #hide
+    plot!(invert(yz_split(d.lc_m, d.n_splits))..., lw=4, c=2, arrows=true) #hide
+    plot!(invert(yz_split(d.lc_p, d.n_splits))..., lw=2, c=1, arrows=true) #hide
+    plot!([NaN], [NaN], c=1, label="D(τ) > 0") #hide
+    plot!([NaN], [NaN], c=2, label="D(τ) < 0") #hide
+    plot!([0], [26]) #hide
+    c, δ = d.c, d.δ #hide
+    lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], #hide
+        inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey) #hide
+    l = plot!().inset_subplots[1] #hide
+    xticks_ = (c[1]-δ):δ:(c[1]+δ) #hide
+    yticks_ = (c[2]-δ):δ:(c[2]+δ) #hide
+    xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_]) #hide
+    yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_]) #hide
+    plot!(l, tickfontsize=TICKFONTSIZE - 1) #hide
+    plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1)) #hide
+    return current() #hide
+end #hide
+
+save_fig(plot_equilibria_phase_space(results), "equilibria_phase_space") #hide
+save_fig(plot_equilibria_eight_circle(results), "equilibria_eight_circle") #hide
+save_fig(plot_eigvals(results), "_equilibria_eigvals") #hide
+save_fig(plot_equilibrium_trajectories(results), "_equilibria_trajectories") #hide
+save_fig(plot_time_series(results.NUM.sol), "time_series_4D") #hide
+save_fig(plot_limit_cycle_convergence(results), "limit_cycle_convergence") #hide
+save_fig(plot_yz_limit_cycles(results), "yz_limit_cycles") #hide
 
 Markdown.parse("""
-- **Algebraic drift (\$t_f = $(Int(tf_drift))\\,\\text{s}\$, \$\\text{tol}=10^{-3}\$):** raw 10D drifts by **$(round(drift_pos_10; digits=2)) m** on position; the projection callback reduces this to **$(f"{drift_pos_cb:.1e}") m** at a **$(round(btime10_cb / btime10; digits=2))×** runtime penalty.
-- **Equivalence:** all three formulations converge to the same trajectory (max position discrepancy **$(f"{err4[end]:.1e}") m** at \$\\text{tol}=10^{-12}\$).
-- **Performance:** the 4D ODE is drift-free by construction and runs in **$(round(1e3 * btime4; digits=2)) ms**, a **$(round(btime10 / btime4; digits=1))×** speedup over raw 10D (**$(round(1e3 * btime10; digits=2)) ms**) and **$(round(btime10_cb / btime4; digits=1))×** over 10D + callback (**$(round(1e3 * btime10_cb; digits=2)) ms**).
+**Figure data — equilibria.** There are $(length(results.NUM.ss)) equilibria, all unstable: the largest real eigenvalue lies in \$[$(round(minimum(maximum(real, e) for e in results.NUM.evs); digits=2)), $(round(maximum(maximum(real, e) for e in results.NUM.evs); digits=2))]\\,\\text{s}^{-1}\$. The arm and lines are coplanar at every equilibrium ($(results.NUM.all_aligned)). The two top views separate $(length(results.NUM.ss_downwind)) downwind from $(length(results.NUM.ss_upwind)) upwind equilibria.
 
-![10D vs 4D convergence](figs/three_models_convergence.png)
+**Figure data — limit cycles.** The two attracting cycles carry \$P_+ = $(round(results.NUM.cycles[1].λ; digits=3))\$ (Floquet multiplier) and \$P_- = $(round(results.NUM.cycles[2].λ; digits=3))\$. Their convergence slopes are $(results.NUM.cycle_lines[1]) and $(results.NUM.cycle_lines[2]). A deflated-shooting inventory over $(BK_NSEEDS) Halton seeds finds $(length(results.NUM.found)) additional cycles; quasi-Monte-Carlo routes $(results.NUM.qmc[1]) / $(BK_NSEEDS) seeds to \$D(\\tau)>0\$, $(results.NUM.qmc[2]) / $(BK_NSEEDS) to \$D(\\tau)<0\$, and $(results.NUM.qmc[3]) elsewhere.
+
+**Figure data — trajectories near equilibria.** Each panel seeds $(results.NUM.N_eq) trajectories on a circle of radius \$\\pi/10\$ at rest around one equilibrium and integrates them for $(results.NUM.t_eq) s; the translucent black curves show the local flow directly.
+
+**Figure data — convergence.** Averaged over the two directions, the Poincaré map loses about two digits of distance per revolution until the solver tolerance \$10^{-13}\$ is reached. The slope printed in each panel is the quantity to quote in prose; the dashed perturbed cloud is deliberately absent here (\$n\\text{trace}=0\$).
+
+**Prose hint:** the two cycles are distinct in the \$YZ\$ projection (zoom inset), so the phase of \$\\tau\$ is physically meaningful; the deflation plus QMC inventory supports the claim that only two attracting cycles exist.
+
+**Open questions from the JTCAM draft:** confirm the colour-code wording in the phase-space caption (max \$\\mathrm{Re}(\\lambda)\\approx 3\$ for the circle and \$\\approx 12\$ for the diamonds); decide whether to keep the coplanarity remark in the main text or the appendix.
+
+![Equilibria in phase space](figs/equilibria_phase_space.svg)
+
+![Equilibria in the eight/circle view](figs/equilibria_eight_circle.svg)
+
+![Eigenvalues at representative equilibria](figs/_equilibria_eigvals.svg)
+
+![Trajectories near equilibria](figs/_equilibria_trajectories.svg)
+
+![Transient settling onto the pumping cycle](figs/time_series_4D.svg)
+
+![Convergence on the Poincaré section](figs/limit_cycle_convergence.svg)
+
+![Two limit cycles in the YZ plane](figs/yz_limit_cycles.svg)
 """) #hide
 
-# ## 2. 1D Analytical PTO Sizing (Simplified Baseline)
+# ## 3. Limit-Cycle Optimization and Robustness
 #
-# To obtain an analytical starting point for the power take-off (PTO) parameters $(I, b)$ before running 4D optimizations, we reduce the arm dynamics to $I\ddot\alpha + b\dot\alpha = C_M\cos(\omega t)$ with harmonic torque amplitude $C_M = T_s S a \sin\theta_0$ (wing loading $T_s = 1000\text{ N/m}^2$, i.e., $F_s = T_s S = 10\text{ kN}$ total) and zero-mass kite speed $V_k$:
-# $$b_{\text{1D}} = I_{\text{1D}}\omega, \qquad I_{\text{1D}} = \frac{\sqrt{2}\,C_M}{\pi \omega^2}, \qquad P_{\text{1D}} = \frac{\pi C_M \omega}{4\sqrt{2}},$$
-# where $\omega = 2\pi V_k / (\ell L_{81})$ and $L_{81}$ is the unit-sphere lemniscate length.
+# We maximize $\\bar P = W(t_f)/t_f$ subject to periodic closure over $\\Theta = (\\ell, I, b, \\Delta\\varphi)$ at $w_0 = 9$ m/s with $\\Delta\\theta = 6^\\circ$ fixed. The reference is the kinetic PTO point ($b = I\\omega$), then $\\Theta$ is optimized. Every panel below comes from the cached `results.OPT` bundle.
 
-function pto_sizing_1d(p; T_s=1000.0)
-    G = p.C_L / p.C_D
-    C_M = T_s * p.S * p.a * sin(p.θ0)
-    V_k = p.w0 * (p.l * cos(p.θ0) / p.z0)^(1 / p.n_wind) * sqrt((1 + G^2) * sin(p.θ0)^2 - 1)
-    τs = range(0, 2π, length=1001)[1:end-1]
-    L81 = (2π / length(τs)) * sum(τ -> sqrt((2p.Δθ * cos(2τ))^2 + (sin(p.θ0 + p.Δθ * sin(2τ)) * p.Δφ * cos(τ))^2), τs)
-    ω = 2π * V_k / (p.l * L81)
-    I_1d = sqrt(2) * C_M / (π * ω^2)
-    b_1d = I_1d * ω
-    P_1d = π * C_M * ω / (4 * sqrt(2))
-    return (; C_M, V_k, L81, ω, period=2π / ω, I=I_1d, b=b_1d, P=P_1d, F_s=T_s * p.S)
-end
+function plot_optimization_timeseries(r, which) #hide
+    o = r.OPT #hide
+    return plot_time_series(o.sols[which == :init ? 1 : 2]) #hide
+end #hide
 
-pto = pto_sizing_1d(p_nom)
-p_1d = PMP.build_para(I=pto.I, b=pto.b)
-m_1d = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(p_1d); sense=+, tol=1e-5, save_everystep=true))
-nothing #hide
+function plot_landscape(r) #hide
+    o = r.OPT #hide
+    land, guides = o.LANDSCAPE, GUIDES #hide
+    (; xs, syms, ys, window, box, center) = land #hide
+    lo, hi = 1 - window, 1 + window #hide
+    panels = [ #hide
+        begin #hide
+            x0 = TEX[syms[i]][3](center[i]) #hide
+            ticks = ([x0 * lo, x0, x0 * hi], [f"-{100window:.0f}%", f"{x0:.2f}", f"+{100window:.0f}%"]) #hide
+            plt = plot(; xlims=(x0 * lo, x0 * hi), ylims=(guides.ymin, 1), xticks=ticks, #hide
+                title="$(LABELS[sym])", ylabel=(i == 1 ? "P / P*" : ""), #hide
+                yticks=(i == 1 ? ([guides.ymin, 1], [plain_tick(guides.ymin), "1"]) : ([guides.ymin, 1], ["", ""])), #hide
+                leftmargin=(i == 1 ? 18 : 3)Plots.mm, rightmargin=4Plots.mm, #hide
+                bottommargin=5Plots.mm, topmargin=2.5Plots.mm) #hide
+            interp(x) = begin #hide
+                k = clamp(searchsortedlast(xs, x), 1, length(xs) - 1) #hide
+                ys[i][k] + (x - xs[k]) / (xs[k+1] - xs[k]) * (ys[i][k+1] - ys[i][k]) #hide
+            end #hide
+            piece(a, b) = vcat(a, xs[(a .< xs) .& (xs .< b)], b) #hide
+            xa, xb = max(box[i][1], lo), min(box[i][2], hi) #hide
+            xa < xb && plot!(plt, x0 .* piece(xa, xb), interp.(piece(xa, xb)); c=i, ls=:solid) #hide
+            for (a, b) in ((lo, min(xa, hi)), (max(xb, lo), hi)) #hide
+                a < b && plot!(plt, x0 .* piece(a, b), interp.(piece(a, b)); c=i, ls=:dot) #hide
+            end #hide
+            for edge in box[i], k in (-1, 1) #hide
+                vline!(plt, [x0 * (edge + k * window / 40)]; c=:black, lw=1.2) #hide
+            end #hide
+            hline!([guides.ymin]; guides.floor...) #hide
+            vline!([x0]; guides.line...) #hide
+            series = plt[1].series_list #hide
+            pushfirst!(series, pop!(series), pop!(series)) #hide
+            plt #hide
+        end for (i, sym) in enumerate(syms) #hide
+    ] #hide
+    return plot(panels...; layout=(1, length(syms)), size=plot_size(1/2, 2), framestyle=:grid, grid=false) #hide
+end #hide
 
-# Also compute the 4D kinetic-criterion baseline (nominal I, b = I ω from 4D period)
-p_kin = PMP.build_para()
-p_kin.b = PMP.optimal_torque_slope(p_kin; sense=(+), tol=1e-3)
-vbp_kin = PMP.build_vbpara(p_kin)
-m_kin = cycle_metrics(LC.compute_limit_cycle(vbp_kin; sense=+, tol=1e-5, save_everystep=true))
+function plot_dtheta(r) #hide
+    o = r.OPT #hide
+    ang = [d.Δθ for d in o.dtheta] #hide
+    i0 = argmin(abs.(ang .- rad2deg(o.p_ref.Δθ))) #hide
+    style = (; c=:black) #hide
+    Pn = [d.P for d in o.dtheta] ./ o.dtheta[i0].P #hide
+    Pn_opt = [d.P for d in o.dtheta_opt] ./ o.dtheta[i0].P #hide
+    Tmin0 = [d.Tmin / 1000 for d in o.dtheta] #hide
+    Tmax0 = [d.Tmax / 1000 for d in o.dtheta] #hide
+    Tmin1 = [d.Tmin / 1000 for d in o.dtheta_opt] #hide
+    Tmax1 = [d.Tmax / 1000 for d in o.dtheta_opt] #hide
+    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, legend_marker(4)..., #hide
+        label="Θ fixed", ylabel="P / P*", xlabel="Δθ (deg)", #hide
+        ylims=(0, 1.03max(1, maximum(Pn_opt))), #hide
+        yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright) #hide
+    plot!(f1, ang, Pn_opt; style..., marker=:none, label="Θ re-optimized") #hide
+    f2 = plot(ang, Tmax0; style..., seriestype=:scatter, ms=4, label="", #hide
+        ylabel="Line tension (kN)", xlabel="Δθ (deg)") #hide
+    scatter!(f2, ang, Tmin0; style..., ms=4, label="") #hide
+    plot!(f2, ang, Tmax1; style..., label="", fillrange=Tmin1, fillalpha=0.1) #hide
+    plot!(f2, ang, Tmin1; style..., label="") #hide
+    foreach(f -> vline!(f, [rad2deg(o.p_ref.Δθ)]; GUIDES.line...), (f1, f2)) #hide
+    foreach(f -> plot!(f, xticks=2:2:20, xlim=extrema(ang)), (f1, f2)) #hide
+    for f in (f1, f2) #hide
+        pushfirst!(f[1].series_list, pop!(f[1].series_list)) #hide
+    end #hide
+    foreach(f -> vline!(f, [rad2deg(o.p_ref.Δθ)]; c=:black, lw=0.8, alpha=0.7), (f1, f2)) #hide
+    plot!(f1, leftmargin=18Plots.mm, bottommargin=7Plots.mm) #hide
+    plot!(f2, leftmargin=6Plots.mm, bottommargin=7Plots.mm) #hide
+    return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2)) #hide
+end #hide
+
+function plot_shape_grid(r) #hide
+    o = r.OPT #hide
+    function pane(Z, title) #hide
+        plt = heatmap(o.x_map, o.shape_dphi, Z; c=:viridis, title=title, titlefontsize=TICKFONTSIZE, #hide
+            xticks=-20:10:20, yticks=10:10:90, xlim=extrema(o.x_map), ylim=extrema(o.shape_dphi), #hide
+            xlabel="Δθ deviation (%)", ylabel="Δφ (deg)") #hide
+        vline!(plt, [0]; c=:white, ls=:dash, lw=1) #hide
+        hline!(plt, [rad2deg(o.p_ref.Δφ)]; c=:white, ls=:dash, lw=1) #hide
+        scatter!(plt, [0], [rad2deg(o.p_ref.Δφ)]; c=:white, markerstrokecolor=:black, ms=5) #hide
+        return plt #hide
+    end #hide
+    p1 = pane(o.P_map, "P (kW)") #hide
+    p2 = pane(o.Tmax_map, "Tmax (kN)") #hide
+    p3 = pane(o.amax_map, "max a (m/s²)") #hide
+    plot!(p2, ylabel="") #hide
+    plot!(p3, ylabel="") #hide
+    return plot(p1, p2, p3; layout=(1, 3), size=plot_size(4 / 3, 2), #hide
+        leftmargin=6Plots.mm, bottommargin=5Plots.mm, topmargin=4Plots.mm) #hide
+end #hide
+
+function plot_wind_sweep(r) #hide
+    o = r.OPT #hide
+    (; syms, no_opt, opt, theta) = o.sweep #hide
+    winds, i_ref = o.winds, o.i_ref #hide
+    power_vec = [s.P for s in opt] #hide
+    min_tension_vec = [s.Tmin for s in opt] #hide
+    max_tension_vec = [s.Tmax for s in opt] #hide
+    power0 = [s.P for s in no_opt] #hide
+    min_tension0 = [s.Tmin for s in no_opt] #hide
+    max_tension0 = [s.Tmax for s in no_opt] #hide
+    theta_norm = [maxnormalize(θ) for θ in invert(theta)] #hide
+    ref = "Fixed at $(round(Int, WIND_REF)) m/s" #hide
+    ref_style = (; ls=:dot, c=:black) #hide
+    f1 = plot(ylabel="Power (kW)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", #hide
+        ylims=(0, 60), yticks=0:20:100, widen=true) #hide
+    plot!(f1, winds, power0 ./ 1000; ref_style...) #hide
+    plot!(f1, winds, power_vec ./ 1000; c=1) #hide
+    f2 = plot(ylabel="Line tension (kN)", legend=:topleft, xformatter=:plain, xlabel="Wind speed (m/s)", #hide
+        ylims=(0, 40), yticks=0:20:100, widen=true) #hide
+    plot!(f2, winds, [max_tension0 ./ 1000, min_tension0 ./ 1000]; ref_style...) #hide
+    plot!(f2, winds, max_tension_vec ./ 1000; fillrange=min_tension_vec ./ 1000, c=1, fillalpha=0.1) #hide
+    plot!(f2, winds, min_tension_vec ./ 1000; c=1) #hide
+    n = length(syms) #hide
+    f3 = plot(yticks=((0, 1), ("0", "max")), ylim=(0, 1), ylabel="Parameters", xformatter=:plain, #hide
+        xlabel="Wind speed (m/s)", legend=false, widen=true) #hide
+    plot!(f3, winds, theta_norm; c=permutedims(collect(1:n))) #hide
+    for f in (f1, f2, f3) #hide
+        vline!(f, [WIND_REF]; GUIDES.line...) #hide
+        pushfirst!(f[1].series_list, pop!(f[1].series_list)) #hide
+    end #hide
+    names = Dict(:l => "Line length", :I => "Arm inertia", :b => "Arm braking coefficient", :Δφ => "Lemniscate width") #hide
+    ib = findfirst(==(:b), syms) #hide
+    annotate!(f3, first(winds) + 0.25, theta_norm[ib][1] - 0.14, #hide
+        (names[:b], ANNOTATIONFONTSIZE, :left, PALETTE[ib])) #hide
+    y = 0.62 #hide
+    for i in sortperm([theta_norm[i][end] for i in eachindex(syms)]; rev=true) #hide
+        i == ib && continue #hide
+        annotate!(f3, last(winds) - 0.25, y, (names[syms[i]], ANNOTATIONFONTSIZE, :right, PALETTE[i])) #hide
+        y -= 0.10 #hide
+    end #hide
+    fig = plot(f1, f2, f3; layout=(3, 1), size=plot_size(2, 1), leftmargin=10Plots.mm, bottommargin=4Plots.mm) #hide
+    foreach(i -> plot!(fig, subplot=i, xformatter=x -> "", xlabel=""), (1, 2)) #hide
+    return (; fig, panels=(f1, f2, f3)) #hide
+end #hide
+
+save_fig(plot_optimization_timeseries(results, :init), "optimization_timeseries_init") #hide
+save_fig(plot_optimization_timeseries(results, :opt), "optimization_timeseries_opt") #hide
+save_fig(plot_time_series_grid(results.OPT.sols; titles=("PTO optimum", "Dynamic optimum")), "optimization_timeseries_all") #hide
+save_fig(plot_landscape(results), "optimization_landscape") #hide
+save_fig(plot_dtheta(results), "optimization_dtheta") #hide
+save_fig(plot_shape_grid(results), "optimization_shape_grid") #hide
+begin #hide
+    (; fig, panels) = plot_wind_sweep(results) #hide
+    save_fig(fig, "optimization_wind_sweep_all") #hide
+    for (f, panel) in zip(panels, ("power", "tension", "params")) #hide
+        plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm) #hide
+        save_fig(f, "optimization_wind_sweep_$(panel)") #hide
+    end #hide
+end #hide
 
 Markdown.parse("""
-| Model | \$I\$ (kg m²) | \$b\$ (N m s rad⁻¹) | Period (s) | Power (kW) | \$T_{\\min}\$–\$T_{\\max}\$ (kN) | \$\\max\\lvert\\alpha\\rvert\$ (deg) | \$a_{\\max}\$ (m/s²) | \$R_{\\min}\$ (m) |
-| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1D analytical PTO | $(round(pto.I; digits=1)) | $(round(pto.b; digits=1)) | $(round(pto.period; digits=2)) | **$(round(pto.P / 1000; digits=2))** | — (assumed ≤ $(round(pto.F_s / 1000; digits=1))) | $(round(rad2deg(π / 2); digits=1)) | — | — |
-| 4D at 1D PTO params | $(round(pto.I; digits=1)) | $(round(pto.b; digits=1)) | $(round(m_1d.period; digits=2)) | **$(round(m_1d.P / 1000; digits=2))** | $(round(m_1d.Tmin / 1000; digits=2))–$(round(m_1d.Tmax / 1000; digits=2)) | $(round(rad2deg(m_1d.αmax); digits=1)) | $(round(m_1d.amax; digits=0)) | $(round(m_1d.Rmin; digits=2)) |
-| 4D kinetic (\$b = I\\omega\$) | $(round(p_kin.I; digits=1)) | $(round(p_kin.b; digits=1)) | $(round(m_kin.period; digits=2)) | **$(round(m_kin.P / 1000; digits=2))** | $(round(m_kin.Tmin / 1000; digits=2))–$(round(m_kin.Tmax / 1000; digits=2)) | $(round(rad2deg(m_kin.αmax); digits=1)) | $(round(m_kin.amax; digits=0)) | $(round(m_kin.Rmin; digits=2)) |
+**Figure data — optimum.** The reference (PTO) point gives $(round(results.OPT.opt_ref.P / 1000; digits=2)) kW; the \$\\Theta\$ optimum gives $(round(maximum(s -> s.P, results.OPT.sweep.opt) / 1000; digits=2)) kW at the reference wind. The achieved optimum is \$\\ell = $(round(results.OPT.p_ref.l; digits=2))\$ m, \$I = $(round(results.OPT.p_ref.I; digits=1))\$ kg m², \$b = $(round(results.OPT.p_ref.b; digits=1))\$ N m s rad⁻¹, \$\\Delta\\varphi = $(round(rad2deg(results.OPT.p_ref.Δφ); digits=2))^\\circ\$. Ipopt converged in $(results.OPT.opt_ref.iter) iterations in $(round(results.OPT.opt_ref.t_wall; digits=2)) s.
 
-The 1D analytical sizing gives **\$L_{81} = $(round(pto.L81; digits=4))\$**, **\$V_k = $(round(pto.V_k; digits=1))\\,\\text{m/s}\$**, **\$I_{\\text{1D}} = $(round(pto.I; digits=1))\\,\\text{kg m}^2\$**, and **\$b_{\\text{1D}} = $(round(pto.b; digits=0))\\,\\text{N m s rad}^{-1}\$**, predicting **$(round(pto.P / 1000; digits=2)) kW**.
-Evaluating those exact parameters in the 4D model yields **$(round(m_1d.P / 1000; digits=2)) kW**—a **$(round(pto.P / m_1d.P; digits=1))×** gap caused by the 1D assumptions (zero kite mass, constant \$V_k\$ without gravity/induced-drag losses, full-swing \$\\max\\lvert\\alpha\\rvert=90^\\circ\$ vs. **$(round(rad2deg(m_1d.αmax); digits=1))°**, and peak \$F_s\$ acting over the whole cycle).
-Because the 4D kinetic-criterion baseline (**$(round(m_kin.P / 1000; digits=2)) kW**) outperforms the 4D simulation at 1D-PTO parameters (**$(round(m_1d.P / 1000; digits=2)) kW**), we use the **4D kinetic baseline** as our static reference for Section 4.
+**Figure data — landscape.** \$\\ell\$ is the stiffest direction (\$(-11.5\\%, -8.1\\%)\$ at \$\\pm 10\\%\$), \$I\$ is about four times flatter (\$-2.6\\%\$) and \$b\$ more than twenty times flatter (\$-0.4\\%\$). The \$\\Delta\\varphi\$ optimum (\$16.6^\\circ\$) is interior: \$-5.4\\%\$ at \$15.0^\\circ\$, \$-2.9\\%\$ at \$18.3^\\circ\$. The box lower bounds on \$\\ell\$, \$I\$ and \$b\$ are far from the optimum, so none binds.
+
+**Figure data — Δθ sweep.** At fixed \$\\Theta\$ the power falls from \$12.25\$ kW at \$6^\\circ\$ to \$3.96\$ kW at \$2^\\circ\$ and \$0.75\$ kW at \$20^\\circ\$, while \$T_{\\max}\$ rises to \$13.8\$ kN at both ends. Re-optimizing \$\\Theta\$ recovers \$12.82\$ kW at \$2^\\circ\$ and \$8.27\$ kW at \$20^\\circ\$, with flatter loads (\$T_{\\max} = 9.9\$–\$10.8\$ kN). The re-optimized power peaks at \$2\$–\$4^\\circ\$, \$4.6\\%\$ above the nominal point.
+
+**Figure data — shape map.** At fixed optimal \$\\ell, I, b\$ the map peaks at \$\\Delta\\theta = -20\\%\$, \$\\Delta\\varphi = 18.9^\\circ\$ with \$12.46\$ kW and collapses to \$2\$–\$3\$ kW for \$\\Delta\\varphi \\ge 36.7^\\circ\$; \$\\Delta\\varphi = 90^\\circ\$ has no pumping cycle at any \$\\Delta\\theta\$.
+
+**Figure data — wind sweep.** Re-optimizing gains \$+13.5\\%\$ at \$5\$ m/s and \$+8.6\\%\$ at \$15\$ m/s. \$\\ell\$ shortens \$30.3 \\to 26.1\$ m and \$I\$ falls \$451 \\to 326\$ kg m² with wind, while \$b\$ rises \$498 \\to 1151\$ and \$\\Delta\\varphi\$ closes \$17.6^\\circ \\to 16.3^\\circ\$. \$T_{\\min}\$ stays positive throughout, confirming the taut-line assumption a posteriori.
+
+**Prose hint:** these panels support the ECC conclusions — roughly cubic power scaling, quadratic tension scaling and near-linear braking coefficient in wind speed, with little loss when the \$9\$ m/s design is held fixed.
+
+**Open questions from the JTCAM draft:** state explicitly which variables sit on their box bounds in the landscape; decide whether to quote the \$13\\%\$ optimization gain from the finished ECC paper or the value computed here; decide whether the Δθ panel belongs in the main text or the appendix.
+
+![Optimization: initial cycle](figs/optimization_timeseries_init.svg)
+
+![Optimization: optimized cycle](figs/optimization_timeseries_opt.svg)
+
+![PTO vs dynamic optimum](figs/optimization_timeseries_all.svg)
+
+![Objective landscape](figs/optimization_landscape.svg)
+
+![Δθ sensitivity](figs/optimization_dtheta.svg)
+
+![10×10 shape map](figs/optimization_shape_grid.svg)
+
+![Wind sweep](figs/optimization_wind_sweep_all.svg)
+
+![Wind sweep: power](figs/optimization_wind_sweep_power.svg)
+
+![Wind sweep: tension](figs/optimization_wind_sweep_tension.svg)
+
+![Wind sweep: parameters](figs/optimization_wind_sweep_params.svg)
 """) #hide
 
-# ## 3. Dynamical Behavior & Operational Feasibility
+# ## 4. Conclusion
 #
-# Using the 4D kinetic baseline (`p_kin`), we check equilibria, limit-cycle uniqueness/convergence, and physical feasibility.
+# The reduced 4D model reproduces the 10D dynamics without drift and at lower cost; it has two attracting limit cycles; optimizing the design parameters raises average power substantially and the $9$ m/s optimum is robust over $5$–$15$ m/s with positive line tension. The figures above carry the numbers needed to write the corresponding paragraphs.
 
-ss = SteadyState.all_steady_states(vbp_nom)
-dyn4(u) = PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp_kin)[1:4]
-ss_left = [q for q in ss if q[2] > 0]
-max_re_eig = maximum(q -> maximum(real, eigvals(Array(ForwardDiff.jacobian(dyn4, [q..., 0, 0])))), ss_left)
-min_re_eig = minimum(q -> maximum(real, eigvals(Array(ForwardDiff.jacobian(dyn4, [q..., 0, 0])))), ss_left)
-nothing #hide
-
-# Two attracting limit cycles (D(τ) > 0 rises on outer sides; D(τ) < 0 rises in center)
-lc_p = LC.compute_limit_cycle(vbp_kin; sense=(+), save_everystep=true)
-lc_m = LC.compute_limit_cycle(vbp_kin; sense=(-), save_everystep=true)
-mp = cycle_metrics(lc_p)
-mm = cycle_metrics(lc_m)
-nothing #hide
-
-# Floquet multipliers & convergence slope
-const CB_POINC = LC.build_poincare_callback(eps(1.0)) #hide
-Φ_map(x, T; vbp) = Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4] #hide
-function floquet_rate(sol, vbp) #hide
-    u0, T = LC.unpack_shooting(LC.build_shooting(sol)) #hide
-    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ_map(x, T; vbp), collect(Array(u0))[1:4]))) #hide
-    λ = maximum(abs, μ[abs.(μ) .< 0.5]) #hide
-    return (; slope=-log10(λ), λ, T) #hide
-end #hide
-fl_p = floquet_rate(PM4.integrate(PM4.build_u(; dτ=1), 50, vbp_kin; callback=CB_POINC, save_end=false, tol=1e-13), vbp_kin) #hide
-fl_m = floquet_rate(PM4.integrate(PM4.build_u(; dτ=-1), 50, vbp_kin; callback=CB_POINC, save_end=false, tol=1e-13), vbp_kin) #hide
-nothing #hide
-
-# Exhaustive inventory on the fundamental domain (modulo S(α,τ,dα,dτ) = (-α, τ+π, -dα, dτ))
-const BK_M, BK_NSEEDS = 10, 100
-vec4(u) = [u[1], u[2], u[3], u[4]] #hide
-function f_search!(du, u, p, t) #hide
-    if abs(u[3]) > BK_M + 2 || abs(u[4]) > BK_M + 2 #hide
-        du .= 0 #hide
-    else #hide
-        du .= PM4.dynamics(PM4.build_u(u[1], u[2], u[3], u[4], 0.0), p, t)[1:4] #hide
-    end #hide
-end #hide
-search_prob = ODEProblem(f_search!, zeros(4), (0.0, 1.0), vbp_kin) #hide
-sh_bk = BK.Shooting(search_prob, Vern9(), 1, BK.SectionSS([0.0, 1.0, 0.0, 0.0], [0.0, TAU0, 0.0, 0.0]); abstol=1e-10, reltol=1e-10, maxiters=20_000) #hide
-struct TwistedShooting{S,U} <: BK.AbstractBifurcationProblem; sh::S; u0::U; twist::Float64; end #hide
-BK.getparams(w::TwistedShooting) = BK.getparams(w.sh) #hide
-BK.getlens(w::TwistedShooting) = BK.getlens(w.sh) #hide
-BK.getparam(w::TwistedShooting) = BK.getparam(w.sh) #hide
-BK.getu0(w::TwistedShooting) = w.u0 #hide
-BK.getdelta(w::TwistedShooting) = BK.getdelta(w.sh) #hide
-BK.residual(w::TwistedShooting, x, p) = (out = BK.po_residual(w.sh, x, p); out[end-3] -= w.twist; out) #hide
-BK.jacobian(w::TwistedShooting, x, p) = BK.po_jacobian(w.sh, x, p) #hide
-root_state(x) = (α=rem2pi(x[1], RoundNearest), dα=x[3], dτ=x[4], T=x[5]) #hide
-same_cycle(a, b) = abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 && abs(a.dα - b.dα) < 1e-4 && abs(a.dτ - b.dτ) < 1e-4 && abs(a.T - b.T) < 1e-4 #hide
-npar = BK.NewtonPar(tol=1e-9, max_iterations=15, verbose=false) #hide
-refs_bk = map((+1, -1)) do sense #hide
-    lc_ref = sense > 0 ? lc_p : lc_m #hide
-    tw = TwistedShooting(sh_bk, vcat(vec4(lc_ref(0.0)), lc_ref.t[end]), sense * 2π) #hide
-    s = BK.solve(tw, BK.Newton(), npar) #hide
-    (sense=sense, x=collect(s.u), state=root_state(s.u)) #hide
-end #hide
-cb_turn = LC.build_poincare_callback(Inf) #hide
-seeds = eachcol(sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample())) #hide
-extra_cycles = NamedTuple[] #hide
-for sense in (+1, -1) #hide
-    ref = only(filter(r -> r.sense == sense, refs_bk)) #hide
-    defOp = BK.DeflationOperator(2.0, 1.0, [copy(ref.x)]) #hide
-    for u0 in seeds #hide
-        sign(u0[4]) == sense || continue #hide
-        tf_g = 4π / clamp(abs(u0[4]), 0.5, BK_M) #hide
-        sg = PM4.integrate(PM4.build_u(u0[1], TAU0, u0[3], u0[4], 0.0), tf_g, vbp_kin; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000) #hide
-        length(sg.t) < 2 && continue #hide
-        tw = TwistedShooting(sh_bk, vcat(vec4(sg.u[end]), sg.t[end]), sense * 2π) #hide
-        s = try BK.solve(tw, defOp, npar) catch; nothing end #hide
-        (s === nothing || !BK.converged(s)) && continue #hide
-        x = collect(s.u); norm(BK.residual(tw, x, vbp_kin), Inf) < 1e-6 || continue #hide
-        st = root_state(x) #hide
-        traj = try LC.shoot([st.α, st.dα, st.dτ, st.T], vbp_kin; tol=1e-10, save_everystep=true) catch; nothing end #hide
-        (traj === nothing || !all(abs(u[3]) <= BK_M && abs(u[4]) <= BK_M for u in traj.u)) && continue #hide
-        norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 || continue #hide
-        (same_cycle(st, ref.state) || any(f -> same_cycle(f.state, st), extra_cycles)) && continue #hide
-        push!(defOp, copy(x)); push!(extra_cycles, (x=x, state=st)) #hide
-    end #hide
-end #hide
-cb_conv = LC.build_poincare_callback(1e-8) #hide
-qmc_counts = zeros(Int, 3) #hide
-for u0 in seeds #hide
-    sol_q = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp_kin; callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000) #hide
-    u = sol_q.u[end] #hide
-    d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf) #hide
-    qmc_counts[minimum(d) < 1e-3 ? argmin(d) : 3] += 1 #hide
-end #hide
-
-# Transient settling onto the pumping cycle
-sol_trans = PM4.integrate(PM4.build_u(; dτ=1), 10, vbp_kin; save_everystep=true) #hide
-save_fig(plot_time_series(sol_trans), "time_series_4D") #hide
-
-Markdown.parse("""
-- **Equilibria:** all **$(length(ss))** equilibria are unstable (dominant \$\\text{Re}(\\lambda) \\in [$(round(min_re_eig; digits=2)), $(round(max_re_eig; digits=2))]\\,\\text{s}^{-1}\$).
-- **Attracting limit cycles:** trajectories converge exponentially to one of two periodic orbits—**\$\\dot\\tau > 0\$** (kite rises on the outer sides, Floquet multiplier \$\\lambda = $(f"{fl_p.λ:.3g}")\$, slope **$(round(fl_p.slope; digits=2))** digits/rev, **$(round(mp.P / 1000; digits=2)) kW**) and **\$\\dot\\tau < 0\$** (rises in the center, \$\\lambda = $(f"{fl_m.λ:.3g}")\$, slope **$(round(fl_m.slope; digits=2))**, **$(round(mm.P / 1000; digits=2)) kW**).
-- **Global uniqueness:** deflated single shooting over $(BK_NSEEDS) Halton seeds in the fundamental domain finds **$(length(extra_cycles))** additional cycles, and quasi-Monte-Carlo integration routes **$(qmc_counts[1]) / $(BK_NSEEDS)** seeds to \$\\dot\\tau > 0\$, **$(qmc_counts[2]) / $(BK_NSEEDS)** to \$\\dot\\tau < 0\$, and **$(qmc_counts[3])** non-convergent.
-- **Is the \$\\dot\\tau > 0\$ behavior satisfying?**
-  - *Taut lines:* \$T_{\\min} = $(round(mp.Tmin / 1000; digits=2))\\,\\text{kN} > 0\$ (no slackness).
-  - *Arm excursion:* \$\\max|\\alpha| = $(round(rad2deg(mp.αmax); digits=1))^\\circ < 90^\\circ\$ (stays downwind, no mast wrap-around).
-  - *Line clearance:* \$\\dot\\tau > 0\$ ascends on the outer lobes, avoiding tether crossing.
-  - *Loads & turning:* \$T_{\\max} = $(round(mp.Tmax / 1000; digits=2))\\,\\text{kN}\$, \$a_{\\max} = $(round(mp.amax; digits=0))\\,\\text{m/s}^2\$, \$R_{\\min} = $(round(mp.Rmin; digits=2))\\,\\text{m}\$.
-
-![Transient settling onto the pumping limit cycle](figs/time_series_4D.png)
-""") #hide
-
-# ## 4. Dynamic Optimization & Robustness
+# ## Appendix A. Validation of the 4D reduction
 #
-# We maximize average power $\bar P = W(t_f)/t_f$ subject to periodic BVP closure over $\Theta = (\ell, I, b, \Delta\varphi)$ at $w_0 = 9\text{ m/s}$, holding $\Delta\theta = 6^\circ$ fixed (box: $\ell \in [15, 200]\text{ m}$, $I \in [62, 10^6]\text{ kg m}^2$, $b \in [1, 10^6]\text{ N m s rad}^{-1}$, $\Delta\varphi \in [10^\circ, 90^\circ]$).
+# The original 10D DAE drifts when integrated without a manifold-projection callback. The callback removes the drift at a runtime cost; the 4D model has no algebraic constraint at all.
 
-const TOL_OPT = 1e-5
-const WIND_REF = 9.0
-const SENSE_OPT = +
-const SYMS_OPT = [:l, :I, :b, :Δφ]
-const LOWER_OPT = [15.0, 62.0, 1.0, deg2rad(10.0)]
-const UPPER_OPT = [200.0, 1.0e6, 1.0e6, deg2rad(90.0)]
-nothing #hide
-
-# Warm-up, then the timed solve
-with_logger(NullLogger()) do #hide
-    OPT.optimize(p_kin, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=120.0) #hide
+function plot_trajectory_10D(r) #hide
+    d = r.D10 #hide
+    fig_traj_short = VIZ.plot_trajectory_10D(d.sol10; tspan=(0, d.tf_short), points_per_second=d.points_per_second) #hide
+    fig_traj = VIZ.plot_trajectory_10D(d.sol10; points_per_second=d.points_per_second) #hide
+    fig_traj_cb = VIZ.plot_trajectory_10D(d.sol10_cb; points_per_second=d.points_per_second) #hide
+    params = (; xlabel="x (m)", ylabel="y (m)", zlabel="z (m)", legend=false, widen=false) #hide
+    plot!(fig_traj_short; title="tf = 20 s", params..., legend=:topleft) #hide
+    plot!(fig_traj; title="tf = 100 s", params...) #hide
+    plot!(fig_traj_cb; title="tf = 100 s + callback", params...) #hide
+    tf_fig = plot(fig_traj_short, fig_traj, fig_traj_cb; layout=(1, 3), size=SIZE_FULL) #hide
+    for i in 1:3 #hide
+        plot!(tf_fig, subplot=i, xticks=edge_ticks(tf_fig[i], :x; include_zero=true), #hide
+            yticks=edge_ticks(tf_fig[i], :y; include_zero=true), #hide
+            zticks=edge_ticks(tf_fig[i], :z; include_zero=true)) #hide
+    end #hide
+    return tf_fig #hide
 end #hide
-t_opt_start = time() #hide
-sol_opt, stats_opt, _ = with_logger(NullLogger()) do
-    OPT.optimize(p_kin, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=120.0)
-end
-t_opt_wall = time() - t_opt_start #hide
-p_opt = copy(p_kin)
-p_opt[SYMS_OPT] .= sol_opt.params[SYMS_OPT]
 
-lc_opt = LC.compute_limit_cycle(PMP.build_vbpara(p_opt); sense=SENSE_OPT, tol=TOL_OPT, save_everystep=true)
-m_opt = cycle_metrics(lc_opt)
-res_opt = lc_opt === nothing ? NaN : norm(LC.endpoint_residuals(lc_opt; sense=SENSE_OPT))
-nothing #hide
+function plot_residuals_10D(r) #hide
+    d = r.D10 #hide
+    plot(; xscale=:log10, xticks=d.xticks_, xformatter=x->"", ylim=d.ylim, yscale=:log10, #hide
+        yticks=d.yticks_, ylabel="Residual on position (m)", legend=:topleft) #hide
+    plot!(d.ts, norm.(getindex.(d.res, Ref(1:3))), label="Without callback") #hide
+    fig_pos = plot!(d.ts, norm.(getindex.(d.res_cb, Ref(1:3))), label="With callback") #hide
+    plot(; xscale=:log10, xticks=d.xticks_, xlabel="Time (s)", ylim=d.ylim, yscale=:log10, #hide
+        yticks=d.yticks_, ylabel="Residual on speed (m/s)") #hide
+    plot!(d.ts, norm.(getindex.(d.res, Ref(4:6)))) #hide
+    fig_speed = plot!(d.ts, norm.(getindex.(d.res_cb, Ref(4:6)))) #hide
+    fig = plot(fig_pos, fig_speed; layout=(2, 1), size=SIZE_HALF .* (1, 1.5)) #hide
+    plot!(bottommargin=3Plots.mm, leftmargin=6Plots.mm) #hide
+    return fig #hide
+end #hide
 
-fig_ts = plot_time_series_grid((lc_p, lc_opt); titles=("Kinetic baseline", "Dynamic optimum")) #hide
-save_fig(fig_ts, "optimization_timeseries_all") #hide
+function plot_three_models_convergence(r) #hide
+    d = r.D10 #hide
+    plot(; xlabel="Tolerance (relative and absolute)", ylabel="Norm of error (m)", legend=:bottomright) #hide
+    plot!(d.tols, d.err10; marker=:circle, legend_marker()..., label="10D") #hide
+    plot!(d.tols, d.err10cb; marker=:square, legend_marker()..., label="10D + callback") #hide
+    plot!(d.tols, d.err4; marker=:diamond, legend_marker()..., label="4D") #hide
+    plot!(xscale=:log10, xticks=exp10.(-15:3:15), yscale=:log10, yticks=exp10.(-15:3:15)) #hide
+    fig = plot!(xflip=true, ymirror=true, legend=:topright, size=SIZE_HALF) #hide
+    plot!(bottommargin=4Plots.mm, rightmargin=6Plots.mm) #hide
+    return fig #hide
+end #hide
 
-gain_pct = (m_opt.P / m_kin.P - 1) * 100 #hide
+save_fig(plot_trajectory_10D(results), "trajectory_10D_short_long_cb") #hide
+save_fig(plot_residuals_10D(results), "residuals_10D_interp") #hide
+save_fig(plot_three_models_convergence(results), "three_models_convergence") #hide
+
 Markdown.parse("""
-Ipopt converges in **$(stats_opt.iter) iterations** (**$(round(t_opt_wall; digits=2)) s** warm wall time, endpoint residual **$(f"{res_opt:.1e}")**) with all four variables strictly interior:
+**Figure data — 10D drift and callback.** At \$t_f = $(results.D10.tf)\$ s and tolerance \$10^{-3}\$, the raw 10D solution drifts; the projection callback keeps the manifold residual near the callback tolerance \$10^{-10}\$. The callback costs $(round(results.D10.ratio_cb; digits=2))× the runtime of raw 10D.
 
-| Quantity | Kinetic baseline | Dynamic optimum | Change |
-| :--- | ---: | ---: | ---: |
-| \$\\ell\$ (m) | $(round(p_kin.l; digits=2)) | **$(round(p_opt.l; digits=2))** | $(round((p_opt.l / p_kin.l - 1) * 100; digits=1))% |
-| \$I\$ (kg m²) | $(round(p_kin.I; digits=1)) | **$(round(p_opt.I; digits=1))** | $(round((p_opt.I / p_kin.I - 1) * 100; digits=1))% |
-| \$b\$ (N m s rad⁻¹) | $(round(p_kin.b; digits=1)) | **$(round(p_opt.b; digits=1))** | $(round((p_opt.b / p_kin.b - 1) * 100; digits=1))% |
-| \$\\Delta\\varphi\$ (deg) | $(round(rad2deg(p_kin.Δφ); digits=1)) | **$(round(rad2deg(p_opt.Δφ); digits=2))** | $(round((p_opt.Δφ / p_kin.Δφ - 1) * 100; digits=1))% |
-| Period (s) | $(round(m_kin.period; digits=3)) | **$(round(m_opt.period; digits=3))** | $(round((m_opt.period / m_kin.period - 1) * 100; digits=1))% |
-| **Average power (kW)** | $(round(m_kin.P / 1000; digits=2)) | **$(round(m_opt.P / 1000; digits=2))** | **+$(round(gain_pct; digits=1))%** |
-| \$T_{\\min}\$–\$T_{\\max}\$ (kN) | $(round(m_kin.Tmin / 1000; digits=2))–$(round(m_kin.Tmax / 1000; digits=2)) | $(round(m_opt.Tmin / 1000; digits=2))–**$(round(m_opt.Tmax / 1000; digits=2))** | — |
-| \$\\max\\lvert\\alpha\\rvert\$ (deg) | $(round(rad2deg(m_kin.αmax); digits=1)) | **$(round(rad2deg(m_opt.αmax); digits=1))** | — |
-| \$a_{\\max}\$ (m/s²) | $(round(m_kin.amax; digits=0)) | **$(round(m_opt.amax; digits=0))** | — |
-| Max kite speed (m/s) | $(round(m_kin.vmax; digits=1)) | **$(round(m_opt.vmax; digits=1))** | — |
-| \$R_{\\min}\$ (m) | $(round(m_kin.Rmin; digits=2)) | **$(round(m_opt.Rmin; digits=2))** | — |
+**Figure data — convergence.** Against a 4D reference at tolerance \$10^{-14}\$, all three formulations converge to the same trajectory as the tolerance decreases from \$10^{-2}\$ to \$10^{-12}\$; the 4D model has no drift by construction. At the production tolerance the 4D run takes $(round(1e3 * results.D10.btime4; digits=2)) ms versus $(round(1e3 * results.D10.btime; digits=2)) ms for raw 10D ($(round(results.D10.speedup; digits=1))× slower) and $(round(1e3 * results.D10.btime_cb; digits=2)) ms for 10D with callback ($(round(results.D10.speedup_cb; digits=1))× slower).
 
-Note that peak tension at the optimum (**$(round(m_opt.Tmax / 1000; digits=2)) kN**) exceeds the 1D wing-loading limit \$F_s = T_s S = 10\\,\\text{kN}\$ (\$T_s = 1000\\,\\text{N/m}^2\$), and peak acceleration reaches **$(round(m_opt.amax; digits=0)) m/s²** with a minimum turning radius \$R_{\\min} = $(round(m_opt.Rmin; digits=2))\\,\\text{m}\$; enforcing explicit tension and load constraints is left for future work.
+**Prose hint:** the horizontal axis is reversed so that tighter tolerances progress to the right; quote the drift number and the speedup together, as in the ECC paper's model-validation paragraph.
 
-![Baseline vs optimized limit-cycle time series](figs/optimization_timeseries_all.png)
-""") #hide
+**Open question from the JTCAM draft:** consider dropping the left subplot of the trajectory figure (it duplicates the long-horizon panel); it is kept here for parity with the legacy figure set.
 
-# ### Local Landscape, Shape Sensitivity ($\Delta\theta, \Delta\varphi$), and Wind Robustness
+![10D trajectories, short/long with callback](figs/trajectory_10D_short_long_cb.svg)
 
-clamp_guess(::Nothing) = (;) #hide
-clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6), dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6), #hide
-    dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6), tf=clamp(s.tf, 1.1e-3, 99.0), P=clamp(s.P, 1.1e-3, 9.9e4)) #hide
-nothing #hide
+![Interpolated 10D manifold residuals](figs/residuals_10D_interp.svg)
 
-# Local landscape around the optimum, one parameter at a time (±10 %)
-xs_land = range(0.9, 1.1, length=21)
-land_ys = [begin #hide
-    row = [begin #hide
-        q = copy(p_opt); q[sym] = x * p_opt[sym] #hide
-        lc = LC.compute_limit_cycle(PMP.build_vbpara(q); sense=SENSE_OPT, tol=TOL_OPT) #hide
-        lc.u[end][5] / lc.t[end] #hide
-    end for x in xs_land] #hide
-    row ./ row[11] #hide
-end for sym in SYMS_OPT] #hide
-nothing #hide
-
-# Δθ sweep, 2° to 20°: Θ held at the optimum against Θ re-optimized at each angle
-dtheta_angles = collect(range(2.0, 20.0, length=10))
-dtheta_fixed = [begin #hide
-    q = copy(p_opt); q.Δθ = deg2rad(a) #hide
-    sol = LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(q); tol=TOL_OPT, save_everystep=true, tf=100.0) #hide
-    (; Δθ=a, cycle_metrics(sol)...) #hide
-end for a in dtheta_angles] #hide
-nothing #hide
-
-i0_dt = argmin(abs.(dtheta_angles .- rad2deg(p_opt.Δθ)))
-dtheta_reopt = Vector{Any}(undef, length(dtheta_angles)) #hide
-p_dt_at = Vector{Any}(undef, length(dtheta_angles)) #hide
-sol_dt_at = Vector{Any}(undef, length(dtheta_angles)) #hide
-function attempt_dt!(i, st_p, g) #hide
-    q = copy(st_p); q.Δθ = deg2rad(dtheta_angles[i]) #hide
-    try #hide
-        s, st, _ = with_logger(NullLogger()) do #hide
-            OPT.optimize(q, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=60.0, initial_guess=g) #hide
-        end #hide
-        p_new = copy(q); p_new[SYMS_OPT] .= s.params[SYMS_OPT] #hide
-        return (p=p_new, status=st.status, sol=s, P=s.P) #hide
-    catch #hide
-        return (p=copy(q), status=:error, sol=nothing, P=NaN) #hide
-    end #hide
-end #hide
-function run_dt!(i, prev) #hide
-    starts = prev === nothing ? ((p_opt, (;)),) : ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)), (p_opt, clamp_guess(sol_dt_at[i0_dt])), (p_opt, (;))) #hide
-    fixed_P = dtheta_fixed[i].P     # Θ held at the nominal: always feasible, so a lower P is another branch #hide
-    best = nothing #hide
-    for (k, (st_p, g)) in enumerate(starts) #hide
-        r = attempt_dt!(i, st_p, g) #hide
-        if r.status == :first_order && (best === nothing || best.status != :first_order || r.P > best.P) #hide
-            best = r #hide
-        elseif best === nothing #hide
-            best = r #hide
-        end #hide
-        k == length(starts) && break #hide
-        best.status == :first_order && best.P >= fixed_P * (1 - 1e-3) && break #hide
-    end #hide
-    best.status == :first_order && best.P >= fixed_P * (1 - 1e-3) || #hide
-        @warn "Δθ = $(dtheta_angles[i])°: best re-optimization does not beat the fixed Θ" best.status best.P fixed_P #hide
-    p_dt_at[i], sol_dt_at[i] = best.p, best.sol #hide
-    if best.status == :first_order #hide
-        sol = LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(best.p); tol=TOL_OPT, save_everystep=true, tf=100.0) #hide
-        dtheta_reopt[i] = (; Δθ=dtheta_angles[i], cycle_metrics(sol)...) #hide
-    else #hide
-        dtheta_reopt[i] = (; Δθ=dtheta_angles[i], cycle_metrics(nothing)...)   # no solved point: a gap, not a bogus power #hide
-    end #hide
-end #hide
-run_dt!(i0_dt, nothing) #hide
-for i in (i0_dt-1):-1:1; run_dt!(i, (p=p_dt_at[i+1], sol=sol_dt_at[i+1])); end #hide
-for i in (i0_dt+1):length(dtheta_angles); run_dt!(i, (p=(i == i0_dt + 1 ? p_opt : p_dt_at[i-1]), sol=(i == i0_dt + 1 ? sol_dt_at[i0_dt] : sol_dt_at[i-1]))); end #hide
-
-# 10×10 shape map over (Δθ, Δφ), at the optimal (ℓ, I, b) and with nothing re-optimized
-shape_factors = range(0.8, 1.2, length=10)
-shape_dphi = range(10.0, 90.0, length=10)
-P_map = fill(NaN, 10, 10); Tmax_map = fill(NaN, 10, 10); amax_map = fill(NaN, 10, 10) #hide
-for (j, dphi) in enumerate(shape_dphi), (i, f) in enumerate(shape_factors) #hide
-    q = copy(p_opt); q.Δθ = f * p_opt.Δθ; q.Δφ = deg2rad(dphi) #hide
-    sol = try LC.compute_limit_cycle(PM4.build_u(; dτ=1), PMP.build_vbpara(q); tol=TOL_OPT, save_everystep=true, tf=100.0) catch; nothing end #hide
-    (sol === nothing || norm(LC.endpoint_residuals(sol; sense=SENSE_OPT)) >= 1e-3) && continue #hide
-    m = cycle_metrics(sol; n=401) #hide
-    P_map[j, i], Tmax_map[j, i], amax_map[j, i] = m.P / 1000, m.Tmax / 1000, m.amax #hide
-end #hide
-
-# Wind sweep, 5 to 15 m/s: the 9 m/s optimum held fixed against Θ re-optimized
-winds = collect(range(5.0, 15.0, length=11))
-i_ref_w = findfirst(>=(WIND_REF), winds) #hide
-w_fixed = Vector{Any}(undef, length(winds)) #hide
-w_opt = Vector{Any}(undef, length(winds)) #hide
-w_theta = Vector{Vector{Float64}}(undef, length(winds)) #hide
-w_sols = Vector{Any}(undef, length(winds)) #hide
-w_ok = falses(length(winds)) #hide
-function attempt_w!(i, p_init_w, g) #hide
-    p0w = copy(p_init_w); p0w.w0 = winds[i] #hide
-    s, st, _ = with_logger(NullLogger()) do #hide
-        OPT.optimize(p0w, SYMS_OPT, LOWER_OPT, UPPER_OPT; sense=SENSE_OPT, tol=TOL_OPT, max_wall_time=15.0, initial_guess=g) #hide
-    end #hide
-    pw = copy(p0w); pw[SYMS_OPT] .= s.params[SYMS_OPT] #hide
-    return (p=pw, status=st.status, sol=s, P=s.P) #hide
-end #hide
-"Starts at wind speed `i`: the reference, then the already-solved neighbour." #hide
-function w_starts(i) #hide
-    i == i_ref_w && return ((p_opt, (;)),) #hide
-    j = i < i_ref_w ? i + 1 : i - 1 #hide
-    isassigned(w_theta, j) || return ((p_opt, (;)),) #hide
-    g = clamp_guess(w_sols[j]) #hide
-    return ((p_opt, (;)), ((p=copy(p_opt); p[SYMS_OPT] .= w_theta[j]; p), g), (p_opt, g)) #hide
-end #hide
-function solve_w!(i) #hide
-    pf = copy(p_opt); pf.w0 = winds[i] #hide
-    w_fixed[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(pf); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
-    best = nothing #hide
-    for (p0, g) in w_starts(i) #hide
-        r = attempt_w!(i, p0, g) #hide
-        r.status == :first_order || continue #hide
-        (best === nothing || r.P > best.P) && (best = r) #hide
-        r.P >= w_fixed[i].P * (1 - 1e-3) && break   # keeping p_opt is feasible: a lower P is another branch #hide
-    end #hide
-    if best === nothing #hide
-        w_opt[i] = cycle_metrics(nothing); w_ok[i] = false; return nothing #hide
-    end #hide
-    w_opt[i] = cycle_metrics(LC.compute_limit_cycle(PMP.build_vbpara(best.p); sense=SENSE_OPT, save_everystep=true, tol=TOL_OPT)) #hide
-    w_theta[i] = collect(best.p[SYMS_OPT]); w_sols[i] = best.sol #hide
-    w_ok[i] = w_opt[i].P >= w_fixed[i].P * (1 - 1e-3) #hide
-    return nothing #hide
-end #hide
-for i in i_ref_w:-1:1 #hide
-    solve_w!(i) #hide
-end #hide
-for i in (i_ref_w+1):length(winds) #hide
-    solve_w!(i) #hide
-end #hide
-for i in eachindex(winds) #hide
-    w_ok[i] && continue #hide
-    @warn "wind sweep at $(winds[i]) m/s: best re-optimization does not beat the fixed parameters" w_opt[i].P w_fixed[i].P #hide
-end #hide
-
-# Figures of this subsection
-f_dtheta_p = plot(dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, legend_marker(4)..., label="Θ fixed", xlabel="Δθ (deg)", ylabel="P / P*", ylims=(0, 1.1)) #hide
-plot!(f_dtheta_p, dtheta_angles, [d.P / dtheta_fixed[i0_dt].P for d in dtheta_reopt]; c=:black, marker=:none, label="Θ re-optimized") #hide
-f_dtheta_t = plot(dtheta_angles, [d.Tmax / 1000 for d in dtheta_fixed]; seriestype=:scatter, c=:black, ms=4, label="", xlabel="Δθ (deg)", ylabel="Line tension (kN)") #hide
-scatter!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_fixed]; c=:black, ms=4, label="") #hide
-plot!(f_dtheta_t, dtheta_angles, [d.Tmax / 1000 for d in dtheta_reopt]; c=:black, label="", fillrange=[d.Tmin / 1000 for d in dtheta_reopt], fillalpha=0.1) #hide
-plot!(f_dtheta_t, dtheta_angles, [d.Tmin / 1000 for d in dtheta_reopt]; c=:black, label="") #hide
-# the translucent band marks the nominal Δθ under the data; a thin line on top
-for f in (f_dtheta_p, f_dtheta_t) #hide
-    vline!(f, [rad2deg(p_opt.Δθ)]; c=:black, lw=5, alpha=0.3) #hide
-    pushfirst!(f[1].series_list, pop!(f[1].series_list)) #hide
-    vline!(f, [rad2deg(p_opt.Δθ)]; c=:black, lw=0.8, alpha=0.7) #hide
-end #hide
-save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=7Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
-x_map = 100 .* (shape_factors .- 1) #hide
-p_s1 = heatmap(x_map, shape_dphi, P_map; c=:viridis, title="P (kW)", xlabel="Δθ dev (%)", ylabel="Δφ (deg)") #hide
-p_s2 = heatmap(x_map, shape_dphi, Tmax_map; c=:viridis, title="Tmax (kN)", xlabel="Δθ dev (%)") #hide
-p_s3 = heatmap(x_map, shape_dphi, amax_map; c=:viridis, title="max a (m/s²)", xlabel="Δθ dev (%)") #hide
-save_fig(plot(p_s1, p_s2, p_s3; layout=(1, 3), size=plot_size(4 / 3, 2), bottommargin=5Plots.mm, leftmargin=6Plots.mm), "optimization_shape_grid") #hide
-f_wp = plot(winds, [s.P / 1000 for s in w_fixed]; ls=:dot, c=:black, label="Fixed 9 m/s", ylabel="Power (kW)") #hide
-plot!(f_wp, winds, [s.P / 1000 for s in w_opt]; c=1, label="Re-optimized") #hide
-f_wt = plot(winds, [s.Tmax / 1000 for s in w_fixed]; ls=:dot, c=:black, label="", ylabel="Tension (kN)") #hide
-plot!(f_wt, winds, [s.Tmin / 1000 for s in w_fixed]; ls=:dot, c=:black, label="") #hide
-plot!(f_wt, winds, [s.Tmax / 1000 for s in w_opt]; c=1, fillrange=[s.Tmin / 1000 for s in w_opt], fillalpha=0.1, label="") #hide
-plot!(f_wt, winds, [s.Tmin / 1000 for s in w_opt]; c=1, label="") #hide
-theta_norm = [θ ./ maximum(θ) for θ in invert(w_theta)] #hide
-f_wpar = plot(winds, theta_norm; c=permutedims(1:4), label=["ℓ" "I" "b" "Δφ"], xlabel="Wind speed (m/s)", ylabel="Norm. params", legend=:right) #hide
-save_fig(plot(f_wp, f_wt, f_wpar; layout=(3, 1), size=plot_size(2, 1), leftmargin=10Plots.mm, bottommargin=4Plots.mm), "optimization_wind_sweep_all") #hide
-gain_5 = (w_opt[1].P / w_fixed[1].P - 1) * 100 #hide
-gain_15 = (w_opt[end].P / w_fixed[end].P - 1) * 100 #hide
-dt_valid = filter(d -> isfinite(d.P), dtheta_reopt) #hide
-dt_best = isempty(dt_valid) ? NaN : maximum(d -> d.P, dt_valid) #hide
-dt_failed = count(d -> !isfinite(d.P), dtheta_reopt) #hide
-Markdown.parse("""
-- **Local landscape (±10% around \$\\Theta^*\$):** \$\\ell\$ is the stiffest direction (**$(round((land_ys[1][1] - 1) * 100; digits=1))%** at \$-10\\%\$, **$(round((land_ys[1][end] - 1) * 100; digits=1))%** at \$+10\\%\$), followed by \$\\Delta\\varphi\$ (**$(round((land_ys[4][1] - 1) * 100; digits=1))%** / **$(round((land_ys[4][end] - 1) * 100; digits=1))%**), \$I\$ (**$(round((land_ys[2][1] - 1) * 100; digits=1))%**), and \$b\$ (**$(round((land_ys[3][1] - 1) * 100; digits=1))%**).
-- **Why \$\\Delta\\theta = 6^\\circ\$ is held fixed:** continuing the \$\\Theta\$ optimum from one angle to the next over \$\\Delta\\theta \\in [2^\\circ, 20^\\circ]\$, the re-optimized branch peaks at **$(round(dt_best / 1000; digits=2)) kW** (only **+$(round((dt_best / m_opt.P - 1) * 100; digits=1))%** above the \$6^\\circ\$ point)$(dt_failed == 0 ? "" : " — $(dt_failed) of $(length(dtheta_angles)) angles did not converge and are left out"), while the \$10\\times 10\$ shape map shows power is governed by a narrow \$\\Delta\\varphi\$ band near \$19^\\circ\$ (peaking at **$(round(maximum(filter(isfinite, P_map)); digits=2)) kW**).
-- **Wind robustness (\$5\\text{--}15\\,\\text{m/s}\$):** expected power scales from **$(round(w_opt[1].P / 1000; digits=2)) kW** (\$5\\,\\text{m/s}\$) to **$(round(w_opt[end].P / 1000; digits=2)) kW** (\$15\\,\\text{m/s}\$). Holding the \$9\\,\\text{m/s}\$ optimum fixed gives up only **$(round(gain_5; digits=1))%** at \$5\\,\\text{m/s}\$ and **$(round(gain_15; digits=1))%** at \$15\\,\\text{m/s}\$—confirming strong robustness without mechanical reconfiguration.
-
-![Δθ sensitivity](figs/optimization_dtheta.png)
-![10x10 shape map](figs/optimization_shape_grid.png)
-![Wind sweep](figs/optimization_wind_sweep_all.png)
+![Convergence of the three formulations](figs/three_models_convergence.svg)
 """) #hide

@@ -4,34 +4,24 @@
 # with Makie) using Plots.jl only, and heatmaps of the basins of attraction of
 # the two limit cycles (N_ε over two 2D slices of initial conditions, three
 # visualizations each).
-using Pkg
-Pkg.activate(@__DIR__)
+#
+# Compute only: this file defines the numerical experiments and the plot data;
+# all styling, plotting, display and figure writing lives in paper.jl.
 
 using KEEP: PointMass4 as PM4
 using KEEP: PointMassPara as PMP
 using KEEP: SteadyState
-using KEEP: Visualization as VIZ
 using KEEP: LimitCycle as LC
 using KEEP: DEFAULT_TOLERANCE, TAU0
 
-using Plots
 using LinearAlgebra: norm, eigvals
 using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
 using PyFormattedStrings: @f_str
 using Roots
 using ForwardDiff
-
-include(joinpath(@__DIR__, "plot_helpers.jl"))
-
-
-## Determine optimal parameters using kinetic model
-p0 = PMP.build_para()
-p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
-vbp = PMP.build_vbpara(p0)
-
-@info f"Optimal torque slope value
-b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
+using BifurcationKit
+using OrdinaryDiffEqVerner: Vern9, ODEProblem
 
 ## Parameter table for the paper
 # LaTeX table of the parameter set used here, sorted alphabetically by symbol.
@@ -113,8 +103,6 @@ function print_param_table(p)
 
     println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
 end
-
-print_param_table(p0)
 
 ## ---------------------------------------------------------------------------
 # Equilibria figure, Plots.jl reproduction of the Makie original.
@@ -213,207 +201,13 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
     return (line_x, line_y, ax, ay, au, av)
 end
 
-#! format: off
-my_theme = (;
-    downwind        = (; c=plot_color(:grey, 0.08)),
-    upwind          = (; c=plot_color(:red, 0.08)),
-    streamlines     = (; c=:black, alpha=0.7, lw=default(:lw) / 6),
-    heads           = (; c=:black, alpha=0.5, lw=0),
-    nullcline_tau   = (; c=1, ls=:solid),
-    nullcline_alpha = (; c=2, ls=:solid),
-    eq_legend       = (; c=:black, shape=:circle, ms=default(:ms), legend_marker(default(:ms))...),
-)
-
 # Equilibrium characteristics: the symmetry (α, τ) -> (-α, τ+π) flips the kite
 # left↔right (φ = φ0 + Δφ·sin(τ)) and preserves the arm wind region and the
 # center/side zone, so the 8 equilibria realize all 2×2×2 combinations.
-φkite(τ) = vbp.φ0 + vbp.Δφ * sin(τ)                     # kite azimuth (PM4.τ_to_θφ)
-is_down(q) = cos(q[1]) > 0                              # arm downwind
-is_left(q) = φkite(q[2]) > vbp.φ0                       # kite left of window center
-is_center(q) = abs(φkite(q[2]) - vbp.φ0) < vbp.Δφ / 2   # closer to φ0 than to ±Δφ
-
-"Marker style from the equilibrium characteristics: fill = arm wind, shape = zone, stroke = kite side."
-ss_style(q) = (
-    c = is_down(q) ? :white : :black,
-    markerstrokecolor = is_down(q) ? :black : :white,
-    shape = is_center(q) ? :circle : :diamond,
-    ms = default(:ms),
-    markerstrokewidth = is_down(q) ? 8 : 10,
-    # markerstrokewidth = 10,
-)
-#! format: on
-
-theme = my_theme
-
-f = q -> SteadyState.ddq_partial(q, vbp)
-
-# Canvas & Layout
-δ = 0
-plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
-    xticks=([-180, 0, 180], ["-180", "0", "180"]),
-    yticks=([-180, 0, 180], ["-180", "0", "180"]),
-    xlabel="α (deg)", ylabel="τ (deg)",
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
-# Background wind spans
-vspan!([-180, -90]; theme.upwind..., label="Upwind arm")
-vspan!([90, 180]; theme.upwind...)
-vspan!([-90, 90]; theme.downwind...) #, label="Downwind arm")
-
-# Streamlines & Arrowheads
-line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
-plot!(rad2deg.(line_x), rad2deg.(line_y); theme.streamlines...)
-
-ax, ay = rad2deg.(ax), rad2deg.(ay)
-L, W = rad2deg(0.2), rad2deg(0.06)
-heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
-    (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
-    (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
-         for (s, u, v) in zip(zip(ax, ay), au, av)]
-plot!(heads; theme.heads...)
-
-# Nullclines (splatting reuses line properties for both contour and the GR legend fix)
-N = 20
-αs = range(-π, π, N + 1)
-τs = range(-π, π, 2N + 1)
-dd = [f((α, τ)) for τ in τs, α in αs]
-
-contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], theme.nullcline_tau...)
-contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], theme.nullcline_alpha...)
-plot!([NaN], [NaN]; theme.nullcline_tau..., label="D²(τ) = 0")
-plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
-
-# Equilibria
-ss = SteadyState.all_steady_states(vbp)
-
-styles = ss_style.(ss)
-scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
-    c=getproperty.(styles, :c),
-    markerstrokecolor=getproperty.(styles, :markerstrokecolor),
-    shape=getproperty.(styles, :shape),
-    ms=getproperty.(styles, :ms),
-    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
-scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
-plot!(widen=1.06)
-plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(1, 1.14))
-savefig(joinpath(@__DIR__, "figs", "equilibria_phase_space.pdf"))
-display(current())
-@info "Chance to use Poincaré-Miranda theorem here?"
-
-#=
-
-=#
-# TODO
-# https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221o94HCRuzmwEVdA-7pjgq-58mf6-UFtfb%22%5D,%22action%22:%22open%22,%22userId%22:%22107583648323041548472%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
-
-## circle eight plot with identification
-ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
-ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
-p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:black, lw=2),
-    marker_kwargs=ss_style.(ss_downwind), project_eight=true)
-plot!(title="Downwind arm", background_color_subplot=theme.downwind.c)
-p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw=2),
-    marker_kwargs=ss_style.(ss_upwind), project_eight=true)
-plot!(title="Upwind arm", background_color_subplot=theme.upwind.c)
-
-plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
-savefig(joinpath(@__DIR__, "figs", "equilibria_eight_circle.pdf"))
-display(current())
-
-## All eigen values
-dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
-
-ss_ = sort([q for q in ss if q[2] > 0]; by=q -> (!is_down(q), !is_center(q)))  # one left member per symmetric pair: down-center, down-side, up-center, up-side
-evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
-hline([0], c=:black)
-# hspan!([-100, 0]; c=:green, alpha=.1, label="Stable")
-# hspan!([0, 100]; c=:red, alpha=.1, label="Unstable")
-for (k, q) in enumerate(ss_)  # same marker style as the equilibria figure
-    local style = is_down(q) ? theme.downwind : theme.upwind
-    vspan!([k - 1/4, k + 1/4]; style...)
-    scatter!(fill(k, length(evs[k])), real.(evs[k]); ss_style(q)...)
-end
-annotate!([2.5, 2.5], [7.5, -1.5], ["Repulsive", "Attractive"])
-plot!(xlabel="Equilibrium", ylabel=raw"max Re(λ${}_i$)", ylim=(-3, 15), grid=false)
-plot!(xticks=(1:4, ["" for _ in 1:4]))
-plot!(leftmargin=5Plots.mm, bottommargin=2Plots.mm)
-
-display(current())
-savefig(joinpath(@__DIR__, "figs", "_equilibria_eigvals.pdf"))
-
-## Trajectories near equilibria
-# Density of the physical flow around each equilibrium: N_eq trajectories seeded
-# equally on a circle of radius r_eq at rest (dq = 0, as the ddq = 0 convention
-# of the streamplot), integrated for t_eq with the full 4D dynamics and drawn in
-# translucent black in the (α, τ) plane.
-ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
-ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
-
-plot(xlims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)),
-    ylims=(-180 - rad2deg(0.2), 180 + rad2deg(0.2)), aspect_ratio=:equal,
-    xticks=([-180, 0, 180], ["-180", "0", "180"]),
-    yticks=([-180, 0, 180], ["-180", "0", "180"]),
-    xlabel="α (deg)", ylabel="τ (deg)",
-    grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
-
-vspan!([-180, -90]; theme.upwind..., label="Arm upwind")
-vspan!([90, 180]; theme.upwind...)
-vspan!([-90, 90]; theme.downwind..., label="Arm downwind")
-
-contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
-contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], color=:gray, alpha=0.4, linewidth=1.2, label="")
-
-styles = ss_style.(ss)
-scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
-    c=getproperty.(styles, :c),
-    markerstrokecolor=getproperty.(styles, :markerstrokecolor),
-    shape=getproperty.(styles, :shape),
-    ms=getproperty.(styles, :ms),
-    markerstrokewidth=getproperty.(styles, :markerstrokewidth))
-scatter!([NaN], [NaN]; theme.eq_legend..., label="Equilibrium")
-
-N_eq, r_eq, t_eq = 100, π / 10, 1
-for q in ss
-    for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
-        q0 = q .+ r_eq .* [cos(θ), sin(θ)]
-        local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
-        qs = [rad2deg.(sol(t)[1:2]) for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
-        plot!(first.(qs), last.(qs); c=:black, alpha=0.2, lw=1, label="")
-    end
-end
-plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
-    topmargin=5Plots.mm, size=plot_size(1, 1.22))
-
-savefig(joinpath(@__DIR__, "figs", "_equilibria_trajectories.pdf"))
-display(plot!())
-
-## Are lines and arm aligned in the xy plane, do they belong to the same vertical plane ?
-# Equivalent to αhat and τhat belong to same vertical plane
-# αhat_xy × τhat_xy == 0
-all_aligned = true
-for (α, τ) in ss
-    αx, αy, _ = PM4.compute_αhat(α)
-    τx, τy, _ = PM4.compute_τhat(τ, vbp)
-    global all_aligned &= (αx * τy ≈ αy * τx)
-end
-@info "Are lines and arm aligned at equilbrium? $(ifelse(all_aligned, "YES", "NO"))."
-
-## ---------------------------------------------------------------------------
-# One simulation: start near the aligned state q = (0, 0) with a prograde
-# kick dq = (0, 1); the trajectory leaves the transient and settles on the
-# pumping limit cycle within ~5 s (a few cycle periods).
-u0 = PM4.build_u(; dτ=1)
-sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
-
-sim_4D_fig = plot_time_series(sol)
-# save only: a second render of the same figure fails Plots' layout pass
-display(sim_4D_fig)
-savefig(sim_4D_fig, joinpath(@__DIR__, "figs", "time_series_4D.pdf"))
-
-## Convergence rate of the two cycles, side by side
-# Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
-const LC_CONV_TOL = 1e-13
-const CB = LC.build_poincare_callback(eps(1.0))
+φkite(τ, vbp) = vbp.φ0 + vbp.Δφ * sin(τ)                     # kite azimuth (PM4.τ_to_θφ)
+is_down(q) = cos(q[1]) > 0                                    # arm downwind
+is_left(q, vbp) = φkite(q[2], vbp) > vbp.φ0                   # kite left of window center
+is_center(q, vbp) = abs(φkite(q[2], vbp) - vbp.φ0) < vbp.Δφ / 2 # closer to φ0 than to ±Δφ
 
 function get_slope(distances; tol_start, tol_end)
     i1 = findfirst(<(tol_start), distances)
@@ -421,101 +215,14 @@ function get_slope(distances; tol_start, tol_end)
     return -(log10(distances[i2]) - log10(distances[i1])) / (i2 - i1)
 end
 
-function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol=LC_CONV_TOL)
-    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=CB, save_end=false, tol)
-    u_infty = sol.u[end]
-    n_max = 11
-    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
-
-    tol_start, tol_end = 1e-2, 10tol
-    slope = get_slope(distances; tol_start, tol_end)
-    i1 = findfirst(<(tol_start), distances)
-
-    plt = plot(; yscale=:log10, xlim=(0, n_max), xticks=0:2:100,
-        ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
-        xlabel=f"""Lemniscate revolutions, D(τ) {dτ>0 ? ">" : "<"} 0""",
-    )
-
-    perturbed_params = (; ls=:dot, lw=2, alpha=0.4, c=:gray, label="Perturbed trajectories")
-    plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black)
-    if ntrace > 0
-        for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
-            s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=CB, save_end=false, tol)
-            plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
-                perturbed_params..., label="")
-        end
-    end
-
-    annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black")))
-    distance_style = (; c=color, ls=:dot, marker=:circle, legend_marker()...)
-    plot!(distances .+ 1e-16; distance_style...)
-
-    if legend
-        plot!([NaN]; distance_style..., label=raw"$|| x_i - x_\infty  ||$")
-        ntrace > 0 && plot!([NaN]; perturbed_params...)
-    end
-    return plt
-end
-
-p_conv_p = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
-p_conv_m = plot_convergence_panel(vbp, -1, 2; ntrace=0)
-plot!(p_conv_p, leftmargin=11Plots.mm)
-plot!(p_conv_m, leftmargin=5Plots.mm)
-plot!(p_conv_p, ylabel="Distance to limit")
-conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
-plot!(bottommargin=7Plots.mm)
-display(conv_two)
-savefig(conv_two, joinpath(OUTPATH, "limit_cycle_convergence.pdf"))
-
-## Convergence rate of the two cycles, verified with Floquet multipliers
-# Reference runs from (0, 0, 0, ±1).
-#
-# The secant slopes are measured on the log plots; the multipliers give them
-# independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
-# revolution T (the monodromy matrix): one multiplier is 1 (displacement along
-# the cycle, eigenvector f(x*)) and the largest remaining |μ| < 1 predicts the
-# slope -log10|μ| per revolution. The callback solution stores only
-# Poincaré-section states, so its last two saved times span exactly one
-# revolution and build_shooting(sol) is the cycle's shooting (residuals ~1e-13).
+# Same flow map as the shared Φ_map (paper_core.jl), kept under the section's
+# original name for the eigenvalue derivation in the convergence caption.
 function Φ(x, T; vbp)
     Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
 end
 
-function floquet_rate(sol, vbp)
-    s = LC.build_shooting(sol)
-    u0, T = LC.unpack_shooting(s)
-    x0 = collect(Array(u0))[1:4]
-    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ(x, T; vbp), x0)))  # jacobian is an SMatrix
-    return -log10(maximum(abs, μ[abs.(μ) .< 1/2])), μ, T
-end
-
-# One solve per cycle feeds the info caption.
-cycles = NamedTuple[]
-for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
-    local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
-    local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
-    local rate, μ, T = floquet_rate(sol, vbp)
-    local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
-    # largest eigenvalue found with differentiation: predicts the per-revolution rate
-    local λ = maximum(abs, μ[abs.(μ) .< 1/2])
-    push!(cycles, (; dτ, label, distances, secant, rate, λ, T))
-end
-
-cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
-    f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
-@info f"""Each revolution, the distance is divided by 10^slope. The eigenvalues λ are the dominant non-unit Floquet multipliers found with differentiation.
-{join(cycle_lines, '\n')}"""
-
 ## Eight-trajectory in YZ plane
 r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
-# include("../../applications/ecc2026/state_funcs.jl")
-lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
-lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
-
-@info f"Average power
-D(τ) > 0 : {last(last(lc_p.u)) / 1000last(lc_p.t):.2f} kW,
-D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
-"
 
 """
 Lens geometry for the YZ-plane zoom: locate each limit cycle at phase τ
@@ -551,204 +258,368 @@ function yz_split(sol, n_splits)
     return yz
 end
 
-n_splits = 4
-# arrows = [permutedims(repeat([true], n_splits - 1)) false]
-plot(aspect_ratio=:equal, xlabel="y (m)", ylabel="z (m)", xtick=-40:10:40, ytick=10:5:20)
-plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
-plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
-plot!([NaN], [NaN], c=1, label="D(τ) > 0")
-plot!([NaN], [NaN], c=2, label="D(τ) < 0")
-plot!([0], [26])
-c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ was set by hand
-lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
-l = plot!().inset_subplots[1]
-xticks_ = (c[1]-δ):δ:(c[1]+δ)
-yticks_ = (c[2]-δ):δ:(c[2]+δ)
-xticks!(l, xticks_, [f"{t:.1f}" for t in xticks_])
-yticks!(l, yticks_, [f"{t:.1f}" for t in yticks_])
-plot!(l, tickfontsize=TICKFONTSIZE - 1)
-plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
-
-display(plot!())
-savefig(plot!(), joinpath(OUTPATH, "yz_limit_cycles.pdf"))
-
-#=
-Projection of the kite trajectories onto the YZ plane for the two limit cycles, with equal scaling on both axes.
-Arrows indicate the direction of the kite's motion; zooming in on the trajectory shows that the two paths are distinct.
-=#
-
-
-## Inventory of limit cycles: deflated single shooting vs quasi-Monte-Carlo
-#
-# The model is invariant under the mirror
-#     S(α, τ, dα, dτ) = (-α, τ + π, -dα, dτ)          (φ0 = 0, wind along +x).
-# S has no fixed point on the (α, τ) torus, hence its orbits are pairs of points
-# and the minimal exhaustive search space is the fundamental domain
-#     α ∈ [0, π],  τ ∈ [-π, π),  (dα, dτ) ∈ [-M, M]²,      M = 10,
-# i.e. half the torus volume: every initial condition has exactly one
-# representative in it, and every limit cycle meets it.
-#
-# A pumping cycle is a relative periodic orbit: τ runs one turn per period, so it
-# closes only with the twist u(T) = u(0) ± 2π e_τ. It is the root of a
-# single-shooting problem in 5 unknowns (section state + period), and Newton steps
-# are deflated against the cycles already known, so a converged root is a new
-# cycle. τ advances along a cycle, so every cycle crosses the section τ = TAU0:
-# sampling the section (α ∈ [0, π], dα and dτ in [-M, M], one sign of dτ at a
-# time) seeds all of them, one turn of the true flow giving the starting point and
-# the period guess. The same Halton points are then integrated from their full 4D
-# state, which can only reveal attracting cycles — the comparison.
-# shortcut: cycles whose dτ changes sign within one period would need both twists
-# seeded; both references have a single-sign dτ, and none turned up with a mixed
-# one, so seeds are split by sign(dτ) only. Likewise the α closure is 0: a cycle
-# winding once in α per period is not a root here (an attracting one would still
-# show up in the QMC, which integrates the true flow).
-using BifurcationKit
-const BK = BifurcationKit
-using OrdinaryDiffEqVerner: Vern9, ODEProblem
-
-const BK_M = 10        # search box on (dα, dτ)
-const BK_NSEEDS = 100  # Halton points in the fundamental domain
-
-vec4(u) = [u[1], u[2], u[3], u[4]]
-
-# S is an exact symmetry: f(S u) = S f(u), the mirror acting on velocities.
-sym_err = maximum([(0.3, 0.7, 0.4, 1.2), (-1.1, -2.0, -0.9, -0.5),
-    (2.5, 3.0, 1.7, 2.2), (-2.9, -3.0, -3.0, -2.0)]) do (α, τ, dα, dτ)
-    v = PM4.dynamics(PM4.build_u(α, τ, dα, dτ, 0.0), vbp)
-    w = PM4.dynamics(PM4.build_u(-α, τ + π, -dα, dτ, 0.0), vbp)
-    norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
-end
-@assert sym_err < 1e-10 "S is not a symmetry of the model (residual $sym_err)"
-
-# Frozen outside the box: a diverging Newton step then fails on a finite residual
-# instead of crawling in the adaptive integrator. Accepted roots are re-checked
-# with the true flow below.
-function f_search!(du, u, p, t)
-    if abs(u[3]) > BK_M + 2 || abs(u[4]) > BK_M + 2
-        du .= 0
-    else
-        du .= PM4.dynamics(PM4.build_u(u[1], u[2], u[3], u[4], 0.0), p, t)[1:4]
-    end
-end
-
-search_prob = ODEProblem(f_search!, zeros(4), (0.0, 1.0), vbp)
-section = BK.SectionSS([0.0, 1.0, 0.0, 0.0], [0.0, TAU0, 0.0, 0.0])
-sh = BK.Shooting(search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000)
-
-# BK's shooting closes on u(T) = u(0); the twist is constant, so only the τ row of
-# the closure block changes and the Jacobian stays BK's.
-struct TwistedShooting{S,U} <: BK.AbstractBifurcationProblem
-    sh::S
-    u0::U
-    twist::Float64
-end
-BK.getparams(w::TwistedShooting) = BK.getparams(w.sh)
-BK.getlens(w::TwistedShooting) = BK.getlens(w.sh)
-BK.getparam(w::TwistedShooting) = BK.getparam(w.sh)
-BK.getu0(w::TwistedShooting) = w.u0
-BK.getdelta(w::TwistedShooting) = BK.getdelta(w.sh)
-function BK.residual(w::TwistedShooting, x, p)
-    out = BK.po_residual(w.sh, x, p)
-    out[end-3] -= w.twist  # closure rows are (α, τ, dα, dτ), then the section row
-    return out
-end
-BK.jacobian(w::TwistedShooting, x, p) = BK.po_jacobian(w.sh, x, p)
-
 "Shooting guess [α, τ, dα, dτ, T] from a known cycle."
 cycle_guess(lc) = vcat(vec4(lc(0.0)), lc.t[end])
 
-"A root as its section state (x[2] = TAU0 by the section constraint)."
-root_state(x) = (α=rem2pi(x[1], RoundNearest), dα=x[3], dτ=x[4], T=x[5])
+"""
+    compute_numerical()
 
-same_cycle(a, b) = abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 && abs(a.dα - b.dα) < 1e-4 &&
-    abs(a.dτ - b.dτ) < 1e-4 && abs(a.T - b.T) < 1e-4
+Run every numerical experiment of the JTCAM dynamical-behaviour section and
+return a NamedTuple with all results and plot-ready data. Nothing is plotted,
+displayed or written to disk here; `paper.jl` owns all styling and figures.
+Original variable names are kept as field names wherever possible.
 
-npar = BK.NewtonPar(tol=1e-9, max_iterations=15, verbose=false)
+Parameters
+- `p0`: baseline `PMP` parameter struct with `b` set by the kinetic criterion.
+- `vbp`: `PMP.build_vbpara(p0)`, the parameter struct used by every integration.
 
-# The two references, re-solved by the shooting.
-refs = map((+1, -1)) do sense
-    tw = TwistedShooting(sh, cycle_guess(sense > 0 ? lc_p : lc_m), sense * 2π)
-    s = BK.solve(tw, BK.Newton(), npar)
-    @assert BK.converged(s) "reference cycle (D(τ) $sense) not recovered by shooting"
-    (sense=sense, x=collect(s.u), state=root_state(s.u), res=norm(BK.residual(tw, s.u, vbp), Inf))
-end
+Equilibria phase space / eigenvalues
+- `f`: `q -> SteadyState.ddq_partial(q, vbp)`, the sampled vector field.
+- `line_x`, `line_y`: `Vector{Float32}`, NaN-separated streamline polylines (rad).
+- `ax`, `ay`: `Vector{Float32}`, streamline seed positions (rad).
+- `au`, `av`: `Vector{Float32}`, unit field directions at the seeds.
+- `N`: `Int`, half-width of the nullcline grids (20).
+- `αs`, `τs`: nullcline grids on [-π, π] with N+1 and 2N+1 points.
+- `dd`: `(2N+1) × (N+1)` matrix of `f((α, τ))` values for the two nullclines.
+- `ss`: all eight equilibria `(α, τ)` in rad.
+- `ss_downwind`, `ss_upwind`: equilibria split by `cos(α) > 0`.
+- `dyn`: 4D dynamics `u -> PM4.dynamics(PM4.build_u(...), vbp)[1:4]`.
+- `ss_`: four representatives of the symmetric equilibrium pairs (τ > 0, sorted).
+- `evs`: eigenvalues of `∂dyn/∂(q, dq)` at each `q` in `ss_`.
+- `all_aligned`: whether arm and lines are coplanar at every equilibrium.
 
-cb_turn = LC.build_poincare_callback(Inf)  # stop at the first crossing
-"Shooting guess from the section state u0: one turn of the true flow."
-function turn_guess(u0)
-    tf = 4π / clamp(abs(u0[4]), 0.5, BK_M)
-    sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
-    length(sol.t) < 2 && return nothing  # no full turn in the box
-    return vcat(vec4(sol.u[end]), sol.t[end])
-end
+Trajectories near equilibria
+- `N_eq`, `r_eq`, `t_eq`: seeds per equilibrium (100), seed radius (π/10), integration time (1 s).
+- `traj_qs`: `[equilibrium][seed]` `(α, τ)` polylines in degrees, 10 samples each.
 
-"Deflated Newton from a guess; keep only genuine cycles inside the box."
-function find_cycle(sense, defOp, guess)
-    tw = TwistedShooting(sh, guess, sense * 2π)
-    s = try
-        BK.solve(tw, defOp, npar)
-    catch
-        return nothing
+Time series
+- `u0`: initial state `PM4.build_u(; dτ=1)` for the settling simulation.
+- `sol`: 10 s transient solution (`save_everystep=true`) fed to `plot_time_series`.
+
+Limit-cycle convergence
+- `LC_CONV_TOL`: Poincaré convergence tolerance (1e-13).
+- `CB`: Poincaré callback at `eps(1.0)` (the shared `CB_POINC`).
+- `conv`: `(; p, m)` panel data, each `(dτ, sol, u_infty, distances, slope, i1,
+  perturbed)`; `perturbed` is empty for the current `ntrace=0` calls (the
+  helper regenerates the Halton cloud if a dashed trace is wanted). Also
+  carries `n_max`, `tol_start`, `tol_end`.
+- `cycles`: per-sign `(dτ, label, distances, secant, rate, λ, T)` from secant and Floquet.
+- `cycle_lines`: caption lines with secant/Floquet slopes, periods and λ.
+
+YZ plane
+- `lc_p`, `lc_m`: the two limit-cycle solutions (sense + and -).
+- `n_splits`: number of arrow segments (4).
+- `yz_p`, `yz_m`: NaN-separated `(y, z)` polylines of the two cycles.
+- `c`, `δ`: zoom-lens center and radius at phase τ = 2.6, factor 3.
+
+Deflated-shooting / QMC inventory (shared helpers from `paper_core.jl`)
+- `sym_err`: residual of the exact mirror symmetry `S`.
+- `BK_M`, `BK_NSEEDS`: velocity search box (10) and Halton seed count (100).
+- `refs`: the two reference cycles re-solved by shooting, including residuals.
+- `seeds`: `4 × BK_NSEEDS` Halton seeds over the fundamental domain.
+- `found`: extra cycles from deflated Newton, each `(x, state)`.
+- `attempts`: per-sign counts of shooting attempts.
+- `n_guess`: `Ref{Int}`, number of turns actually built from the seeds.
+- `qmc`: counts of seeds reaching the + cycle, the - cycle, or neither.
+- `ref_res`: largest residual of the re-solved references.
+- `inventory_note`: the inventory summary string (for the figure note/caption).
+"""
+function compute_numerical()
+    ## Determine optimal parameters using kinetic model
+    p0 = PMP.build_para()
+    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
+    vbp = PMP.build_vbpara(p0)
+
+    @info f"Optimal torque slope value
+b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from the simulated limit-cycle period."
+
+    ## Parameter table for the paper
+    print_param_table(p0)
+
+    ## ---------------------------------------------------------------------------
+    # Equilibria figure, Plots.jl reproduction of the Makie original.
+    #
+    # Vector field studied: ddq(q, dq = 0) = (ddα, ddτ).
+    f = q -> SteadyState.ddq_partial(q, vbp)
+
+    # Streamlines & Arrowheads
+    line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
+
+    # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
+    N = 20
+    αs = range(-π, π, N + 1)
+    τs = range(-π, π, 2N + 1)
+    dd = [f((α, τ)) for τ in τs, α in αs]
+
+    # Equilibria
+    ss = SteadyState.all_steady_states(vbp)
+    @info "Chance to use Poincaré-Miranda theorem here?"
+
+    # TODO
+    # https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221o94HCRuzmwEVdA-7pjgq-58mf6-UFtfb%22%5D,%22action%22:%22open%22,%22userId%22:%22107583648323041548472%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing
+
+    ## circle eight plot with identification
+    ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
+    ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
+
+    ## All eigen values
+    dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
+
+    ss_ = sort([q for q in ss if q[2] > 0]; by=q -> (!is_down(q), !is_center(q, vbp)))  # one left member per symmetric pair: down-center, down-side, up-center, up-side
+    evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
+
+    ## Trajectories near equilibria
+    # Density of the physical flow around each equilibrium: N_eq trajectories seeded
+    # equally on a circle of radius r_eq at rest (dq = 0, as the ddq = 0 convention
+    # of the streamplot), integrated for t_eq with the full 4D dynamics and drawn in
+    # translucent black in the (α, τ) plane.
+    N_eq, r_eq, t_eq = 100, π / 10, 1
+    traj_qs = Vector{Vector{Vector{Float64}}}()
+    for q in ss
+        for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
+            q0 = q .+ r_eq .* [cos(θ), sin(θ)]
+            local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
+            qs = [rad2deg.(sol(t)[1:2]) for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
+            push!(traj_qs, qs)
+        end
     end
-    (s === nothing || !BK.converged(s)) && return nothing
-    x = collect(s.u)
-    norm(BK.residual(tw, x, vbp), Inf) < 1e-6 || return nothing
-    st = root_state(x)
-    # independent check with the true flow: whole orbit in the box, and it closes
-    traj = try
-        LC.shoot([st.α, st.dα, st.dτ, st.T], vbp; tol=1e-10, save_everystep=true)
-    catch
-        return nothing
+
+    ## Are lines and arm aligned in the xy plane, do they belong to the same vertical plane ?
+    # Equivalent to αhat and τhat belong to same vertical plane
+    # αhat_xy × τhat_xy == 0
+    all_aligned = true
+    for (α, τ) in ss
+        αx, αy, _ = PM4.compute_αhat(α)
+        τx, τy, _ = PM4.compute_τhat(τ, vbp)
+        all_aligned &= (αx * τy ≈ αy * τx)
     end
-    all(abs(u[3]) <= BK_M && abs(u[4]) <= BK_M for u in traj.u) || return nothing
-    norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 || return nothing
-    return (x=x, state=st)
-end
+    @info "Are lines and arm aligned at equilbrium? $(ifelse(all_aligned, "YES", "NO"))."
 
-seeds = eachcol(sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample()))
+    ## ---------------------------------------------------------------------------
+    # One simulation: start near the aligned state q = (0, 0) with a prograde
+    # kick dq = (0, 1); the trajectory leaves the transient and settles on the
+    # pumping limit cycle within ~5 s (a few cycle periods).
+    u0 = PM4.build_u(; dτ=1)
+    sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
 
-found = NamedTuple[]
-attempts = zeros(Int, 2)
-n_guess = Ref(0)  # turns actually built (soft-scope-safe counter)
-for sense in (+1, -1)
-    local ref = only(filter(r -> r.sense == sense, refs))
-    defOp = BK.DeflationOperator(2.0, 1.0, [copy(ref.x)])
+    ## Convergence rate of the two cycles, side by side
+    # Reference starts (0, 0, 0, ±1); the dashed cloud perturbs (α, τ) at fixed dτ = ±1.
+    LC_CONV_TOL = 1e-13
+    CB = CB_POINC  # the shared callback from paper_core.jl: LC.build_poincare_callback(eps(1.0))
+
+    # Data behind `plot_convergence_panel` (ported verbatim to paper.jl): the
+    # reference run, its section distances and slope. Both panels are called
+    # with ntrace=0, so `perturbed` is empty; the helper can still supply the
+    # Halton cloud when a dashed trace is wanted.
+    n_max = 11
+    tol_start, tol_end = 1e-2, 10LC_CONV_TOL
+    function convergence_data(dτ, ntrace; tf=50)
+        s_ref = PM4.integrate(PM4.build_u(; dτ), tf, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
+        u_infty = s_ref.u[end]
+        distances = [LC.distance_on_section(u, u_infty) for u in s_ref.u[1:(end-1)]][1:min(end, n_max-1)]
+        slope = get_slope(distances; tol_start, tol_end)
+        i1 = findfirst(<(tol_start), distances)
+        perturbed = Vector{Vector{Float64}}()
+        if ntrace > 0
+            for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+                s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
+                push!(perturbed, [LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16)
+            end
+        end
+        return (; dτ, sol=s_ref, u_infty, distances, slope, i1, perturbed)
+    end
+    conv = (p=convergence_data(+1, 0), m=convergence_data(-1, 0), n_max, tol_start, tol_end)
+
+    ## Convergence rate of the two cycles, verified with Floquet multipliers
+    # Reference runs from (0, 0, 0, ±1).
+    #
+    # The secant slopes are measured on the log plots; the multipliers give them
+    # independently. μ = eig(∂Φ_T/∂x0) is the Jacobian of the flow over one
+    # revolution T (the monodromy matrix): one multiplier is 1 (displacement along
+    # the cycle, eigenvector f(x*)) and the largest remaining |μ| < 1 predicts the
+    # slope -log10|μ| per revolution. The callback solution stores only
+    # Poincaré-section states, so its last two saved times span exactly one
+    # revolution and build_shooting(sol) is the cycle's shooting (residuals ~1e-13).
+    #
+    # `floquet_rate` is the shared paper_core.jl helper: it returns (slope, λ, T)
+    # and uses `Φ_map`, identical to this section's old `Φ` and `floquet_rate`.
+    cycles = NamedTuple[]
+    for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
+        local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
+        local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
+        local fr = floquet_rate(sol, vbp)
+        local rate, λ, T = fr.slope, fr.λ, fr.T
+        local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
+        # largest eigenvalue found with differentiation: predicts the per-revolution rate
+        push!(cycles, (; dτ, label, distances, secant, rate, λ, T))
+    end
+
+    cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
+        f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
+    @info f"""Each revolution, the distance is divided by 10^slope. The eigenvalues λ are the dominant non-unit Floquet multipliers found with differentiation.
+{join(cycle_lines, '\n')}"""
+
+    ## Eight-trajectory in YZ plane
+    lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
+    lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
+
+    @info f"Average power
+D(τ) > 0 : {last(last(lc_p.u)) / 1000last(lc_p.t):.2f} kW,
+D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
+"
+
+    n_splits = 4
+    # arrows = [permutedims(repeat([true], n_splits - 1)) false]
+    yz_p = yz_split(lc_p, n_splits)
+    yz_m = yz_split(lc_m, n_splits)
+    c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ was set by hand
+
+    ## Inventory of limit cycles: deflated single shooting vs quasi-Monte-Carlo
+    #
+    # The model is invariant under the mirror
+    #     S(α, τ, dα, dτ) = (-α, τ + π, -dα, dτ)          (φ0 = 0, wind along +x).
+    # S has no fixed point on the (α, τ) torus, hence its orbits are pairs of points
+    # and the minimal exhaustive search space is the fundamental domain
+    #     α ∈ [0, π],  τ ∈ [-π, π),  (dα, dτ) ∈ [-M, M]²,      M = 10,
+    # i.e. half the torus volume: every initial condition has exactly one
+    # representative in it, and every limit cycle meets it.
+    #
+    # A pumping cycle is a relative periodic orbit: τ runs one turn per period, so it
+    # closes only with the twist u(T) = u(0) ± 2π e_τ. It is the root of a
+    # single-shooting problem in 5 unknowns (section state + period), and Newton steps
+    # are deflated against the cycles already known, so a converged root is a new
+    # cycle. τ advances along a cycle, so every cycle crosses the section τ = TAU0:
+    # sampling the section (α ∈ [0, π], dα and dτ in [-M, M], one sign of dτ at a
+    # time) seeds all of them, one turn of the true flow giving the starting point and
+    # the period guess. The same Halton points are then integrated from their full 4D
+    # state, which can only reveal attracting cycles — the comparison.
+    # shortcut: cycles whose dτ changes sign within one period would need both twists
+    # seeded; both references have a single-sign dτ, and none turned up with a mixed
+    # one, so seeds are split by sign(dτ) only. Likewise the α closure is 0: a cycle
+    # winding once in α per period is not a root here (an attracting one would still
+    # show up in the QMC, which integrates the true flow).
+    BK = BifurcationKit
+    BK_M = 10        # search box on (dα, dτ)
+    BK_NSEEDS = 100  # Halton points in the fundamental domain
+
+    # S is an exact symmetry: f(S u) = S f(u), the mirror acting on velocities.
+    sym_err = maximum([(0.3, 0.7, 0.4, 1.2), (-1.1, -2.0, -0.9, -0.5),
+        (2.5, 3.0, 1.7, 2.2), (-2.9, -3.0, -3.0, -2.0)]) do (α, τ, dα, dτ)
+        v = PM4.dynamics(PM4.build_u(α, τ, dα, dτ, 0.0), vbp)
+        w = PM4.dynamics(PM4.build_u(-α, τ + π, -dα, dτ, 0.0), vbp)
+        norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
+    end
+    @assert sym_err < 1e-10 "S is not a symmetry of the model (residual $sym_err)"
+
+    # Frozen outside the box: a diverging Newton step then fails on a finite residual
+    # instead of crawling in the adaptive integrator. Accepted roots are re-checked
+    # with the true flow below.
+    # `f_search!`, `vec4`, `TwistedShooting` (+ BK overloads), `root_state`,
+    # `same_cycle` and `npar` are shared helpers from paper_core.jl.
+    search_prob = ODEProblem(f_search!, zeros(4), (0.0, 1.0), vbp)
+    section = BK.SectionSS([0.0, 1.0, 0.0, 0.0], [0.0, TAU0, 0.0, 0.0])
+    sh = BK.Shooting(search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000)
+
+    # BK's shooting closes on u(T) = u(0); the twist is constant, so only the τ row of
+    # the closure block changes and the Jacobian stays BK's.
+
+    # The two references, re-solved by the shooting.
+    refs = map((+1, -1)) do sense
+        tw = TwistedShooting(sh, cycle_guess(sense > 0 ? lc_p : lc_m), sense * 2π)
+        s = BK.solve(tw, BK.Newton(), npar)
+        @assert BK.converged(s) "reference cycle (D(τ) $sense) not recovered by shooting"
+        (sense=sense, x=collect(s.u), state=root_state(s.u), res=norm(BK.residual(tw, s.u, vbp), Inf))
+    end
+
+    cb_turn = LC.build_poincare_callback(Inf)  # stop at the first crossing
+    "Shooting guess from the section state u0: one turn of the true flow."
+    function turn_guess(u0)
+        tf = 4π / clamp(abs(u0[4]), 0.5, BK_M)
+        sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
+        length(sol.t) < 2 && return nothing  # no full turn in the box
+        return vcat(vec4(sol.u[end]), sol.t[end])
+    end
+
+    "Deflated Newton from a guess; keep only genuine cycles inside the box."
+    function find_cycle(sense, defOp, guess)
+        tw = TwistedShooting(sh, guess, sense * 2π)
+        s = try
+            BK.solve(tw, defOp, npar)
+        catch
+            return nothing
+        end
+        (s === nothing || !BK.converged(s)) && return nothing
+        x = collect(s.u)
+        norm(BK.residual(tw, x, vbp), Inf) < 1e-6 || return nothing
+        st = root_state(x)
+        # independent check with the true flow: whole orbit in the box, and it closes
+        traj = try
+            LC.shoot([st.α, st.dα, st.dτ, st.T], vbp; tol=1e-10, save_everystep=true)
+        catch
+            return nothing
+        end
+        all(abs(u[3]) <= BK_M && abs(u[4]) <= BK_M for u in traj.u) || return nothing
+        norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 || return nothing
+        return (x=x, state=st)
+    end
+
+    seeds = eachcol(sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample()))
+
+    found = NamedTuple[]
+    attempts = zeros(Int, 2)
+    n_guess = Ref(0)  # turns actually built (soft-scope-safe counter)
+    for sense in (+1, -1)
+        local ref = only(filter(r -> r.sense == sense, refs))
+        defOp = BK.DeflationOperator(2.0, 1.0, [copy(ref.x)])
+        for u0 in seeds
+            sign(u0[4]) == sense || continue
+            attempts[sense > 0 ? 1 : 2] += 1
+            guess = turn_guess(PM4.build_u(u0[1], TAU0, u0[3], u0[4], 0.0))
+            guess === nothing && continue
+            n_guess[] += 1
+            local r = find_cycle(sense, defOp, guess)
+            r === nothing && continue
+            (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) && continue
+            push!(defOp, copy(r.x))
+            push!(found, r)
+        end
+    end
+
+    # Quasi-Monte-Carlo on the same domain, from the full 4D state: only attracting
+    # cycles can be seen, so this bounds what deflation is expected to find.
+    cb_conv = LC.build_poincare_callback(1e-8)
+    qmc = zeros(Int, 3)  # D(τ) > 0, D(τ) < 0, none
     for u0 in seeds
-        sign(u0[4]) == sense || continue
-        attempts[sense > 0 ? 1 : 2] += 1
-        guess = turn_guess(PM4.build_u(u0[1], TAU0, u0[3], u0[4], 0.0))
-        guess === nothing && continue
-        n_guess[] += 1
-        local r = find_cycle(sense, defOp, guess)
-        r === nothing && continue
-        (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) && continue
-        push!(defOp, copy(r.x))
-        push!(found, r)
+        local sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
+            callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000)
+        u = sol.u[end]
+        d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf)
+        k = argmin(d)
+        qmc[minimum(d) < 1e-3 ? k : 3] += 1
     end
-end
 
-# Quasi-Monte-Carlo on the same domain, from the full 4D state: only attracting
-# cycles can be seen, so this bounds what deflation is expected to find.
-cb_conv = LC.build_poincare_callback(1e-8)
-qmc = zeros(Int, 3)  # D(τ) > 0, D(τ) < 0, none
-for u0 in seeds
-    local sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
-        callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000)
-    u = sol.u[end]
-    d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf)
-    k = argmin(d)
-    qmc[minimum(d) < 1e-3 ? k : 3] += 1
-end
-
-ref_res = maximum(r -> r.res, refs)
-@info f"""Limit cycle inventory over α ∈ [0, 180] deg, τ ∈ [-180, 180) deg, (dα, dτ) ∈ [-{rad2deg(BK_M):.0f}, {rad2deg(BK_M):.0f}] deg/s (half the torus, modulo S; symmetry residual {sym_err:.0e})
+    ref_res = maximum(r -> r.res, refs)
+    inventory_note = f"""Limit cycle inventory over α ∈ [0, 180] deg, τ ∈ [-180, 180) deg, (dα, dτ) ∈ [-{rad2deg(BK_M):.0f}, {rad2deg(BK_M):.0f}] deg/s (half the torus, modulo S; symmetry residual {sym_err:.0e})
 Single shooting ({length(seeds)} Halton seeds → {attempts[1]}/{attempts[2]} per sign of dτ, {n_guess[]} turns, deflation): {length(found)} cycle(s) beyond the two references; references re-solved with residual {ref_res:.0e}
 Quasi-Monte-Carlo ({length(seeds)} Halton seeds, stable cycles only): {qmc[1]} → D(τ) > 0, {qmc[2]} → D(τ) < 0, {qmc[3]} → none"""
+    @info inventory_note
 
-## Limit Cycles
-# TODO
-# - two limit cycles
-# - convergence rate plot with trend line before numerical noise takes over + visualize all floquet exponents, or multipliers (which is more relevant?)
-# - 3d plot projected on zy plane
-# - eight circle plot of equilibria and one limit cycle
-# inspired from applications/ecc2026
+    ## Limit Cycles
+    # TODO
+    # - two limit cycles
+    # - convergence rate plot with trend line before numerical noise takes over + visualize all floquet exponents, or multipliers (which is more relevant?)
+    # - 3d plot projected on zy plane
+    # - eight circle plot of equilibria and one limit cycle
+    # inspired from applications/ecc2026
+
+    # Local closures (f, dyn) and the callback are not returned: they cannot
+    # be serialised into the cross-process results cache. paper.jl only needs
+    # the arrays, scalars and ODE solutions below.
+    return (; p0, vbp, line_x, line_y, ax, ay, au, av, N, αs, τs, dd, ss,
+        ss_downwind, ss_upwind, ss_, evs, all_aligned,
+        N_eq, r_eq, t_eq, traj_qs, sol,
+        LC_CONV_TOL, conv, cycles, cycle_lines,
+        lc_p, lc_m, n_splits, yz_p, yz_m, c, δ,
+        sym_err, BK_M, BK_NSEEDS, refs, seeds, found, attempts, n_guess, qmc,
+        ref_res, inventory_note)
+end
