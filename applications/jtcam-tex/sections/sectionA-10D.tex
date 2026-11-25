@@ -1,7 +1,8 @@
 
 \section{10D model} \label{sec:model10D}
 \subsection{Model description}
-In this appendix, we describe the model designed by \alter{Alain Nême} inspired by \alter{Fagiano PhD thesis} and \alter{Diehl PhD thesis}. 
+% TODO cite Fagiano PhD thesis and Diehl PhD thesis
+In this appendix, we describe the model designed by Alain Nême inspired by Fagiano PhD thesis and Diehl PhD thesis. 
 The objective is to have an ODE that does not involve a control to simulate a kite flying horizontal eights, or lemniscates, while the arm extracts energy from the system.
 The kite $K$ is attached to the tip of a rotating arm $A$ of length $a$ with four lines of length $\ell$ (assumed constant), the arm rotates around $\vu z$ at the origin $O$.
 
@@ -31,7 +32,7 @@ Spherical coordinates use the physics convention also found in ISO 80000-2:2019:
     \item $\phi$ is the azimuthal angle from the $x$-axis.
 \end{itemize}
 %
-\alter{Spherical coordinates in annex with more details and a figure?}
+% TODO Spherical coordinates in annex with more details and a figure?
 The state of the system at time $t$ is given by the configuration vector
 \begin{equation} \label{eq:state_vector}
     \vq(t) = (\alpha(t), \theta_\ell(t), \phi_\ell(t), R(t), \tau_\ell(t))
@@ -107,7 +108,7 @@ We then obtain the aerodynamic forces of the kite
     \vb D &= D \vu k_b.
 \end{align}
 
-\alter{SCHEMA pour top bottom right dans la perspective du kite}
+% TODO SCHEMA pour top bottom right dans la perspective du kite
 
 To assess the impact of line length on the performance of the device, we also need to model the drag of the lines.
 Let us first define the apparent wind of the lines at distance $\lambda$ from the attachment point $A$:
@@ -200,8 +201,9 @@ from which we compute $\vb F_\ell$, directed by $-\lhat$:
     \vb F_\ell = \frac{-I \ddot \alpha - b \dot \alpha}{a \sin(\theta_\ell) \sin(\phi_\ell)} \lhat.
 \end{equation}
 In the above, $\sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \ref{eq:rhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
-\alter{better explanation?}
-With a typical choice of parameters \alter{define when it breaks : when does $proj_xy(K)$ equals A ?} the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
+% TODO better explanation?
+% TODO define when it breaks: when does proj_xy(K) equal A?
+With a typical choice of parameters the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
 However, $\sin(\phi_\ell)$ could very well be null, but the singularity is only in the equations as we observe no exceptional behavior when the lines and the arm are aligned ($xy$-plane)
 
 \subsubsection*{Fictitious force of the cone}
@@ -260,7 +262,7 @@ The acceleration of the kite $\ddot{\OK}$ obtained by differentiating twice its 
     \ddot \OK &= \ddot R \rhat + \dot R \dot \rhat + \dot R \dot \rhat + R \ddot \rhat = \ddot R \rhat + 2 \dot R \dot \rhat + R \ddot \rhat.
 \end{split}\end{equation}
 %
-\alter{continue developing to have the full expression of $\ddot \OK$ ?}
+% TODO continue developing to have the full expression of ddot OK?
 %
 The three forces $\vb F_g$, $\vb F_a(\vq, \dq)$, and a$\vb F_\ell(\vq, \dq, \ddq)$ are developed in \ref{eq:f_grav_10D}, \ref{eq:f_aero_10D}, and \ref{eq:f_lines-10D} respectively.
 
@@ -300,7 +302,8 @@ The algebraic equation $\vb g(\vq) = 0$ is reduced to
 and differentiating a second time yields
 \begin{equation}\begin{cases} \ddg(\vq, \dq, \ddq) = 0 \\ \dg(\vq(t_0), \dq(t_0)) = 0 \\ \vb g(\vq(t_0)) = 0,\end{cases}\end{equation}
 which also exhibits three new algebraic equations that were previously hidden : $\dot g(u) = 0$, \emph{i.e.} not only must the configuration be consistent, but the velocities as well.
-\alter{Show the differentiation of g?} In our particular case, \emph{two} differentiation steps are required, thus we are working with an \emph{index $2$} \ac{dae}.
+% TODO Show the differentiation of g?
+In our particular case, \emph{two} differentiation steps are required, thus we are working with an \emph{index $2$} \ac{dae}.
 By doing so, our system is reduced to $5$ second order \ac{ode}s and $6$ initial conditions:
 \begin{equation}\begin{cases}
     \vb f(\vq, \dq, \ddq) = 0_{\R^2} \\
@@ -330,19 +333,21 @@ We can finally solve the system numerically using an \ac{ode} solver like Runge-
 
 On the left, we show the trajectory for $t_f = 20$ and $\OA + \AK$ seems to coincide with $\OK$, yet on the left, by integrating for longer, the two trajectories diverge.
 Even though we initialize such that $\dg(\vq(t_0)) = 0$ and the \ac{ode} part enforces $\ddg(\vq, \vb v, \dot{\vb v}) = 0$, the slight integration error made at each time step accumulate and make $\dg$, and eventually $\vb g$, drift away from zero \ref{fig:residuals}.
-\alter{runtime}
+% TODO runtime
 
 \subsection{Limitations of this approach}
-\alter{Is this better written ? -- We knowingly pick a loose tolerance to exacerbate the problem: even with a correct initialization, the algebraic residuals accumulate an error over time, so much so that after 80 seconds, the state is completely incoherent, \(r, \tau\) and \(\alpha, \theta_l, \phi_l\) telling completely different stories about the position of the kite $K$. For this reason, we introduce a \emph{manifold projection callback}: after every Runge-Kutta step, we apply a Newton algorithm on the state.}
+% TODO Is this better written? -- We knowingly pick a loose tolerance to exacerbate the problem: even with a correct initialization, the algebraic residuals accumulate an error over time, so much so that after 80 seconds, the state is completely incoherent, \(r, \tau\) and \(\alpha, \theta_l, \phi_l\) telling completely different stories about the position of the kite $K$. For this reason, we introduce a \emph{manifold projection callback}: after every Runge-Kutta step, we apply a Newton algorithm on the state.}
 
 We just saw that the method in not stable for longer integration periods.
 
-This can be avoided by using a callback \alter{cite diffeqcallback.jl} to project $(\vq, \vb v)$ on the acceptable manifold
+% TODO cite diffeqcallback.jl
+This can be avoided by using a callback to project $(\vq, \vb v)$ on the acceptable manifold
 \begin{equation}
     \left\{ (\vq, \vb v) \in \R^{5+5} \mid \vb g(\vq) = 0 \land \dg(\vq, \vb v) = 0 \right\}
 \end{equation}
 using one or multiple steps of Newton's method.
-The state is becomes coherent at all times \ref{fig:residuals} but the running time is multiplied by two \alter{table of run times? at least give some values}.
+The state is becomes coherent at all times \ref{fig:residuals} but the running time is multiplied by two.
+% TODO table of run times? at least give some values
 Another limitation of this approach include the reliance on an external symbolic solver, whose output is copy pasted into the code, therefore the code is unreadable and hard to maintain, and a small change in the model requires re-running the symbolic solver.
 
 \begin{center} \label{fig:residuals}

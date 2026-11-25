@@ -25,7 +25,8 @@ start form equilibrium, speed in correct direction, integrate until first return
 
 \end{enumerate}
 
-\alter{relevant? any implications?} All state and parameter values are normalized with unit length \(L\) the physical arm length, unit mass \(M\) the mass of the kite, and unit time \(T\) the wind speed at reference altitude over arm length ratio; therefore, \(a = m = v_{\mathrm{ref}} = 1\).
+% TODO relevant? any implications?
+All state and parameter values are normalized with unit length \(L\) the physical arm length, unit mass \(M\) the mass of the kite, and unit time \(T\) the wind speed at reference altitude over arm length ratio; therefore, \(a = m = v_{\mathrm{ref}} = 1\).
 
 Let the state be \(vb x = (\vb q, \dq) = (\alpha, \tau, \dot \alpha, \dot \tau\). We are first interested in the steady states of the dynamical system, \emph{i.e.} static solutions with both zero velocity and acceleration. Therefore we are looking for solutions \(\vb q_0\) to
 
@@ -42,15 +43,18 @@ In Figure~\ref{fig:equilibria-phase-space} we identify those solutions at the in
     \caption{Zero velocity curves and equilibria of the dynamics.
     The black arrows represent the direction of the vector field $\ddq(\vq, \dq = 0)$, the green lines are the nullclines of $\ddot \alpha(\alpha, \tau)$, \emph{i.e.} the points $(\alpha, \tau)$ such that $\ddot \alpha(\alpha, \tau) = 0$, and the purple lines are the ones of $\ddot \tau(\alpha, \tau)$.
     At their intersections lie the equilibria of the system (all unstable), with color codes ranging from yellow to blue according to the highest real part of their eigenvalues.
-    The background is green when the arm points downwind and red when it points upwind. \alter{change graphical references in captions, also, says that max(Re(lambda i)) is approx 3 for circle and 12 for diamonds, for both colors}}
+    % TODO change graphical references in captions, also, says that max(Re(lambda i)) is approx 3 for circle and 12 for diamonds, for both colors
+    The background is green when the arm points downwind and red when it points upwind.}
     \label{fig:equilibria-phase-space}
 \end{figure}
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/equilibria_eight_circle}
-    \caption{\alter{configuration of the same equilibria in \emph{almost physical} top view of the system (position of the kite is not adjusted according to arm angle. We verified numerically that for all equilibria, the arm and the lines belong to the same vertical plane, \emph{i.e.} their projections in the $XY$ plane are aligned. \alter{For sale})}}
-    We find eight equilibria in total. They are unstable and we verify that for all of them, the lines and the arms are aligned when projected in the $x-y$ plane. \alter{move steady steates descriptions here: one ss on the side (diamond), one near the center (circle), plus their symmetry through \(\sigma\) \ref{eq:symmetry}, for both downwind and upwind arm.}
+    % TODO For sale
+    \caption{Configuration of the same equilibria in \emph{almost physical} top view of the system (the position of the kite is not adjusted according to the arm angle). We verified numerically that for all equilibria, the arm and the lines belong to the same vertical plane, \emph{i.e.} their projections in the $XY$ plane are aligned.}
+    We find eight equilibria in total. They are unstable and we verify that for all of them, the lines and the arms are aligned when projected in the $x-y$ plane.
+    % TODO move steady states descriptions here: one ss on the side (diamond), one near the center (circle), plus their symmetry through sigma (eq:symmetry), for both downwind and upwind arm.
     \label{fig:equilibria-eight-circle}
 \end{figure}
 
@@ -59,14 +63,17 @@ Let us now look at dynamical solutions to this dynamical system. One such trajec
 \begin{equation}
     \dot x = f(x)
 \end{equation}
-For integrating, we use the order-9 Verner method provided by OrdinaryDiffEqVerner.jl \addcite{.} with absolute and relative integration tolerance of \(10^{-9}\) unless specified otherwise.
+% TODO cite OrdinaryDiffEqVerner.jl
+For integrating, we use the order-9 Verner method provided by OrdinaryDiffEqVerner.jl with absolute and relative integration tolerance of \(10^{-9}\) unless specified otherwise.
 
-Let \( x_0^{\pm} = (0, 0, 0, \pm 1)\) in normalized units \alter{or adimensionalized ?}. Time series for \(x_0^+\) exhibit a periodic orbit behavior.  
+% TODO or adimensionalized?
+Let \( x_0^{\pm} = (0, 0, 0, \pm 1)\) in normalized units. Time series for \(x_0^+\) exhibit a periodic orbit behavior.  
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/time_series_4D}
-    \caption{\alter{Time series of the state for a ten second integration. Initial state is . After a few seconds, the same pattren is repeated: this hints that our dynamical systems exhibits a limit cycle.}}
+    % TODO give the initial state
+    \caption{Time series of the state for a ten second integration. After a few seconds, the same pattern is repeated: this hints that our dynamical system exhibits a limit cycle.}
     \label{fig:timeseries}
 \end{figure}
 
