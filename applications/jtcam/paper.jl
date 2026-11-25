@@ -251,7 +251,7 @@ function plot_convergence_panel(c; legend=true) #hide
     (; dτ, distances, slope, i1) = c #hide
     plt = plot(; yscale=:log10, xlim=(0, 11), xticks=0:2:100, #hide
         ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16), #hide
-        xlabel=f"""Lemniscate revolutions, D(τ) $(dτ>0 ? ">" : "<") 0""") #hide
+        xlabel="""Lemniscate revolutions, D(τ) $(dτ>0 ? ">" : "<") 0""") #hide
     plot!(i -> distances[i1] * exp10(-slope * (i - i1)); c=:black) #hide
     annotate!((5, 1e-11, (f"slope = {slope:.2f}", :right, ANNOTATIONFONTSIZE, colorant"black"))) #hide
     distance_style = (; c=dτ > 0 ? 1 : 2, ls=:dot, marker=:circle, legend_marker()...) #hide
@@ -568,7 +568,7 @@ end #hide
 
 function plot_three_models_convergence(r) #hide
     d = r.D10 #hide
-    plot(; xlabel="Tolerance (relative and absolute)", ylabel="Norm of error (m)", legend=:bottomright) #hide
+    plot(; xlabel="Solver tolerance", ylabel="Norm of error (m)", legend=:bottomright) #hide
     plot!(d.tols, d.err10; marker=:circle, legend_marker()..., label="10D") #hide
     plot!(d.tols, d.err10cb; marker=:square, legend_marker()..., label="10D + callback") #hide
     plot!(d.tols, d.err4; marker=:diamond, legend_marker()..., label="4D") #hide

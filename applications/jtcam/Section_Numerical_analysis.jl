@@ -535,7 +535,7 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
     "Shooting guess from the section state u0: one turn of the true flow."
     function turn_guess(u0)
         tf = 4π / clamp(abs(u0[4]), 0.5, BK_M)
-        sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
+        local sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
         length(sol.t) < 2 && return nothing  # no full turn in the box
         return vcat(vec4(sol.u[end]), sol.t[end])
     end

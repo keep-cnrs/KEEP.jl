@@ -292,7 +292,7 @@ We maximize $\\bar P = W(t_f)/t_f$ subject to periodic closure over $\\Theta = (
 
 ````
 
-**Figure data — optimum.** The reference (PTO) point gives 12.25 kW; the $\Theta$ optimum gives 56.41 kW at the reference wind. The achieved optimum is $\ell = 26.97$ m, $I = 351.6$ kg m², $b = 737.1$ N m s rad⁻¹, $\Delta\varphi = 16.62^\circ$. Ipopt converged in 20 iterations in 0.58 s.
+**Figure data — optimum.** The reference (PTO) point gives 12.25 kW; the $\Theta$ optimum gives 56.41 kW at the reference wind. The achieved optimum is $\ell = 26.97$ m, $I = 351.6$ kg m², $b = 737.1$ N m s rad⁻¹, $\Delta\varphi = 16.62^\circ$. Ipopt converged in 20 iterations in 0.59 s.
 
 **Figure data — landscape.** $\ell$ is the stiffest direction ($(-11.5\%, -8.1\%)$ at $\pm 10\%$), $I$ is about four times flatter ($-2.6\%$) and $b$ more than twenty times flatter ($-0.4\%$). The $\Delta\varphi$ optimum ($16.6^\circ$) is interior: $-5.4\%$ at $15.0^\circ$, $-2.9\%$ at $18.3^\circ$. The box lower bounds on $\ell$, $I$ and $b$ are far from the optimum, so none binds.
 
@@ -342,9 +342,9 @@ The original 10D DAE drifts when integrated without a manifold-projection callba
 
 ````
 
-**Figure data — 10D drift and callback.** At $t_f = 100$ s and tolerance $10^{-3}$, the raw 10D solution drifts; the projection callback keeps the manifold residual near the callback tolerance $10^{-10}$. The callback costs 1.09× the runtime of raw 10D.
+**Figure data — 10D drift and callback.** At $t_f = 100$ s and tolerance $10^{-3}$, the raw 10D solution drifts; the projection callback keeps the manifold residual near the callback tolerance $10^{-10}$. The callback costs 1.1× the runtime of raw 10D.
 
-**Figure data — convergence.** Against a 4D reference at tolerance $10^{-14}$, all three formulations converge to the same trajectory as the tolerance decreases from $10^{-2}$ to $10^{-12}$; the 4D model has no drift by construction. At the production tolerance the 4D run takes 2.21 ms versus 45.19 ms for raw 10D (20.5× slower) and 49.3 ms for 10D with callback (22.3× slower).
+**Figure data — convergence.** Against a 4D reference at tolerance $10^{-14}$, all three formulations converge to the same trajectory as the tolerance decreases from $10^{-2}$ to $10^{-12}$; the 4D model has no drift by construction. At the production tolerance the 4D run takes 2.25 ms versus 44.45 ms for raw 10D (19.8× slower) and 48.82 ms for 10D with callback (21.7× slower).
 
 **Prose hint:** the horizontal axis is reversed so that tighter tolerances progress to the right; quote the drift number and the speedup together, as in the ECC paper's model-validation paragraph.
 
