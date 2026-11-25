@@ -4,7 +4,26 @@
 if abspath(PROGRAM_FILE) == (@__FILE__) && get(ENV, "PAPER_LITERATE_EXEC", "0") != "1" #src
     ENV["PAPER_LITERATE_EXEC"] = "1" #src
     using Literate #src
-    Literate.markdown(@__FILE__, @__DIR__; execute=true, flavor=Literate.CommonMarkFlavor(), credit=false) #src
+    # Literate hides code line by line; collapse multi-line text output into one line so #hide applies to all of it. #src
+    function inline_text_sources(s::AbstractString) #src
+        lines = split(s, '\n'; keepempty=true) #src
+        out = String[]; i = 1 #src
+        while i <= length(lines) #src
+            if endswith(lines[i], "Markdown.parse(\"\"\"") #src
+                j = i + 1; body = String[] #src
+                while j <= length(lines) && strip(lines[j]) != "\"\"\") #hide" #src
+                    push!(body, lines[j]); j += 1 #src
+                end #src
+                j <= length(lines) || error("unterminated Markdown.parse block at line $i") #src
+                push!(out, "Markdown.parse(\"\"\"" * join(body, "\\n") * "\\n\"\"\") #hide") #src
+                i = j + 1 #src
+            else #src
+                push!(out, lines[i]); i += 1 #src
+            end #src
+        end #src
+        return join(out, '\n') #src
+    end #src
+    Literate.markdown(@__FILE__, @__DIR__; execute=true, flavor=Literate.CommonMarkFlavor(), credit=false, preprocess=inline_text_sources) #src
     exit(0) #src
 end #src
 
@@ -505,7 +524,7 @@ for f in (f_dtheta_p, f_dtheta_t) #hide
     pushfirst!(f[1].series_list, pop!(f[1].series_list)) #hide
     vline!(f, [rad2deg(p_opt.Δθ)]; c=:black, lw=0.8, alpha=0.7) #hide
 end #hide
-save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=14Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
+save_fig(plot(f_dtheta_p, f_dtheta_t; layout=(1, 2), size=plot_size(1, 2), bottommargin=7Plots.mm, leftmargin=10Plots.mm), "optimization_dtheta") #hide
 x_map = 100 .* (shape_factors .- 1) #hide
 p_s1 = heatmap(x_map, shape_dphi, P_map; c=:viridis, title="P (kW)", xlabel="Δθ dev (%)", ylabel="Δφ (deg)") #hide
 p_s2 = heatmap(x_map, shape_dphi, Tmax_map; c=:viridis, title="Tmax (kN)", xlabel="Δθ dev (%)") #hide

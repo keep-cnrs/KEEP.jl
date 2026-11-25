@@ -714,8 +714,8 @@ function plot_dtheta(dtheta, dopt, guides, mark)
 
     # the margins are per panel (the theme sets margin = 0): only the left one
     # carries a y label and y tick labels
-    plot!(f1, leftmargin=18Plots.mm, bottommargin=14Plots.mm)
-    plot!(f2, leftmargin=6Plots.mm, bottommargin=14Plots.mm)
+    plot!(f1, leftmargin=18Plots.mm, bottommargin=7Plots.mm)
+    plot!(f2, leftmargin=6Plots.mm, bottommargin=7Plots.mm)
     return plot(f1, f2; layout=(1, 2), size=plot_size(1, 2))
 end
 
