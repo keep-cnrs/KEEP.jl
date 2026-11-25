@@ -40,7 +40,7 @@ where
 \begin{equation} \label{eq:traject_Model_Deriv}
     \theta(\tau) = \theta_0 + \Delta\theta \sin(2\tau), \qquad \phi(\tau) = \Delta\phi \sin\tau, \qquad \tau\in\mathbf{S}^1.
 \end{equation}
-The curve \(\mathscr{E} = \vu r(\mathbf{S}^1)\) is a figure eight drawn on \(\mathbf{S}^2\) (Fig.~\ref{fig:eight_plot}).
+The curve \(\mathscr{E} = \vu r(\mathbf{S}^1)\) is a figure eight drawn on \(\mathbf{S}^2\) (Figs.~\ref{fig:eight_plot} and~\ref{fig:cone_eight}).
 It is centred at the point of polar angle \(\theta_0\) in the vertical plane \((O,\vu x,\vu z)\) that contains the wind, and its shape is controlled by two amplitudes: \(\Delta\phi\) is its half-width in azimuth, and \(\Delta\theta\) its half-height in polar angle.
 We assume \(\Delta\theta>0\), \(0<\Delta\phi<\pi\) and \(0<\theta_0-\Delta\theta<\theta_0+\Delta\theta<\pi/2\), so that the eight lies in the upper hemisphere.
 Then \(\mathscr{E}\) is a regular closed curve: its speed \(v = \norm{\vu r'}\), given by
@@ -64,6 +64,13 @@ The kite is constrained to fly on the conical hull of the eight,
 \end{equation}
 a cone of vertex \(O\) whose generators are the rays through the points of \(\mathscr{E}\).
 It is a ruled, developable surface (see Section~\ref{sec:opt-curvature}), smooth away from \(O\) and from the ray through the centre of the eight, along which it crosses itself.
+\begin{figure}
+  \centering
+  \includestandalone[width=0.7\textwidth]{figs/cone_eight}
+  \caption{The cone \(\mathscr{C}\) (light blue) over the spherical eight \(\mathscr{E}\) (black) and a trajectory of the kite drawn on it (red). Each generator of the cone, such as the dashed one, meets \(\mathscr{E}\) at \(\vu r(\tau)\) and the trajectory at \(K = r\,\vu r(\tau)\). Not to scale.}
+  \label{fig:cone_eight}
+\end{figure}
+
 The pair \((r,\tau)\) provides coordinates on \(\mathscr{C}\): \(r = \norm{\OK}\) is the distance to \(O\), and \(\tau\) labels the generator.
 At \(K = r\,\vu r(\tau)\), the tangent plane to \(\mathscr{C}\) is spanned by \(\vu r\) and \(\vu r'\), which are orthogonal, and the unit normal is
 \begin{equation} \label{eq:cone-normal}
@@ -171,7 +178,7 @@ Second-order derivatives, needed for the accelerations, can be obtained for nume
 % - resistive torque
 % - line torque
 
-We model the wind velocity profile \( \vb w \) using a standard power-law wind shear model.% TODO cite 1/7 power law
+We model the wind velocity profile \( \vb w \) using a standard power-law wind shear model. % TODO cite 1/7 power law
 Since the unit vector \( \vu x \) points downwind, the wind field is given by
 \begin{equation}
     \vb w(z) = w_{\text{ref}} \qty(\frac{z}{z_{\text{ref}}})^{1/7} \vu x,

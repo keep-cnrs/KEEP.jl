@@ -91,7 +91,7 @@ Deflation algorithm for that set of parameters did not yield new limit cycles, o
 
 We define a sequence of states $(\vb x_i)_{i \geq 1}$ lying on a surface of section $\Sigma$, such that $\vb x_{i+1}$ is the first intersection between $\{\varphi^t(\vb x_i),\, t > 0\}$ and $\Sigma$, where $\varphi^t$ is the flow of ~\eqref{eq:eom}. Let
 \begin{equation}
-    \Sigma = \{\vb x \in T(S^1 \times S^1) \mid \tau(\vb x) = 0\}
+    \Sigma = \{\vb x \in T\mathbf{T}^2 \mid \tau(\vb x) = 0\}
 \end{equation}
 and $\Delta t(\vb x)$ be the time needed to achieve the first crossing of $\Sigma$ from state $\vb x$, namely:
 \begin{equation}
@@ -99,7 +99,7 @@ and $\Delta t(\vb x)$ be the time needed to achieve the first crossing of $\Sigm
 \end{equation}
 We then define the first recurrence map, or Poincaré map, as
 \begin{equation}
-    P : \vb x \in T(S^1 \times S^1) \mapsto \varphi^{\Delta t(\vb x)}(\vb x) \in \Sigma,
+    P : \vb x \in T\mathbf{T}^2 \mapsto \varphi^{\Delta t(\vb x)}(\vb x) \in \Sigma,
 \end{equation}
 and finally the desired sequence
 \begin{equation}\begin{cases}
@@ -111,7 +111,7 @@ Since the trajectory starting at $\vb x^0$ approaches an attracting limit cycle,
 The sequence converges exponentially, and in only $8$ iterations (seven revolutions over the lemniscate), we reach the precision limit of our ODE solver, with a distance of less than $10^{-12}$; in fact, we approximately gain $2$ digits of $\vb x_\infty$ after each revolution.
 The points $\vb x_i$ are obtained using DifferentialEquations.jl's continuous callback feature, which saves the current state when a user defined function changes its sign, using the high-precision dense output from the ODE solver.
 
-We confirm that there exist only two attracting limit cycles by sampling the state space with $(\alpha, \tau) \in S^1 \times S^1$ and velocities $-M \leq \dot\alpha, \dot\tau \leq M$, and simulating the trajectory of each sampled point until convergence to a limit cycle with a \SI{1e-9} tolerance.
+We confirm that there exist only two attracting limit cycles by sampling the state space with $(\alpha, \tau) \in \mathbf{T}^2$ and velocities $-M \leq \dot\alpha, \dot\tau \leq M$, and simulating the trajectory of each sampled point until convergence to a limit cycle with a \SI{1e-9} tolerance.
 We choose $M = 10 \si{\radian\per\second}$ as upper bound; it corresponds to high arm and kite speeds which would be quickly damped by the generator and aerodynamic drag anyway.
 
 \begin{figure}[thpb]

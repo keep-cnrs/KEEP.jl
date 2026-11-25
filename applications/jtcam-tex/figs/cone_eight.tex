@@ -1,0 +1,65 @@
+\documentclass[tikz,border=2pt]{standalone}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{mathrsfs}
+\usepackage{tikz-3dplot}
+\begin{document}
+% Cone over the spherical eight, and a kite trajectory drawn on it (not to scale).
+\tdplotsetmaincoords{78}{100}
+\begin{tikzpicture}[tdplot_main_coords, scale=2.4, line join=round]
+
+% ---- parameters (angles in degrees; exaggerated for readability) ----
+\def\thetaZero{55} \def\DeltaTheta{16} \def\DeltaPhi{42}
+\def\ell{1.9} \def\a{0.55} \def\Rmax{2.7}
+
+\pgfmathdeclarefunction{thf}{1}{\pgfmathparse{\thetaZero + \DeltaTheta*sin(2*#1)}}
+\pgfmathdeclarefunction{phf}{1}{\pgfmathparse{\DeltaPhi*sin(#1)}}
+\pgfmathdeclarefunction{ux}{1}{\pgfmathparse{sin(thf(#1))*cos(phf(#1))}}
+\pgfmathdeclarefunction{uy}{1}{\pgfmathparse{sin(thf(#1))*sin(phf(#1))}}
+\pgfmathdeclarefunction{uz}{1}{\pgfmathparse{cos(thf(#1))}}
+% arm angle along the orbit (any smooth law; only the shape of r matters here)
+\pgfmathdeclarefunction{alf}{1}{\pgfmathparse{50 + 70*sin(#1)}}
+\pgfmathdeclarefunction{pf}{1}{\pgfmathparse{\a*sin(thf(#1))*cos(phf(#1)-alf(#1))}}
+\pgfmathdeclarefunction{rf}{1}{\pgfmathparse{pf(#1) + sqrt(pf(#1)*pf(#1) + \ell*\ell - \a*\a)}}
+
+% ---- axes ----
+\draw[->,gray] (0,0,0) -- (1.5,0,0) node[below left,black]{$x$};
+\draw[->,gray] (0,0,0) -- (0,1.5,0) node[right,black]{$y$};
+\draw[->,gray] (0,0,0) -- (0,0,1.6) node[above,black]{$z$};
+
+% ---- cone: translucent patches between neighbouring generators ----
+\foreach \t in {0,4,...,356}{
+  \pgfmathsetmacro{\tb}{\t+4}
+  \fill[SkyBlue,opacity=0.16]
+    (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)})
+            -- ({\Rmax*ux(\tb)},{\Rmax*uy(\tb)},{\Rmax*uz(\tb)}) -- cycle;
+}
+% generators
+\foreach \t in {0,12,...,348}{
+  \draw[SkyBlue!80!black,opacity=0.45,thin]
+    (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+}
+% rim of the cone at r = Rmax
+\draw[SkyBlue!80!black,opacity=0.7]
+  plot[domain=0:360,samples=181,variable=\t] ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+
+% ---- the eight on the unit sphere ----
+\draw[very thick,black]
+  plot[domain=0:360,samples=181,variable=\t] ({ux(\t)},{uy(\t)},{uz(\t)});
+\node[black] at ({1.0*ux(305)},{1.0*uy(305)},{1.0*uz(305)+0.13}) {$\mathscr{E}$};
+
+% ---- kite trajectory on the cone ----
+\draw[very thick,BrickRed]
+  plot[domain=0:360,samples=241,variable=\t] ({rf(\t)*ux(\t)},{rf(\t)*uy(\t)},{rf(\t)*uz(\t)});
+
+% one generator highlighted: eight point, kite position
+\def\tk{62}
+\draw[dashed,black] (0,0,0) -- ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)});
+\fill[black]  ({ux(\tk)},{uy(\tk)},{uz(\tk)}) circle (0.7pt);
+\fill[BrickRed] ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)}) circle (1.2pt)
+  node[above right]{$K$};
+\fill (0,0,0) circle (0.8pt) node[below left]{$O$};
+
+% label of the cone
+\node[SkyBlue!60!black] at ({0.97*\Rmax*ux(215)},{0.97*\Rmax*uy(215)},{0.97*\Rmax*uz(215)}) {$\mathscr{C}$};
+\end{tikzpicture}
+\end{document}
