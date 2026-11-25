@@ -1,7 +1,7 @@
 
 This project is part of improving the performance of technologies that meet the challenges of the law concerning the energy transition.
 The innovative KEEP (Kite Electrical Energy Production) technology developed at ENSTA enables the production of electrical energy from a kite capturing wind energy.
-The first numerical models of the system show an increase of about 50\% in the efficiency of this technology compared to already existing ones \alter{\url{https://www.sciencedirect.com/science/article/pii/S0960148118308206}}.
+The first numerical models of the system show an increase of about 50\% in the efficiency of this technology compared to already existing ones.% TODO cite https://www.sciencedirect.com/science/article/pii/S0960148118308206
 In the short and medium term, the onshore and ship application with a power production ranging from a few tens to hundreds of kW is targeted, extension to an offshore production power capacity at a MW scale with 1000 sqm kites is an objective.
 To do this, following developments are required: the improvement of the mechanical model and the theoretical analysis of the complete dynamic system.
 
@@ -99,7 +99,7 @@ For \(a=0\), both sheets reduce to the sphere of radius \(\ell\), and so does \(
   \caption{The spindle torus \(\mathscr{T}\) swept by the sphere of radius \(\ell\) centred at the arm tip, with its outer sheet (apple) and its inner sheet (lemon). The kite lies in the solid \(\mathscr{S}\) between the two sheets. Not to scale.}
   \label{fig:spindle_torus}
 \end{figure}
-\alter{figure: remove title, labels, tick labels, rescale properly?}
+% TODO figure: remove title, labels, tick labels, rescale properly?
 
 \paragraph{Kinematic map.}
 The kite therefore lies on the intersection \(\mathscr{C}\cap\mathscr{S}\).
@@ -171,7 +171,8 @@ Second-order derivatives, needed for the accelerations, can be obtained for nume
 % - resistive torque
 % - line torque
 
-We model the wind velocity profile \( \vb w \) using a standard power-law wind shear model \addcite{1/7 power law}. Since the unit vector \( \vu x \) points downwind, the wind field is given by
+We model the wind velocity profile \( \vb w \) using a standard power-law wind shear model.% TODO cite 1/7 power law
+Since the unit vector \( \vu x \) points downwind, the wind field is given by
 \begin{equation}
     \vb w(z) = w_{\text{ref}} \qty(\frac{z}{z_{\text{ref}}})^{1/7} \vu x,
 \end{equation}
@@ -241,7 +242,7 @@ Since \(\ddot{\vb r}\) and, through \eqref{eq:f_lines}, \(\vb F_\ell\) are affin
 \begin{equation} \label{eq:eom_implicit}
     M(\vq) \ddq = \vb h(\vq, \dq),
 \end{equation}
-whose explicit solution is derived in Section~\ref{sec:explicit-ddq} \alter{keep that annex?}.
+whose explicit solution is derived in Section~\ref{sec:explicit-ddq}.% TODO keep that annex?
 
 The state of the dynamical system is \(\vb x = (\vq, \dq) = (\alpha, \tau, \dot \alpha, \dot \tau) \in \mathbf{T}^2\times\mathbf{R}^2\), and the evolution function \(f\) is defined by
 \begin{equation}
