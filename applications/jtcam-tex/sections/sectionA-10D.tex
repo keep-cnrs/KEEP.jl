@@ -1,0 +1,360 @@
+
+\section{10D model} \label{sec:model10D}
+\subsection{Model description}
+In this appendix, we describe the model designed by \alter{Alain Nême} inspired by \alter{Fagiano PhD thesis} and \alter{Diehl PhD thesis}. 
+The objective is to have an ODE that does not involve a control to simulate a kite flying horizontal eights, or lemniscates, while the arm extracts energy from the system.
+The kite $K$ is attached to the tip of a rotating arm $A$ of length $a$ with four lines of length $\ell$ (assumed constant), the arm rotates around $\vu z$ at the origin $O$.
+
+\subsection{Static and kinematics}
+Let us define three unit vectors: $\vb a$ follows the arm, $\lhat$ follows the lines and $\rhat$ points to the kite:
+\begin{align}
+    \vb a &= \frac{\OA}{\norm{\OA}} = \begin{pmatrix}
+        \cos(\alpha) \\ \sin(\alpha) \\ 0
+    \end{pmatrix} \\
+    \lhat &= \frac{\AK}{\norm{\AK}} = \begin{pmatrix}
+        \sin(\theta_\ell) \cos(\alpha + \phi_\ell) \\ \sin(\theta_\ell) \sin(\alpha + \phi_\ell) \\ \cos(\theta_\ell)
+    \end{pmatrix} \\ \label{eq:that-10D}
+    \vb r &= \frac{\OK}{\norm{\OK}} = \begin{pmatrix}
+        \sin(\theta(\tau)) \cos(\phi(\tau)) \\ \sin(\theta(\tau)) \sin(\phi(\tau)) \\ \cos(\theta(\tau))
+    \end{pmatrix} \text{ with}
+    \begin{cases}
+        \theta : \tau \mapsto \theta_0 + \Delta \theta \sin(2\tau) \\
+        \phi : \tau \mapsto \Delta \phi \sin(\tau)
+    \end{cases}.
+\end{align}
+%
+Here, $\alpha$ is the angle between the arm and the $x$-axis (aligned with the wind), $\theta_\ell$, $\phi_\ell$ are the spherical coordinates of $K$ in $(A, \vb a, \vu z \times \vb a, \vu z)$, and $R$, $\theta$ and $\phi$ are the spherical coordinates of $K$ in $(O, \vu x, \vu y, \vu z)$.
+Spherical coordinates use the physics convention also found in ISO 80000-2:2019:
+\begin{itemize}
+    \item $r$ is the radius,
+    \item $\theta$ is the polar angle from the $z$-axis,
+    \item $\phi$ is the azimuthal angle from the $x$-axis.
+\end{itemize}
+%
+\alter{Spherical coordinates in annex with more details and a figure?}
+The state of the system at time $t$ is given by the configuration vector
+\begin{equation} \label{eq:state_vector}
+    \vq(t) = (\alpha(t), \theta_\ell(t), \phi_\ell(t), R(t), \tau_\ell(t))
+\end{equation}
+%
+and its corresponding velocities $\dq(t)$, while $\theta_0$, $\Delta \theta$ and $\Delta \phi$ are the parameters that control the shape of the lemniscate.
+Note that:
+\begin{itemize}
+    \item $\OA$ depends only on state $\alpha$,
+    \item $\AK$ depends only on state $\theta_\ell$ and $\phi_\ell$,
+    \item $\OK$ depends only on state $R$ and $\tau$.
+\end{itemize}
+%
+Using Chasles' relation, we get the following loop closure condition:
+\begin{equation} \label{eq:loop_closure_vector}
+    \OK = \OA + \AK.
+\end{equation}
+%
+We define
+\begin{equation} \label{eq:func_g}
+\begin{split}
+    \vb g : \vq \in \R^5 \mapsto
+    \vb g(\vq) &= \OK(\vq) - \OA(\vq) - \AK(\vq) \\
+    &= \begin{pmatrix}
+        R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\phi_\ell) \\
+        R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\phi_\ell) \\
+        R \cos(\theta(\tau)) - \ell \cos(\theta_\ell)
+    \end{pmatrix} \in \R^3
+\end{split}
+\end{equation}
+such that \eqref{eq:loop_closure_vector} rewrites to
+\begin{equation} \label{eq:loop_closure_function}
+    \vb g(\vq) = 0_{\R^3}
+\end{equation}
+We have a five dimensional state (\emph{cf.} \ref{eq:state_vector}) subject to three algebraic constraints (\emph{cf.} \ref{eq:loop_closure_function}), thus the system has two \ac{dof}.
+
+\begin{remark} 
+The set of acceptable positions for $K$ is the intersection between a filled torus (filled \emph{spindle} torus if the lines are longer than the arm, \emph{i.e.} $\ell > a$) and an eight-shaped cone.
+\begin{center}
+[Spindle torus] [lemniscate cone]
+\end{center}
+\end{remark}
+
+\subsection{Dynamics}  \label{sec:model10D-dynamics}
+
+We assume that all forces apply to the kite at point $K$ of mass $m$ and all moments apply to the arm which rotates around $\vu z$ at point $O$.
+We want to determine $\ddq$ in terms of $\vq$ and $\dq$.
+
+\subsubsection*{Aerodynamic forces} \label{sec:model10D-dyn-aero}
+
+We choose the 1/7-power-law profile to model the wind, such that the wind speed $\vb w$ at altitude $z$ is given by $\vb w(z) = w_r \qty( z / z_r )^{1/7} \vu x$.
+The apparent wind, the wind which is felt by the kite, is then $\vb w_a = \vb w - \dot \OK$.
+The lift $L$ and drag $D$ of the kite are respectively
+\begin{align}
+    L &= \frac{1}{2} S \rho_a C_L \norm{\vb w_a}^2 \\
+    D &= \frac{1}{2} S \rho_a C_D \norm{\vb w_a}^2
+\end{align}
+%
+where $S$ is the surface of the kite, $\rho_a$ is the density of the air and $C_L$ and $C_D$ the lift and drag coefficients.
+Using the lift-to-drag ratio $f = L / D$, we get the simpler $D = L/f$.
+realistically, $C_L$ and $C_D$ should depend on the angle of incidence, but we don't model this angle and assume of value of $0$.
+To determine the direction of the lift and drag forces, we assume that the chord of the kite is aligned with the apparent wind, and that its leading edge is perpendicular to the lines, which completely determines the orientation of the kite.
+Let us define $\vu k_b$ the unit vector aligned with the chord pointing to the \emph{back} of the kite, $\vu k_r$ the unit vector aligned with the leading edge pointing to the \emph{right} of the kite, and $\vu k_t$ the unit vector normal to the surface of the kite pointing to its \emph{top}.
+We have :
+\begin{align}
+    \vu k_b &= \frac{\vb w_a }{\norm{\vb w_a}} \\
+    \vu k_r &= \frac{\lhat \times \vu k_b}{\norm{\lhat \times \vu k_b}} \\
+    \vu k_t &= \vu k_b \times \vu k_r.
+\end{align}
+We then obtain the aerodynamic forces of the kite
+\begin{align}
+    \vb L &= L \vu k_t \\
+    \vb D &= D \vu k_b.
+\end{align}
+
+\alter{SCHEMA pour top bottom right dans la perspective du kite}
+
+To assess the impact of line length on the performance of the device, we also need to model the drag of the lines.
+Let us first define the apparent wind of the lines at distance $\lambda$ from the attachment point $A$:
+\begin{equation}
+    \vb w_{a,\ell}(\lambda) = \vb w\qty(\frac{\lambda}{\ell} K_z) - \frac{\lambda}{\ell} \dot{\OK} - \qty(1 - \frac{\lambda}{\ell}) \dot \OA,
+\end{equation}
+%
+and $\vu w_a = \frac{\vb w_a}{\norm{\vb w_a}}$ is its unit vector.
+Then we compute the apparent surface of an element of one line of length $\dd{\lambda}$ and diameter $d_\ell$:
+\begin{equation}
+    S_a = d_\ell \dd{\lambda} \sin(\theta_a(\lambda))
+\end{equation}
+%
+where $\theta_a$ is the angle between the lines and the apparent wind.
+Using $\lhat \cdot \vu w_a = \cos(\theta_a)$, we get $\sin(\theta_a) = 1 - (\lhat \cdot \vu w_a)^2$, thus
+\begin{equation}
+    S_a = d_\ell \dd{\lambda} \qty(1 - (\lhat \cdot \vu w_a(\lambda))^2).
+\end{equation}
+%
+The drag of the $n = 4$ lines with drag coefficient $C_{D,\ell}$ is
+\begin{equation}\begin{split}
+    \vb D_\ell
+    &= \bigintssss \limits_{\lambda = 0}^{\lambda = \ell} \frac{1}{2} n d_\ell \qty(1 - (\ell \cdot \vu w_{a,\ell}(\lambda))^2) \rho_a C_{D,\ell} \norm{\vb w_{a,\ell}(\lambda)}^2 \vu w_{a,\ell}(\lambda) \dd{\lambda} \\
+    &= \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \int \limits_{\xi=0}^{\xi=1} \qty(1 - (\lhat \cdot \vu w_{a,\ell}(\ell \xi))^2) \norm{\vb w_{a,\ell}(\ell \xi)}^2 \vu w_{a,\ell}(\lambda) \dd{\xi}.
+\end{split}\end{equation}
+%
+We make a few big approximations to simplify this integral:
+\begin{itemize}
+    \item the speed of $A$ is negligible: $\dot A \approx 0$ and the wind profile is linear along the lines: $\vb w_{a,\ell}(\lambda) \approx \frac{\lambda}{\ell} \vb w_a$,
+    \item the apparent wind is always perpendicular to the lines: $\qty(1 - (\ell \cdot \vu w_a(\ell \xi))^2) \approx 1$,
+    \item the direction of the force is the same as for the kite drag: $\vb{\tilde D}_\ell = \tilde D_\ell \vu k_b$.
+\end{itemize}
+%
+We in turn get this approximation for the drag of the lines:
+\begin{equation}\begin{split}
+    \tilde D_\ell
+    &\textcolor{red}{\text{equal or approx?}}\approx \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \int \limits_{\xi=0}^{\xi=1} \norm{\xi \vb w_a}^2 \dd{\xi} \\
+    &= \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a}^2 \int \limits_{\xi=0}^{\xi=1} \xi^2 \dd{\xi}.
+\end{split}\end{equation}
+%
+Finally, we get the following expression for the approximated drag of the lines:
+\begin{equation}
+    \tilde D_\ell = \frac{1}{6} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a}^2,
+\end{equation}
+and the total aerodynamic force of the system is
+\begin{equation} \label{eq:f_aero_10D}
+    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a.
+\end{equation}
+\textcolor{red}{verify consistency, used to be $\vb F_a = L \vu k_t + (D + \tilde D_\ell) \vu k_b$}
+\subsubsection*{Gravity}
+
+The kite has mass $m$ and the lines have density $\rho_\ell$, therefore their mass is $m_\ell = n \pi \ell \rho_\ell d_\ell^2 / 4$.
+We assume that the kite lifts half of the lines, while the rest is supported by the arm.
+The total flying mass is then $m + m_\ell/2$ and the total weight is
+\begin{equation} \label{eq:f_grav_10D}
+    \vb F_g = -\qty(m + \frac{m_\ell}{2}) g \vu z.
+\end{equation}
+
+\subsubsection*{Line tension and torque on the arm}
+
+We denote $\vb F_\ell = -F_\ell \lhat$ the tension of the lines on the kite, then, the torque applied by the lines on the arm is
+\begin{equation}
+    \vb T_\ell = \OA \times (- \vb F_\ell) = a F_\ell \vb a \times \lhat.
+\end{equation}
+%
+Since the arm rotates around the $z$ axis, only the torque in the $z$ direction has an effect, therefore we only need the $z$ component of $\vb T_\ell$.
+Also, for computing the cross-product, let us rewrite the vectors $\vb a$ and $\lhat$ in the base attached to the arm $\mathcal B_a = (\vb a, \vu z \times \vb a, \vu z)$; trivially, $\vb a = 1 \vb a$ and 
+\begin{equation} \label{eq:rhat-10D}
+    \vu r = \sin(\theta_\ell) \cos(\phi_\ell) \vb a + \sin(\theta_\ell) \sin(\phi_\ell) (\vu z \times \vb a) + \cos(\theta_\ell) \vu z.
+\end{equation}
+%
+Let us now compute the cross-product:
+\begin{equation}
+    \vu z \cdot (F_\ell \vb a \times \lhat) = 1 \cdot \sin(\theta_\ell) \sin(\phi_\ell) - 0 \cdot \sin(\theta_\ell) \cos(\phi_\ell) = \sin(\theta_\ell) \sin(\phi_\ell),
+\end{equation}
+%
+from which we finally get the expression for the effective torque of the lines:
+\begin{equation}
+    \vb T_\ell \cdot \vu z = a F_\ell \sin(\theta_\ell) \sin(\phi_\ell).
+\end{equation}
+%
+The torque of the generator on the arm is $T : \omega \mapsto -b \omega$ where $b$ is a rotational viscous damping coefficient with dimension of torque per angular velocity, and the arm has inertia $I$, such that using Newton's second law, we get
+\begin{equation} \label{eq:newton_arm_10D}
+    I \ddot \alpha
+    = \vb T_\ell \cdot \vu z + T(\dot \alpha)
+    = a F_\ell \sin(\theta_\ell) \sin(\phi_\ell) - b \dot \alpha,
+\end{equation}
+from which we compute $\vb F_\ell$, directed by $-\lhat$:
+\begin{equation} \label{eq:f_lines-10D}
+    \vb F_\ell = \frac{-I \ddot \alpha - b \dot \alpha}{a \sin(\theta_\ell) \sin(\phi_\ell)} \lhat.
+\end{equation}
+In the above, $\sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \ref{eq:rhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
+\alter{better explanation?}
+With a typical choice of parameters \alter{define when it breaks : when does $proj_xy(K)$ equals A ?} the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
+However, $\sin(\phi_\ell)$ could very well be null, but the singularity is only in the equations as we observe no exceptional behavior when the lines and the arm are aligned ($xy$-plane)
+
+\subsubsection*{Fictitious force of the cone}
+To understand this section better, let's picture a train on a railway.
+The train doesn't control where by steering (a \emph{control} in the mathematical sense), instead, the railway exerts a force on the train, always perpendicular to railway/the direction of the train, that keeps the train on the track passively.
+We want the eight-shaped cone to play the role of the railway to passively steer the kite into eight-shaped trajectories.
+One way to physically describe this interaction is that the kite glides without friction on the manifold, therefore it feels a fictitious force $\vb F_c$ always perpendicular to the manifold.
+The cone has two tangent vectors $\pdv{\OK}{R}$ and $\pdv{\OK}{\tau}$, therefore it is normal to both:
+\begin{equation}\begin{cases} \label{eq:f_cone_constraint_10D}
+    \vb F_c \cdot \pdv{\OK}{R} = 0 \\
+    \vb F_c \cdot \pdv{\OK}{\tau} = 0.
+\end{cases}\end{equation}
+
+\subsection{applying Newton's second law to the kite}
+
+Newton's second law applied to the kite's center of mass gives
+\begin{equation} \label{eq:newton_kite_10D}
+    m \ddot{\OK} = \vb F_a + \vb F_g + \vb F_\ell + \vb F_c.
+\end{equation}
+%
+At this point, we need to choose two equations to keep, while the others will be used at substitutions.
+For their nice symmetry, we keep \ref{eq:f_cone_constraint_10D} and use the others to express $\vb F_c$ in terms of $\vq, \dq$, and $\ddq$.
+From \ref{eq:newton_kite_10D}, we have that
+\begin{equation} \label{eq:f_cone_newton_10D}
+    \vb F_c = m \ddot{\OK} - \vb F_a - \vb F_g - \vb F_\ell.
+\end{equation}
+%
+The acceleration of the kite $\ddot{\OK}$ obtained by differentiating twice its position $\OK$:
+\begin{equation}
+    \OK = R \rhat = R \begin{pmatrix}
+        \sin(\theta) \cos(\phi) \\
+        \sin(\theta) \sin(\phi) \\
+        \cos(\theta)
+    \end{pmatrix},
+\end{equation}
+%
+\begin{equation}\begin{split}
+    \dot \OK &= \dot R \rhat + R \dot \rhat
+    = \dot R \begin{pmatrix}
+        \sin(\theta) \cos(\phi) \\
+        \sin(\theta) \sin(\phi) \\
+        \cos(\theta)
+    \end{pmatrix} + R \begin{pmatrix}
+        \cos(\theta) \cos(\phi) \dot \theta - \sin(\theta) \sin(\phi) \dot \phi \\
+        \cos(\theta) \sin(\phi) \dot \theta + \sin(\theta) \cos(\phi) \dot \phi \\
+        -\sin(\theta) \dot \theta
+    \end{pmatrix} \\
+    &= \begin{pmatrix}
+        \sin(\theta) \cos(\phi) \dot R + \cos(\theta) \cos(\phi) \dot \theta - \sin(\theta) \sin(\phi) \dot \phi \\
+        \sin(\theta) \sin(\phi) \dot R + \cos(\theta) \sin(\phi) \dot \theta + \sin(\theta) \cos(\phi) \dot \phi \\
+        \cos(\theta) \dot R - \sin(\theta) \dot \theta
+    \end{pmatrix},
+\end{split}\end{equation}
+%
+\begin{equation}\begin{split}
+    \ddot \OK &= \ddot R \rhat + \dot R \dot \rhat + \dot R \dot \rhat + R \ddot \rhat = \ddot R \rhat + 2 \dot R \dot \rhat + R \ddot \rhat.
+\end{split}\end{equation}
+%
+\alter{continue developing to have the full expression of $\ddot \OK$ ?}
+%
+The three forces $\vb F_g$, $\vb F_a(\vq, \dq)$, and a$\vb F_\ell(\vq, \dq, \ddq)$ are developed in \ref{eq:f_grav_10D}, \ref{eq:f_aero_10D}, and \ref{eq:f_lines-10D} respectively.
+
+We have written every quantity in \ref{eq:f_cone_newton_10D} explicitly in terms of $\vq$, $\dq$, and $\ddq$, thus \ref{eq:f_cone_constraint_10D} is a system of two second order \ac{ode}s in $\vq \in \R^5$.
+By combining \ref{eq:f_cone_constraint_10D} and \ref{eq:loop_closure_function}, we obtain the following system of two implicit second order \ac{ode}s and three algebraic equations (or constraints):
+%
+\begin{equation}\begin{cases}
+    \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\OK}{R}}(\vq) = 0 \\
+    \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\OK}{\tau}}(\vq) = 0 \\
+    R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\phi_\ell) = 0 \\
+    R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\phi_\ell) = 0 \\
+    R \cos(\theta(\tau)) - \ell \cos(\theta_\ell) = 0,
+\end{cases}\end{equation}
+%
+which can be rewritten as
+%
+\begin{equation}\begin{cases} \label{eq:dae}
+    \vb f(\vq, \dq, \ddq) &= 0_{\R^2} \\
+    \vb g(\vq) &= 0_{\R^3},
+\end{cases}\end{equation}
+%
+with
+%
+\begin{equation}
+    \vb f(\vq, \dq, \ddq) = \begin{pmatrix}
+        \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\OK}{R}}(\vq) \\
+        \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\OK}{\tau}}(\vq)
+    \end{pmatrix}
+\end{equation}
+
+\subsection{Numerical solving}
+The system found in \ref{eq:dae} consists of two \ac{ode}s and three algebraic equations of $\vq : t \mapsto \vq(t) \in \R^5$, therefore it is a \ac{dae}.
+The first step toward a solution is to reduce it to a system of \ac{ode}s, which is called index reduction.
+It consists in differentiating the algebraic equations with respect to time until we have a system of \ac{ode}s, while adding initial conditions to keep the original algebraic equations valid at all times.
+The algebraic equation $\vb g(\vq) = 0$ is reduced to
+\begin{equation}\begin{cases} \dg(\vq, \dq) = 0 \\ \vb g(\vq(t_0)) = 0,\end{cases}\end{equation}
+and differentiating a second time yields
+\begin{equation}\begin{cases} \ddg(\vq, \dq, \ddq) = 0 \\ \dg(\vq(t_0), \dq(t_0)) = 0 \\ \vb g(\vq(t_0)) = 0,\end{cases}\end{equation}
+which also exhibits three new algebraic equations that were previously hidden : $\dot g(u) = 0$, \emph{i.e.} not only must the configuration be consistent, but the velocities as well.
+\alter{Show the differentiation of g?} In our particular case, \emph{two} differentiation steps are required, thus we are working with an \emph{index $2$} \ac{dae}.
+By doing so, our system is reduced to $5$ second order \ac{ode}s and $6$ initial conditions:
+\begin{equation}\begin{cases}
+    \vb f(\vq, \dq, \ddq) = 0_{\R^2} \\
+    \ddg(\vq, \dq, \ddq) = 0_{\R^3} \\
+    \dg(\vq(t_0), \dq(t_0)) = 0_{\R^3} \\
+    \vb g(\vq(t_0)) = 0_{\R^3},
+\end{cases}\end{equation}
+We introduce $v = \dq$ and rewrite this previous system with only first order \ac{ode}s and initial conditions:
+\begin{equation}\begin{cases}
+    \vb f(\vq, \vb v, \dot{\vb v}) = 0_{\R^2} \\
+    \ddg(\vq, \vb v, \dot{\vb v}) = 0_{\R^3} \\
+    \dq - \vb v = 0_{\R^5} \\
+    \dg(\vq(t_0), \vb v(t_0)) = 0_{\R^3} \\
+    \vb g(\vq(t_0)) = 0_{\R^3}.
+\end{cases}\end{equation}
+The first two vector equations are implicit and nonlinear in $\du$: we use a symbolic solver to solve them and have the explicit expression of $\dot{\vb v}$ directly written into our code.
+As for the initialization, we have to choose $(\vq, \vb v) \in \R^{5+5}$ verifying the six implicit nonlinear constraints.
+To make the solving easier, we set
+\begin{equation}\begin{cases}
+    \alpha(t_0) = 0 \\
+    \dot \alpha(t_0) = 0,
+\end{cases}\end{equation}
+and let the user choose $(\tau(t_0), \dot \tau) \in \R^2$.
+We again use a symbolic solver to determine the rest of the initial conditions as a function of $(\tau(t_0), \dot \tau(t_0))$.
+
+We can finally solve the system numerically using an \ac{ode} solver like Runge-Kutta 5(4) to get the trajectory shown on the left pane of \ref{fig:callback-comparison}. 
+
+On the left, we show the trajectory for $t_f = 20$ and $\OA + \AK$ seems to coincide with $\OK$, yet on the left, by integrating for longer, the two trajectories diverge.
+Even though we initialize such that $\dg(\vq(t_0)) = 0$ and the \ac{ode} part enforces $\ddg(\vq, \vb v, \dot{\vb v}) = 0$, the slight integration error made at each time step accumulate and make $\dg$, and eventually $\vb g$, drift away from zero \ref{fig:residuals}.
+\alter{runtime}
+
+\subsection{Limitations of this approach}
+\alter{Is this better written ? -- We knowingly pick a loose tolerance to exacerbate the problem: even with a correct initialization, the algebraic residuals accumulate an error over time, so much so that after 80 seconds, the state is completely incoherent, \(r, \tau\) and \(\alpha, \theta_l, \phi_l\) telling completely different stories about the position of the kite $K$. For this reason, we introduce a \emph{manifold projection callback}: after every Runge-Kutta step, we apply a Newton algorithm on the state.}
+
+We just saw that the method in not stable for longer integration periods.
+
+This can be avoided by using a callback \alter{cite diffeqcallback.jl} to project $(\vq, \vb v)$ on the acceptable manifold
+\begin{equation}
+    \left\{ (\vq, \vb v) \in \R^{5+5} \mid \vb g(\vq) = 0 \land \dg(\vq, \vb v) = 0 \right\}
+\end{equation}
+using one or multiple steps of Newton's method.
+The state is becomes coherent at all times \ref{fig:residuals} but the running time is multiplied by two \alter{table of run times? at least give some values}.
+Another limitation of this approach include the reliance on an external symbolic solver, whose output is copy pasted into the code, therefore the code is unreadable and hard to maintain, and a small change in the model requires re-running the symbolic solver.
+
+\begin{center} \label{fig:residuals}
+    \includegraphics[width=\textwidth]{figs/residuals_10D_interp}
+\end{center}
+
+
+\begin{center} \label{fig:traj-callback}
+    \includegraphics[width=\textwidth]{figs/trajectory_10D_short_long_cb.pdf}
+    I should probably drop the left subplot as it is identical to \ref{fig:traj20-80}'s right subplot.
+\end{center}
+
+As previously mentioned, this model has five states but only two degrees of freedom; this observation motivates the main result of the paper, which is a whole rewrite of the model by having only two states and no configuration constraint.
+The pure \ac{ode} form makes the analytical work much easier, the numerical solution has no drift and is computed much faster because of the reduced number of dimensions, no symbolic solver is required, nor is a callback.
+

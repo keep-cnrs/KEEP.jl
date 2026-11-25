@@ -1,0 +1,78 @@
+\PassOptionsToPackage{dvipsnames,xcdraw}{xcolor}
+\documentclass[OptSoft]{jtcam_preprint}
+\usepackage[acronym,shortcuts]{glossaries}
+\makeglossaries
+
+% https://mirrors.ibiblio.org/CTAN/macros/latex/contrib/physics/physics.pdf
+\usepackage{physics}
+\usepackage{booktabs}
+\usepackage[dvipsnames,table,xcdraw]{xcolor}
+\usepackage{bigints}
+\usepackage{standalone}
+
+\usepackage{tikz}
+\usetikzlibrary{3d}
+\usepackage{tikz-3dplot}
+
+
+\usepackage{mymacros}
+\usepackage{myacronyms}
+
+% WARNING WARNING ::: Last package to load
+\usepackage{hyperref}
+\sisetup{
+    angle-symbol-degree = deg
+}
+\title{Rocking Arm Model for Kite Power Generation, KEEP project}
+\runningtitle{Rocking Arm Model for Kite Power Generation, KEEP project}
+
+\author[1]{\orcid{0009-0009-7987-1573}Antonin Bavoil}
+\author[2]{Author 2}
+\runningauthor{Antonin Bavoil et al.}
+
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\date{\today}
+
+\keywords{dynamical system, parametric optimization, limit cycle, airborne wind energy, kite, power generation}
+\addbibresource{refs.bib}
+
+\begin{document}
+\showthe\textwidth
+\showthe\columnwidth
+\showthe\hsize
+
+
+\tableofcontents
+\clearpage
+
+% \include{sections/outline}
+% \include{sections/outline_v2}
+
+\alter{flushend is not working on https://texleaf.inria.fr, but works on local install}
+\alter{acronyms should be displayed somewhere -- they are not}
+
+\include{sections/section1-modelling}
+\include{sections/sectionC-1D_PTO}
+\include{sections/section2-dynamical-analysis}
+\include{sections/section-optimization-jb}
+%\include{sections/section-optimization-draft}
+
+\appendix
+\include{sections/sectionA-10D}
+\include{sections/sectionB-explicit-ddq}
+\include{sections/appendix-eight}
+\include{sections/annex-curv}
+
+% TEST CITATION -- remove once biblatex/biber pipeline is confirmed working
+Test citation \cite{delebecque:hal-02090402}.
+
+\clearpage
+\printglossaries
+
+\end{document}
+
+% lyx
+% TODO:
+% - déplacer les définitions dans une première section (lhat, ahat, rhat, OA, AK, OK, a, l, α, τ, R, θl, φl) avec schéma vecteur + distance et schema angles

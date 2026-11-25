@@ -1,0 +1,144 @@
+\section{Curvature of the kite trajectory: computations and proofs} \label{app:curv}
+
+This appendix gathers the computations and proofs behind Section~\ref{sec:opt-curvature}, whose notation is used throughout.
+Primes denote derivatives with respect to \(\tau\), and the subscript \(\sigma\) a derivative with respect to the arclength \(\sigma\) of the spherical eight.
+
+\paragraph{Radial distance.}
+From \(\norm{\vb r - \OA}^2 = \ell^2\) with \(\vb r = r\,\vu r\), one gets \(r^2 - 2pr + a^2 - \ell^2 = 0\), where \(p = \vu r \vdot \OA\).
+Since \(a<\ell\), the roots have opposite signs, and the positive one is \(r = p + R\), \(R = \sqrt{p^2+\ell^2-a^2}\).
+As \(r\) increases with \(p\in[-a,a]\), \(\ell-a\le r\le\ell+a\).
+Moreover \(\dv*{r}{p} = 1 + p/R = r/R\), so that, with \(u = \ln r\),
+\begin{equation}
+    u_p = \frac1R, \qquad u_{pp} = -\frac{p}{R^3}, \qquad R \ge \sqrt{\ell^2-a^2}.
+\end{equation}
+
+\paragraph{Spherical eight.}
+With \(\vu e_\theta, \vu e_\phi\) the coordinate unit vectors,
+\begin{equation}
+\begin{split}
+    \vu r' &= \theta'\,\vu e_\theta + \sin\theta\,\phi'\,\vu e_\phi, \\
+    \vu r'' &= -(\theta'^2 + \sin^2\theta\,\phi'^2)\,\vu r + (\theta'' - \sin\theta\cos\theta\,\phi'^2)\,\vu e_\theta + (\sin\theta\,\phi'' + 2\cos\theta\,\theta'\phi')\,\vu e_\phi.
+\end{split}
+\end{equation}
+Hence \(v^2 = \theta'^2 + \sin^2\theta\,\phi'^2\), and \(\kappa_g = \det(\vu r, \vu r', \vu r'')/v^3\) gives
+\begin{equation}
+    v^3\kappa_g = \sin\theta\,(\theta'\phi'' - \theta''\phi') + \cos\theta\,\phi'\,(2\theta'^2 + \sin^2\theta\,\phi'^2).
+\end{equation}
+With \(\theta' = 2\Delta\theta\cos2\tau\), \(\theta'' = -4\Delta\theta\sin2\tau\), \(\phi' = \Delta\phi\cos\tau\) and \(\phi'' = -\Delta\phi\sin\tau\), one has
+\begin{equation}
+    \theta'\phi'' - \theta''\phi' = -2\Delta\theta\Delta\phi\cos2\tau\sin\tau + 4\Delta\theta\Delta\phi\sin2\tau\cos\tau = 2\Delta\theta\Delta\phi\sin\tau\,(2+\cos2\tau),
+\end{equation}
+since \(4\cos^2\tau - \cos2\tau = 2 + \cos2\tau\), and \(2\theta'^2 = 8\Delta\theta^2\cos^22\tau\), which gives the stated \(v^2\) and \(\kappa_g\).
+Since \(\cos\tau\) and \(\cos2\tau\) do not vanish simultaneously, \(v>0\).
+At \(\tau=\pi/2\): \(\theta=\theta_0\), \(v = 2\Delta\theta\), and \(\kappa_g = \Delta\phi\sin\theta_0/(4\Delta\theta^2)\).
+At \(\tau = 3\pi/4\): \(\theta = \theta_0-\Delta\theta\), \(\cos2\tau=0\), \(v = \Delta\phi\sin(\theta_0-\Delta\theta)/\sqrt2\), which gives the stated value.
+
+\paragraph{Curvature formula.}
+To obtain \eqref{eq:curv-formula}, work in the frame \((\vu r, \vu t, \vu n)\); using \(\vu r_\sigma = \vu t\) and \(\vu t_\sigma = -\vu r + \kappa_g\vu n\),
+\begin{equation}
+    \vb r_\sigma = r_\sigma\,\vu r + r\,\vu t, \qquad
+    \vb r_{\sigma\sigma} = (r_{\sigma\sigma} - r)\,\vu r + 2r_\sigma\,\vu t + r\kappa_g\,\vu n .
+\end{equation}
+Then \(\norm{\vb r_\sigma}^2 = r^2 + r_\sigma^2\) and
+\begin{equation}
+    \norm{\vb r_\sigma \times \vb r_{\sigma\sigma}}^2 = r^2\kappa_g^2\,(r^2 + r_\sigma^2) + (r^2 + 2r_\sigma^2 - r\,r_{\sigma\sigma})^2 .
+\end{equation}
+With \(r_\sigma = r\,u_\sigma\) and \(r_{\sigma\sigma} = r\,(u_{\sigma\sigma} + u_\sigma^2)\), this gives \(\norm{\vb r_\sigma}^2 = r^2(1+u_\sigma^2)\) and
+\begin{equation}
+    \norm{\vb r_\sigma \times \vb r_{\sigma\sigma}}^2 = r^4\bigl[\kappa_g^2(1+u_\sigma^2) + (1+u_\sigma^2 - u_{\sigma\sigma})^2\bigr],
+\end{equation}
+and \(\kappa = \norm{\vb r_\sigma\times\vb r_{\sigma\sigma}}/\norm{\vb r_\sigma}^3\) is \eqref{eq:curv-formula}.
+
+\paragraph{Decomposition on the cone.}
+Parametrise \(\mathcal C\) by \(X(r,\sigma) = r\,\vu r(\sigma)\).
+Then \(X_r = \vu r\), \(X_\sigma = r\,\vu t\), the unit normal is \(\vu n\), and \(X_{rr} = 0\), \(X_{r\sigma} = \vu t\), \(X_{\sigma\sigma} = r\,(-\vu r + \kappa_g\vu n)\).
+The fundamental forms are
+\begin{equation}
+    \mathrm{I} = \dd r^2 + r^2\dd\sigma^2, \qquad \mathrm{II} = r\,\kappa_g\,\dd\sigma^2,
+\end{equation}
+so the principal curvatures are \(0\) (direction \(\vu r\)) and \(\kappa_g/r\) (direction \(\vu t\)), and the Gauss curvature vanishes.
+Since \(\mathrm I\) is the Euclidean metric in polar coordinates \((r,\sigma)\), the map \((r,\sigma)\mapsto(r\cos\sigma, r\sin\sigma)\) is a local isometry onto the plane (the development of the cone).
+For the trajectory \(\sigma\mapsto(r(\sigma),\sigma)\), by Meusnier's theorem,
+\begin{equation}
+    \kappa_n = \frac{\mathrm{II}(\vb r_\sigma,\vb r_\sigma)}{\mathrm{I}(\vb r_\sigma,\vb r_\sigma)} = \frac{r\kappa_g}{r^2 + r_\sigma^2} = \frac{\kappa_g}{r\,(1+u_\sigma^2)},
+\end{equation}
+with \(\sin^2\beta = r^2/(r^2+r_\sigma^2)\) for the angle \(\beta\) between \(\vb r_\sigma\) and \(\vu r\).
+The geodesic curvature is intrinsic, hence equal to the curvature of the developed planar curve given in polar form by \(r(\sigma)\), namely
+\begin{equation}
+    \frac{r^2 + 2r_\sigma^2 - r\,r_{\sigma\sigma}}{(r^2+r_\sigma^2)^{3/2}} = \frac{1 + u_\sigma^2 - u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}}.
+\end{equation}
+Their squares add up to \eqref{eq:curv-formula}.
+For \(a=0\), \(r\equiv\ell\), \(u_\sigma = u_{\sigma\sigma} = 0\), and the developed curve is the circle of radius \(\ell\).
+
+\paragraph{Arm-free lower bound.}
+For \(a=0\), \(\kappa = \sqrt{1+\kappa_g^2}/\ell \ge 1/\ell\).
+At \(\tau=0\) (\(\theta = \theta_0\), \(\sin\tau=0\), \(\cos\tau=1\)) the numerator of \(\kappa_g\) equals \(\Delta\phi\cos\theta_0\,(8\Delta\theta^2 + \Delta\phi^2\sin^2\theta_0)\), and at \(\tau=\pi\) its opposite.
+If \(\theta_0\ne\pi/2\), these have opposite signs, so by continuity \(\kappa_g\) vanishes on \((0,\pi)\), and likewise on \((\pi,2\pi)\); if \(\theta_0 = \pi/2\), it vanishes at \(\tau = 0,\pi\).
+Hence \(\min\kappa = 1/\ell\).
+
+\paragraph{Upper bound, step 1: lower bound on the speed.}
+We prove \(v\ge v_*\) on the box.
+Put \(x = \cos^2\tau\in[0,1]\), \(\delta = \Delta\theta_-\), \(\varpi = m\Delta\phi_-\).
+Since \(\cos^22\tau = (2x-1)^2\) and both terms of \(v^2\) are nondecreasing in \(\Delta\theta\), \(\Delta\phi\) and \(\sin\theta\ge m\),
+\begin{equation}
+    v^2 \ge q(x) = 4\delta^2(2x-1)^2 + \varpi^2 x .
+\end{equation}
+The convex quadratic \(q\) is minimal at \(x^* = \tfrac12 - \varpi^2/(32\delta^2) < 1\).
+If \(\varpi\ge4\delta\), then \(x^*\le0\) and \(\min_{[0,1]}q = q(0) = 4\delta^2\).
+Otherwise \(x^*\in(0,1)\), \(2x^*-1 = -\varpi^2/(16\delta^2)\), and
+\begin{equation}
+    q(x^*) = \frac{\varpi^4}{64\delta^2} + \frac{\varpi^2}2 - \frac{\varpi^4}{32\delta^2} = \frac{\varpi^2}2 - \frac{\varpi^4}{64\delta^2},
+\end{equation}
+which is \(v_*^2\).
+
+\paragraph{Upper bound, step 2: bound on the geodesic curvature of the eight.}
+We prove \(\abs{\kappa_g}\le\bar\kappa_g\) on the box.
+With \(y = \sin\tau\), \(\abs{\sin\tau}\,(2+\cos2\tau) = \abs{y}\,(3-2y^2)\le\sqrt2\) on \([-1,1]\) (maximum at \(y^2 = 1/2\)).
+Also \(8\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau\le2v^2\).
+Hence
+\begin{equation}
+    \abs{\kappa_g} \le \frac{2\sqrt2\,M\,\Delta\theta\Delta\phi}{v^3} + \frac{2C\,\Delta\phi\,\abs{\cos\tau}}{v},
+\end{equation}
+and \(v\ge\Delta\phi\sin\theta\,\abs{\cos\tau}\ge m\Delta\phi\,\abs{\cos\tau}\) bounds the last term by \(2C/m\); the first is at most \(2\sqrt2\,M\Delta\theta_+\Delta\phi_+/v_*^3\) by the lower bound \(v\ge v_*\).
+
+\paragraph{Upper bound, step 3: reduction to the second derivative of \(u\).}
+With \(s = u_\sigma^2\ge0\) and \(w = u_{\sigma\sigma}\), \(\kappa_g^2(1+s)/(1+s)^3\le\kappa_g^2\) and
+\begin{equation}
+    \frac{(1+s-w)^2}{(1+s)^3} \le \frac{(1+s+\abs{w})^2}{(1+s)^3} = \frac{\bigl(1+\abs{w}/(1+s)\bigr)^2}{1+s} \le (1+\abs{w})^2,
+\end{equation}
+so that \(r\kappa\le\sqrt{\kappa_g^2 + (1+\abs{u_{\sigma\sigma}})^2}\), and \(r\ge\ell-a\ge\ell_--a\).
+
+\paragraph{Upper bound, step 4: bound on \(u_{\sigma\sigma}\).}
+We show \(\abs{u_{\sigma\sigma}}\le U\).
+Write \(p = a\,g\) with \(g = \sin\theta\cos\psi\), \(\psi = \phi-\alpha\).
+Then
+\begin{equation}
+\begin{split}
+    g' &= \cos\theta\,\theta'\cos\psi - \sin\theta\sin\psi\,\psi', \\
+    g'' &= -\sin\theta\,\theta'^2\cos\psi + \cos\theta\,\theta''\cos\psi - 2\cos\theta\,\theta'\psi'\sin\psi - \sin\theta\cos\psi\,\psi'^2 - \sin\theta\sin\psi\,\psi'' ,
+\end{split}
+\end{equation}
+and with \(\abs{\theta'}\le2\Delta\theta_+\), \(\abs{\theta''}\le4\Delta\theta_+\), \(\abs{\psi'}\le\Delta\phi_++A_1\), \(\abs{\psi''}\le\Delta\phi_++A_2\), we get \(\abs{g'}\le\abs{\theta'}+\abs{\psi'}\le\Gamma_1\) and \(\abs{g''}\le(\abs{\theta'}+\abs{\psi'})^2 + \abs{\theta''} + \abs{\psi''}\le\Gamma_2\).
+Using \(u_p = 1/R\) and \(u_{pp} = -p/R^3\), \(u' = u_p\,a g'\) and \(u'' = u_p\,a g'' + u_{pp}\,a^2g'^2\), so that
+\begin{equation}
+    \abs{u'}\le\varepsilon'\,\Gamma_1, \qquad \abs{u''}\le\varepsilon'\,\Gamma_2 + \varepsilon'^3\,\Gamma_1^2 .
+\end{equation}
+Next, \(v' = (\vu r'\vdot\vu r'')/v = \vu t\vdot\vu r''\) is bounded by the tangential part of \(\vu r''\) computed above:
+\begin{equation}
+    \abs{v'}\le\abs{\theta''} + \tfrac12\phi'^2 + \abs{\phi''} + 2\abs{\theta'}\abs{\phi'}\le V_1 .
+\end{equation}
+Finally \(\abs{u_{\sigma\sigma}}\le\abs{u''}/v^2 + \abs{u'}\abs{v'}/v^3\), and \(v\ge v_*\) gives \(U\).
+
+\paragraph{Conclusion of the upper bound.}
+Combining the bounds on \(\kappa_g\), on \(r\kappa\) and on \(u_{\sigma\sigma}\), \(\kappa\le\sqrt{\bar\kappa_g^2 + (1+U)^2}/r\le\sqrt{\bar\kappa_g^2 + (1+U)^2}/(\ell_--a)\).
+For \(a=0\), \(U=0\) and \(r=\ell\ge\ell_-\), and the lower bound was proved above.
+As \(\varepsilon' = \varepsilon/\sqrt{1-\varepsilon^2}\), \(U = O(\varepsilon)\).
+
+\paragraph{Expansion for small arm length.}
+From the expression of \(r\), \(r = \ell\bigl(\varepsilon g + \sqrt{1-\varepsilon^2+\varepsilon^2g^2}\bigr)\), so that \(u = \ln\ell + \varepsilon g + O(\varepsilon^2)\) and \(1/r = (1-\varepsilon g)/\ell + O(\varepsilon^2)\), with \(O(\varepsilon^2)\) remainders whose first two \(\tau\)-derivatives are \(O(\varepsilon^2)\) when \(\alpha'\), \(\alpha''\) are bounded.
+Since \(v\ge v_*>0\), \(u_\sigma = O(\varepsilon)\) and \(u_{\sigma\sigma} = \varepsilon\,g_{\sigma\sigma} + O(\varepsilon^2)\) uniformly.
+Then \eqref{eq:curv-formula} gives
+\begin{equation}
+    r\kappa = \sqrt{\kappa_g^2 + (1-u_{\sigma\sigma})^2} + O(\varepsilon^2) = K - \varepsilon\,\frac{g_{\sigma\sigma}}{K} + O(\varepsilon^2),
+\end{equation}
+and multiplying by \(\ell/r\) yields \eqref{eq:curv-first-order}.
