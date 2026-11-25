@@ -14,3 +14,4 @@ The KEEP.jl repo is part of the [control-toolbox ecosystem](https://github.com/c
 | **Release / Version** | [![Release](https://img.shields.io/github/v/release/abavoil/KEEP.jl.svg)](https://github.com/abavoil/KEEP.jl/releases) |
 | **License** | [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/abavoil/KEEP.jl/blob/master/LICENSE) |
 | **Code Style / Quality** | [![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/JuliaDiff/BlueStyle) [![Aqua.jl](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) |
+
