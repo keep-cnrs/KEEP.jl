@@ -1,0 +1,146 @@
+\section{Optimization} \label{sec:optimization}
+
+We designed this model to evaluate the average power output of KEEP.
+%\alter{add a label to the dynamical analysis section and reference it}
+In the previous section, we computed limit cycles for a given set of environment and design parameters.
+%\alter{do we keep 'limit cycle'?}
+We now fix the environment, mainly the reference wind speed \(w_0\), and maximize the average power output over one revolution of a periodic orbit by tuning a selection of design parameters.
+
+\subsection{Optimizing for maximum average power} \label{sec:opt-power}
+
+To assess the quality of a set of parameters, we measure the total work done by the generator, \emph{i.e.} the amount of energy extracted from the system.
+We obtain this information by augmenting the state with the work \(W\) done since the start of the simulation, whose time derivative is the instantaneous power, namely the product of (the opposite of) the torque and the arm angular velocity:
+\begin{equation} \label{eq:work}
+    W(0) = 0, \qquad
+    \dot W = P = - \dot \alpha \, T(\dot \alpha) = b \, \dot \alpha^2 \geq 0.
+\end{equation}
+The work is integrated concurrently with \(\vb x = (\alpha, \tau, \dot \alpha, \dot \tau)\), using the same numerical scheme, and we denote the augmented state \(\tilde{\vb x} = (\vb x, W)\).
+The average power over a periodic orbit of period \(t_f\) is then
+\begin{equation}
+    \bar P = W_f / t_f, \qquad W_f = W(t_f).
+\end{equation}
+Since the trajectory converges to the same periodic orbit (given \(\dot \tau > 0\)), maximizing the average power as \(t \to \infty\) is equivalent to maximizing it over one period of this orbit.
+
+For the solution of the \ac{ivp} to be a periodic orbit, looping constraints must be enforced at \(t_f\), which yields a \ac{bvp}.
+Without loss of generality, we fix the phase by imposing \(\tau(0) = 0\), so that \(\tau(t_f) = \pm 2\pi\).
+%\alter{this is probably going to be a repeat of the previous section}
+The sign determines the direction of travel of the kite: it rises either on the sides of the eight (\(\tau(t_f) = +2\pi\)) or in its center (\(\tau(t_f) = -2\pi\)).
+To avoid the lines sliding against each other, we choose the former.
+
+We optimize the line length \(\ell\), the arm inertia \(I\) and the braking coefficient \(b\) of the generator, and denote by \(\Theta = (\ell, I, b)\) the vector of design parameters.
+The optimization problem reads
+\begin{equation} \label{eq:opt-problem}
+W_f / t_f \underset{\substack{\alpha_0, \dot{\alpha}_0, \dot{\tau}_0 \\ W_f, t_f \\ \Theta}}{\longrightarrow} \max
+\end{equation}
+subject to constraints
+\begin{equation} \label{eq:opt-constraints}
+\begin{split}
+    &\alpha(t_f, \Theta) = \alpha_0 \\
+    &\tau(t_f, \Theta) = 2\pi \\
+    &\dot \alpha(t_f, \Theta) = \dot \alpha_0 \\
+    &\dot \tau(t_f, \Theta) = \dot \tau_0 \\
+    &W(t_f, \Theta) = W_f,
+\end{split}
+\end{equation}
+where the components of \(\tilde{\vb x}(t_f, \Theta)\) are obtained by integrating the \ac{ivp} from \(\tilde{\vb x}_0 = (\alpha_0, 0, \dot \alpha_0, \dot \tau_0, 0)\) with parameters \(\Theta\), and \(W_f\) is a slack variable for the final work.
+In the search for parameters that provide more power, the solver thus also determines the corresponding initial condition lying on the periodic orbit.
+
+\paragraph{Initial guess.}
+We reuse our work on equilibria and limit cycles to provide the solver with an initial guess that satisfies the constraints.
+%\alter{can we get them from Alain's kinematic model in the appendix? ``We start with values obtained from annex X where we use a kinematic model to determine the optimal parameters...''}
+Starting from a physically reasonable set of parameters \(\Theta_0\), we compute the corresponding limit cycle (with the correct direction of travel), from which we extract \(\alpha_0, \dot \alpha_0, \dot \tau_0, t_f\) and \(W_f\); this results into a feasible point.
+
+\paragraph{Implementation.}
+The problem is modelled with ADNLPModels.jl \cite{migot2021adnlpmodels}, which computes all required derivatives algorithmically with ForwardDiff.jl \cite{RevelsLubinPapamarkou2016}.
+It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(10^{-8}\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
+The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(10^{-9}\) with Tsit5 \cite{tsitouras2011rk54}, a Runge--Kutta 5(4) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+%\alter{Ipopt requires a bounding box; we give it as large as possible to avoid saturating a bound.}
+The parameters and their bounds are described in Table~\ref{tab:opt_descr}, while the result of the optimization is presented in Table~\ref{tab:opt_results}.
+%\alter{ECC run: 11 iterations, \SI{0.5}{\second} on an M2 MacBook Air, but at tolerance \(10^{-6}\); update iteration count and timing for \(10^{-8}\)}
+Ipopt solves the problem in about a dozen iterations, without a single restoration iteration, meaning it never leaves the feasible region.
+We show the power curve over the limit cycle in Figure~\ref{fig:optimized_power}: after optimization, the period is significantly increased and about \(13\%\) more power is harvested on average.
+
+\begin{table}[thpb]
+\centering
+\caption{Description of the optimized parameters}
+\begin{tabular}{l S S}
+    \toprule
+    {Symbol (Unit)} & {Lower} & {Upper} \\
+    \midrule
+    $\ell$ (\si{\meter}) & 10.3 & 93.0 \\
+    $I$ (\si{\kilogram\meter\squared}) & 433.3 & 3900.0 \\
+    $b$ (\si{\newton\meter\second\per\radian}) & 1333.3 & 12000.0 \\
+    \bottomrule
+\end{tabular}
+\label{tab:opt_descr}
+\end{table}
+
+\begin{table}[thpb]
+\centering
+\caption{Optimization results}
+\begin{tabular}{l S S}
+    \toprule
+    {Symbol (Unit)} & {Initial Guess} & {Solution} \\
+    \midrule
+    $\ell$ (\si{\meter}) & 31.0 & 47.4 \\
+    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 3541.3 \\
+    $b$ (\si{\newton\meter\second\per\radian}) & 4000.0 & 3862.6 \\
+    \midrule
+    Average power (\si{\kilo\watt}) & 9.05 & 10.21 \\
+    Norm of residual & {$3.7\times10^{-9}$} & {$5.3\times10^{-10}$} \\
+    \bottomrule
+\end{tabular}
+\label{tab:opt_results}
+\end{table}
+
+\begin{figure}[thpb]
+    \centering
+    \includegraphics{figs/optimized_power}
+    \caption{Power generation curves over the normalized time comparing the initial guess (black) to the optimized limit cycle (red).
+    Solid lines represent instantaneous power, while the horizontal dotted lines indicate the average power generated over the cycle.
+    After optimization, the period is significantly increased, resulting in approximately 13\% more power harvested on average.}
+    \label{fig:optimized_power}
+\end{figure}
+
+\subsection{Optimal design as a function of wind speed} \label{sec:opt-wind}
+
+Since the optimization converges quickly, we repeat the procedure for a range of reference wind speeds \(w_0\).
+For each integer wind speed from \SIrange{5}{15}{\meter\per\second}, we find the set of parameters (Figure~\ref{fig:parameterized_optimization_params}) that maximizes power (Figure~\ref{fig:parameterized_optimization_power}) and show the corresponding minimum and maximum line tension over the limit cycle (Figure~\ref{fig:parameterized_optimization_tension}).
+For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{10}{\meter\per\second}.
+This set of parameters proves strongly resilient across a wide range of wind speeds (\(\pm 50\%\)), as it yields nearly as much power as the actual optimum (with a difference of less than \(5\%\)), with only a slight increase in tension.
+%\alter{landscape of the objective around the optimum: no asymmetry, just aim for the middle?}
+There is thus no need to adapt the geometry to the wind speed.
+The system exhibits quasilinear scaling along this parameterized optimization, even though the length of the arm (and other parameters) is kept constant, which makes it impossible to scale the model perfectly to wind speed.
+We observe the following approximate trends:
+\begin{itemize}
+    \item power is proportional to the cube of wind speed, consistent with the scaling of wind power;
+    \item tension is proportional to the square of wind speed;
+    \item line length \(\ell\) and arm inertia \(I\) are both ratios of first-order polynomials in wind speed;
+    \item the arm braking coefficient \(b\) is proportional to wind speed;
+    \item (not shown) the period is inversely proportional to wind speed.
+\end{itemize}
+
+The maximum line tension defines the strength requirements for the kite fabric and lines.
+Furthermore, the minimum line tension remains positive, confirming \emph{a posteriori} the modeling assumption that the lines are always in tension and never exert compression on the arm.
+
+\begin{figure}[thpb]
+  \centering
+  \includegraphics{figs/parametrized_optimization_power}
+  \caption{Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed \(w_0\) is varied.
+  The reference curve is generated by fixing the design parameters to the optimal values for \(w_0 = \SI{10}{\meter\per\second}\).}
+  \label{fig:parameterized_optimization_power}
+\end{figure}
+
+\begin{figure}[thpb]
+  \centering
+  \includegraphics{figs/parametrized_optimization_tension}
+  \caption{Minimum and maximum line tension \(\vb F_\ell\) for optimized (blue) and reference (black) parameters.}
+  \label{fig:parameterized_optimization_tension}
+\end{figure}
+
+\begin{figure}[thpb]
+  \centering
+  \includegraphics{figs/parametrized_optimization_params}
+  \caption{Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for \(w_0 = \SI{10}{\meter\per\second}\) (black dashed lines).}
+  \label{fig:parameterized_optimization_params}
+\end{figure}

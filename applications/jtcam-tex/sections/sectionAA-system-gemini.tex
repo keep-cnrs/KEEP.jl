@@ -1,0 +1,343 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage{tikz}
+\usetikzlibrary{3d,calc}
+\usepackage{tikz-3dplot}
+
+\geometry{margin=1in}
+
+\title{Configuration and Modeling of the KEEP System}
+\author{Kite Electrical Energy Production (KEEP) Project}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Configuration of the system and physical parameters}
+
+\subsection{Configuration}
+
+The system consists of an oscillating rigid arm of length $a$ and a kite $K$ connected to the tip of the arm $A$ via a tether of length $\ell$. The arm is pivoted at the origin $O$ and rotates in the horizontal $xy$-plane. 
+
+\tdplotsetmaincoords{70}{-15}
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[tdplot_main_coords, scale=2.2]
+
+% ==== ORIGIN AND AXES ====
+\coordinate (O) at (0,0,0);
+\node[circle,fill,inner sep=1pt] at (O) {};
+\node[below left] at (O) {O};
+
+\draw[->] (0,0,0) -- (3,0,0) node[anchor=west]{$x$};
+\draw[->] (0,0,0) -- (0,1.5,0) node[anchor=south]{$y$};
+\draw[->] (0,0,0) -- (0,0,2) node[anchor=west]{$z$};
+
+% ==== POINT A IN XY-PLANE ====
+\def\a{2}
+\def\alphaA{20}
+\pgfmathsetmacro{\xA}{\a*cos(\alphaA)}
+\pgfmathsetmacro{\yA}{\a*sin(\alphaA)}
+\coordinate (A) at (\xA, \yA, 0);
+\node[circle,fill,inner sep=1pt] at (A) {};
+\node[below] at (A) {A};
+
+% Projections of A
+\coordinate (Ax) at (\xA, 0, 0);
+\coordinate (Ay) at (0, \yA, 0);
+
+% Lines from O
+\draw[thick] (O) -- (A) node[midway, sloped, above] {$a$};
+\draw[dotted] (O) -- (Ax);
+\draw[dotted] (O) -- (Ay);
+
+% Resisting torque indication at O
+\draw[->, purple, thick] (0.4, 0, 0) arc (0:120:0.4) node[midway, above right] {$\Gamma_r$};
+
+% Angle alpha
+\tdplotdefinepoints(0,0,0)(1,0,0)(\xA,\yA,0)
+\tdplotdrawpolytopearc[->]{1.5}{anchor=east}{$\alpha$}
+
+% ==== POINT K ====
+\def\l{2}
+\def\thetaZero{70}
+\def\DeltaTheta{5}
+\def\DeltaPhi{30}
+\def\tauK{90}
+
+\pgfmathdeclarefunction{thetaFunc}{1}{\pgfmathparse{\thetaZero + \DeltaTheta * sin(2*#1)}}
+\pgfmathdeclarefunction{phiFunc}{1}  {\pgfmathparse{\DeltaPhi * sin(#1)}}
+\pgfmathdeclarefunction{xTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * cos(phiFunc(#1))}}
+\pgfmathdeclarefunction{yTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * sin(phiFunc(#1))}}
+\pgfmathdeclarefunction{zTauFunc}{1} {\pgfmathparse{cos(thetaFunc(#1))}}
+
+\pgfmathsetmacro{\dotprod}{\xA * xTauFunc(\tauK) + \yA * yTauFunc(\tauK)}
+\pgfmathsetmacro{\rK}{\dotprod + sqrt(\dotprod * \dotprod + \l^2 - \a^2)}
+
+\pgfmathsetmacro{\xK}{\rK * xTauFunc(\tauK)}
+\pgfmathsetmacro{\yK}{\rK * yTauFunc(\tauK)}
+\pgfmathsetmacro{\zK}{\rK * zTauFunc(\tauK)}
+
+\coordinate (K) at (\xK, \yK, \zK);
+\coordinate (K_xy) at (\xK, \yK, 0);
+
+% Helper points from A
+\pgfmathsetmacro{\xAel}{\xA}
+\pgfmathsetmacro{\yAel}{\yA}
+\pgfmathsetmacro{\zAel}{1.5}
+\coordinate (A_el) at (\xAel, \yAel, \zAel);
+
+\pgfmathsetmacro{\xAext}{1.5*\xA}
+\pgfmathsetmacro{\yAext}{1.5*\yA}
+\coordinate (A_ext) at (\xAext, \yAext, 0);
+
+% Draw K and lines
+\node[circle,fill,inner sep=1pt] at (K) {};
+\node[above] at (K) {K};
+
+\draw (A) -- (K) node[midway, sloped, below] {$\ell$};
+\draw[dotted] (O) -- (K) node[pos = 0.35, sloped, above] {$r$};
+
+\draw[dotted] (A) -- (A_ext);
+\draw[dotted] (K) -- (K_xy) -- (A);
+\draw[dotted] (A) -- (A_el);
+
+\newcommand{\KCoord}[2]{({#1 * xTauFunc(#2)}, {#1 * yTauFunc(#2)}, {#1 * zTauFunc(#2)})}
+
+% Lemniscate Manifold
+\draw[domain = 0:360, samples = 40, smooth, dashed, variable = \t]
+    plot (\KCoord{\rK}{\t});
+\draw[->, domain = 0:\tauK, samples = 20, smooth, pink, thick, variable = \t]
+    plot (\KCoord{\rK}{\t});
+
+\node[below, pink] at \KCoord{\rK}{\tauK/2} {$\tau$};
+
+\end{tikzpicture}
+\caption{Three-dimensional static configuration of the oscillating arm and the kite constrained to a spherical lemniscate manifold.}
+\label{fig:static_config}
+\end{figure}
+
+\subsubsection{Coordinate Systems and Position Vectors}
+We define a direct orthonormal reference frame $(\vec{e}_x, \vec{e}_y, \vec{e}_z)$ centered at $O$.
+The position of the arm's tip $A$ is restricted to the horizontal $xy$-plane at a fixed distance $a$ from the origin:
+\begin{equation}
+\vec{x}_A(\alpha) = \begin{pmatrix} a \cos\alpha \\ a \sin\alpha \\ 0 \end{pmatrix}
+\end{equation}
+where $\alpha \in [0, 2\pi]$ represents the angle of the arm relative to the $x$-axis.
+
+The kite $K$ is located at a distance $r$ from the origin along the direction vector $\vec{u}(\tau)$, which represents a lemniscate manifold (figure-eight trajectory) on the unit sphere:
+\begin{equation}
+\vec{x}_K(\tau, r) = r \vec{u}(\tau) = r \begin{pmatrix} \sin\theta(\tau)\cos\phi(\tau) \\ \sin\theta(\tau)\sin\phi(\tau) \\ \cos\theta(\tau) \end{pmatrix}
+\end{equation}
+where the elevation $\theta(\tau)$ and azimuth $\phi(\tau)$ are parametrized by the manifold coordinate $\tau \in [0, 2\pi]$:
+\begin{align}
+\theta(\tau) &= \theta_0 + \Delta\theta \sin(2\tau) \\
+\phi(\tau) &= \Delta\phi \sin(\tau)
+\end{align}
+Here, $\theta_0$ is the mean elevation angle, and $\Delta\theta$, $\Delta\phi$ are the path amplitudes.
+
+\subsubsection{Resolution of the Radial Distance}
+Since the physical tether between $A$ and $K$ is assumed rigid with a constant length $\ell$, the coordinates must satisfy the algebraic distance constraint:
+\begin{equation}
+\|\vec{x}_K - \vec{x}_A\|^2 = \ell^2 \iff \|r\vec{u}(\tau) - \vec{x}_A(\alpha)\|^2 = \ell^2
+\end{equation}
+Expanding this relation yields a quadratic equation in $r$:
+\begin{equation}
+r^2 - 2 D(\alpha, \tau) r + a^2 - \ell^2 = 0
+\label{eq:quadratic_r}
+\end{equation}
+where $D(\alpha, \tau)$ is the projection of the arm's tip onto the direction of the kite:
+\begin{equation}
+D(\alpha, \tau) = \vec{x}_A(\alpha) \cdot \vec{u}(\tau) = a \sin\theta(\tau) \cos(\alpha - \phi(\tau))
+\end{equation}
+Solving Eq.~\eqref{eq:quadratic_r} for the outer positive physical root yields:
+\begin{equation}
+r(\alpha, \tau) = D(\alpha, \tau) + \sqrt{D(\alpha, \tau)^2 + \ell^2 - a^2}
+\end{equation}
+
+\subsubsection{Generalized Coordinates}
+Depending on the modeling abstraction level, two configurations are studied:
+\begin{itemize}
+    \item \textbf{Simplified 2D formulation (for standard paper model)}: The kite is strictly constrained to the lemniscate path and the tether is inextensible. The configuration is completely described by 2 degrees of freedom:
+    \begin{equation}
+    q = (\alpha, \tau)^T
+    \end{equation}
+    \item \textbf{Unconstrained 5D formulation (for high-fidelity models)}: We relax the algebraic constraints of rigid path tracking and rigid tether. The configuration is described by 5 generalized coordinates:
+    \begin{equation}
+    q_5 = (\alpha, \tau, R, \theta_\ell, \phi_\ell)^T
+    \end{equation}
+    where $R$ is the dynamic tether length, and $\theta_\ell$, $\phi_\ell$ represent the polar and azimuth angles of the tether vector $\vec{\ell} = \vec{x}_K - \vec{x}_A$ respectively.
+\end{itemize}
+
+\subsection{Kinematics}
+
+The physical velocities of points $A$ and $K$ are mapped from the generalized coordinate velocities $\dot{q} = (\dot{\alpha}, \dot{\tau})^T$ via the system Jacobians:
+\begin{equation}
+\vec{v}_X = \dot{\vec{x}}_X = \frac{\partial \vec{x}_X}{\partial q} \dot{q}
+\end{equation}
+For the arm tip $A$, the velocity is:
+\begin{equation}
+\vec{v}_A = \frac{\partial \vec{x}_A}{\partial \alpha} \dot{\alpha} = \begin{pmatrix} -a\sin\alpha \\ a\cos\alpha \\ 0 \end{pmatrix} \dot{\alpha}
+\end{equation}
+For the kite $K$, the velocity is computed as:
+\begin{equation}
+\vec{v}_K = \frac{\partial \vec{x}_K}{\partial \alpha} \dot{\alpha} + \frac{\partial \vec{x}_K}{\partial \tau} \dot{\tau}
+\end{equation}
+where the partial derivatives are explicitly given by:
+\begin{align}
+\frac{\partial \vec{x}_K}{\partial \alpha} &= \frac{\partial r}{\partial \alpha} \vec{u}(\tau) \\
+\frac{\partial \vec{x}_K}{\partial \tau} &= \frac{\partial r}{\partial \tau} \vec{u}(\tau) + r \frac{\partial \vec{u}}{\partial \tau}
+\end{align}
+Applying the chain rule to the quadratic solution for $r$ yields:
+\begin{equation}
+\frac{\partial r}{\partial \alpha} = \frac{r}{\sqrt{D^2 + \ell^2 - a^2}} \frac{\partial D}{\partial \alpha}, \quad \frac{\partial r}{\partial \tau} = \frac{r}{\sqrt{D^2 + \ell^2 - a^2}} \frac{\partial D}{\partial \tau}
+\end{equation}
+where:
+\begin{align}
+\frac{\partial D}{\partial \alpha} &= -a \sin\theta(\tau) \sin(\alpha - \phi(\tau)) \\
+\frac{\partial D}{\partial \tau} &= a \cos\theta(\tau) \theta'(\tau) \cos(\alpha - \phi(\tau)) + a \sin\theta(\tau) \phi'(\tau) \sin(\alpha - \phi(\tau))
+\end{align}
+and the temporal derivatives of the path angles are:
+\begin{equation}
+\theta'(\tau) = 2 \Delta\theta \cos(2\tau), \quad \phi'(\tau) = \Delta\phi \cos(\tau)
+\end{equation}
+
+\subsection{Dynamics}
+
+The system experiences gravitational, generator-resisting, and aerodynamic forces. Figure \ref{fig:dynamics_config} outlines the force distribution on the coupled arm-kite system.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[tdplot_main_coords, scale=2.2]
+
+% ==== ORIGIN AND AXES ====
+\coordinate (O) at (0,0,0);
+\node[circle,fill,inner sep=1pt] at (O) {};
+\node[below left] at (O) {O};
+
+\draw[->] (0,0,0) -- (3,0,0) node[anchor=west]{$x$};
+\draw[->] (0,0,0) -- (0,1.5,0) node[anchor=south]{$y$};
+\draw[->] (0,0,0) -- (0,0,2) node[anchor=west]{$z$};
+
+% Setup coordinates exactly as in Fig 1
+\def\a{2}
+\def\alphaA{20}
+\pgfmathsetmacro{\xA}{\a*cos(\alphaA)}
+\pgfmathsetmacro{\yA}{\a*sin(\alphaA)}
+\coordinate (A) at (\xA, \yA, 0);
+\node[circle,fill,inner sep=1pt] at (A) {};
+\node[below] at (A) {A};
+
+\def\l{2}
+\def\thetaZero{70}
+\def\DeltaTheta{5}
+\def\DeltaPhi{30}
+\def\tauK{90}
+
+\pgfmathdeclarefunction{thetaFunc}{1}{\pgfmathparse{\thetaZero + \DeltaTheta * sin(2*#1)}}
+\pgfmathdeclarefunction{phiFunc}{1}  {\pgfmathparse{\DeltaPhi * sin(#1)}}
+\pgfmathdeclarefunction{xTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * cos(phiFunc(#1))}}
+\pgfmathdeclarefunction{yTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * sin(phiFunc(#1))}}
+\pgfmathdeclarefunction{zTauFunc}{1} {\pgfmathparse{cos(thetaFunc(#1))}}
+
+\pgfmathsetmacro{\dotprod}{\xA * xTauFunc(\tauK) + \yA * yTauFunc(\tauK)}
+\pgfmathsetmacro{\rK}{\dotprod + sqrt(\dotprod * \dotprod + \l^2 - \a^2)}
+
+\pgfmathsetmacro{\xK}{\rK * xTauFunc(\tauK)}
+\pgfmathsetmacro{\yK}{\rK * yTauFunc(\tauK)}
+\pgfmathsetmacro{\zK}{\rK * zTauFunc(\tauK)}
+
+\coordinate (K) at (\xK, \yK, \zK);
+
+% Draw arm and tether
+\draw[thick] (O) -- (A);
+\draw (A) -- (K);
+\node[circle,fill,inner sep=1pt] at (K) {};
+\node[above] at (K) {K};
+
+% ==== WIND SHEAR BACKGROUND ====
+\foreach \z in {0.3, 0.7, 1.1, 1.5, 1.9} {
+    \pgfmathsetmacro{\windlen}{0.45 * (\z)^0.16}
+    \draw[->, cyan!80!black, thin] (-0.5, -0.4, \z) -- ++(\windlen, 0, 0);
+}
+\node[cyan!80!black, right] at (-0.5, -0.4, 1.9) {$\vec{v}_w(z)$};
+
+% ==== FORCES AT THE ORIGIN (Resisting Torque) ====
+\draw[->, purple, thick] (0.4, 0, 0) arc (0:-100:0.4) node[midway, below left] {$\Gamma_r$};
+
+% ==== FORCES AT THE KITE ====
+% Gravity
+\draw[->, red!80!black, thick] (K) -- ++(0, 0, -0.55) node[below] {$\vec{F}_{g}$};
+
+% Apparent Wind vector
+\draw[->, cyan, thick] (K) -- ++(0.5, -0.1, -0.1) node[right] {$\vec{v}_a$};
+
+% Aerodynamic Lift & Drag
+\draw[->, orange, thick] (K) -- ++(0.35, -0.07, -0.07) node[below right] {$\vec{F}_D$};
+\draw[->, green!60!black, thick] (K) -- ++(-0.1, -0.15, 0.45) node[above] {$\vec{F}_L$};
+
+% Tether Tension
+\draw[->, blue, thick] (K) -- ($(K)!0.35!(A)$) node[midway, left] {$\vec{T}$};
+
+\end{tikzpicture}
+\caption{Dynamic force environment acting on the oscillating arm and the kite, displaying the wind profile $\vec{v}_w(z)$, resisting generator torque $\Gamma_r$, gravity $\vec{F}_g$, tether tension $\vec{T}$, aerodynamic drag $\vec{F}_D$, and lift $\vec{F}_L$.}
+\label{fig:dynamics_config}
+\end{figure}
+
+\subsubsection{Wind Profile}
+To capture realistic wind shear variations with altitude $z$, we assume a standard power-law wind profile:
+\begin{equation}
+\vec{v}_w(z) = v_{w, \text{ref}} \left(\frac{z}{z_{\text{ref}}}\right)^\gamma \vec{e}_x
+\end{equation}
+where $v_{w, \text{ref}}$ is the wind velocity at a chosen reference altitude $z_{\text{ref}}$, and $\gamma$ is the atmospheric shear exponent.
+
+\subsubsection{Aerodynamic Forces}
+The relative velocity of the air with respect to the kite, known as the apparent wind velocity, is:
+\begin{equation}
+\vec{v}_a = \vec{v}_w(z_K) - \vec{v}_K
+\end{equation}
+The aerodynamic forces consist of lift $\vec{F}_L$ and drag $\vec{F}_D$:
+\begin{align}
+\vec{F}_D &= \frac{1}{2} \rho_a A_K C_D \|\vec{v}_a\|^2 \vec{e}_D \\
+\vec{F}_L &= \frac{1}{2} \rho_a A_K C_L \|\vec{v}_a\|^2 \vec{e}_L
+\end{align}
+where:
+\begin{itemize}
+    \item $\rho_a$ is the air density, and $A_K$ is the reference wing area of the kite.
+    \item $C_L$, $C_D$ are the lift and drag coefficients.
+    \item $\vec{e}_D = \frac{\vec{v}_a}{\|\vec{v}_a\|}$ is the drag unit vector, pointing in the direction of the apparent wind flow.
+    \item $\vec{e}_L$ is the lift unit vector, which is orthogonal to $\vec{e}_D$ and lies in the kite's symmetry plane.
+\end{itemize}
+The total aerodynamic force acting on the kite is the vector sum:
+\begin{equation}
+\vec{F}_{\text{aer}} = \vec{F}_L + \vec{F}_D
+\end{equation}
+Tether drag can also be lumped directly into the kite's drag coefficient $C_D$ by adding an equivalent drag contribution proportional to the tether dimensions.
+
+\subsubsection{Gravity}
+Gravity acts vertically downwards on both the kite (mass $m_K$) and the arm (distributed mass or concentrated mass):
+\begin{equation}
+\vec{F}_g = -m_K g \vec{e}_z
+\end{equation}
+
+\subsubsection{Resisting Torque}
+An electric generator connected to the arm pivot at $O$ extracts electrical energy by exerting a damping/control resisting torque $\Gamma_r$ that opposes the rotation of the arm:
+\begin{equation}
+\Gamma_r = -c_{\text{gen}} \dot{\alpha}
+\end{equation}
+where $c_{\text{gen}} > 0$ is the generator's damping/load coefficient.
+
+\subsubsection{Lagrangian Mechanics Formulation}
+Applying the Euler-Lagrange equations to the generalized coordinates $q = (\alpha, \tau)^T$, the equations of motion are expressed as:
+\begin{equation}
+M(q)\ddot{q} + C(q,\dot{q})\dot{q} + G(q) = Q(q,\dot{q})
+\end{equation}
+where $M(q)$ is the system mass matrix, $C(q,\dot{q})$ captures the Coriolis and centrifugal terms, $G(q)$ represents the generalized gravity forces, and $Q(q,\dot{q})$ contains the projections of the non-conservative forces (aerodynamic forces $\vec{F}_{\text{aer}}$ and resisting generator torque $\Gamma_r$) onto the system tangent space.
+
+\section*{References}
+\noindent [1] A. Bavoil, J.-B. Caillau, L. Dell'Elce, and A. N\^eme. "Airborne wind energy: the KEEP project." Accepted at the European Control Conference (ECC), 2026.
+
+\end{document}

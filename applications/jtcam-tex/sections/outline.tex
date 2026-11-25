@@ -1,0 +1,176 @@
+
+\section{Original Model}
+
+\subsection{Parameters, Coordinates and Forces}
+\begin{itemize}
+ \item quickly describe the parameters cf. abstract wesc
+ \item 2 kinematic chains: R, $\tau$ (which gives $\theta$ and $\phi$) and $\alpha, \theta, \phi$
+ \item All possible kite states = $\{K \in \mathbb{R}^3 \mid \exists (A_x, A_y) \in \mathbb{R}^2 \mid A_x^2 + A_y^2 = l^2 \land \|K - (A_x, A_y, 0)\| = r\}$
+ \item gravity, aerodynamics, line tension + conservation of angular momentum and torque function
+\end{itemize}
+
+\subsection{Deeper dive in cone constraint}
+\begin{itemize}
+ \item Simulate an aerodynamical control through a fictitious force that is normal to the cone. Give intuition with the train analogy or go straight to the maths ?
+\end{itemize}
+
+\textbf{LDE}: pas plus tard, quand on developpe les EoM plutot?
+
+\subsection{Derivation of the kinematic}
+\begin{itemize}
+ \item for each kinematic chain, differentiate the state to get the velocity
+\end{itemize}
+
+\subsection{Derivation of the dynamics}
+\begin{itemize}
+ \item kept as an implicit dynamics of the form $M(\vq)\ddot{\vq} = f(\vq, \dot{\vq})$
+\end{itemize}
+
+\subsection{Implementation}
+Is it interesting to talk about implementation details ?
+
+\textbf{LDE}: quel details? Il me semble bizarre que tu montres ici les resultats qui suivent. Pour moi ca a plus de sens de faire d'abord la derivation du modele reduit et montrer que ses resultats collent avec le modèle complet dans une section de validation.
+
+\subsubsection{Optimisation and sensitivity analysis around the optimum}
+\begin{itemize}
+ \item Show that when optimizing for $(r, I_{eq})$ using the simplex method we get something
+ \item Slices of the cost function
+\end{itemize}
+
+\subsubsection{Cons of this optimisation approach}
+\begin{itemize}
+ \item High run time
+ \item cost function is bad because of the sinusoidal/wavy noise
+\end{itemize}
+
+\section{Derivation of the reduced model}
+
+\subsection{Vaschy-Buckingham reduction on the parameters}
+Motivations: \href{https://en.wikipedia.org/wiki/Chebychev%E2%80%93Gr%C3%BCbler%E2%80%93Kutzbach_criterion}{mobility formula}, \href{https://en.wikipedia.org/wiki/Buckingham_%CF%80_theorem}{$\pi$ theorem}
+
+\begin{enumerate}
+ \item Determine a minimal set of parameters to describe the model
+ \item Choose a set of parameters to normalize the model
+\end{enumerate}
+
+\subsection{From 5 coordinates to 2 using geometry}
+\begin{itemize}
+ \item Intuition: 5 dimensions and 3 constraints -> only two degrees of freedom. Need the correct vocabulary
+ \item Some geometry
+ \item Recover all 5 of the original coordinates using only $\alpha$ and $\tau$ to show equivalence
+\end{itemize}
+
+\subsection{Derivation of the kinematic}
+\begin{itemize}
+ \item differentiate the state to get the velocity
+\end{itemize}
+
+\subsection{Derivation of the dynamics}
+\begin{itemize}
+ \item up to explicit computation of $\ddot{\vq}$
+\end{itemize}
+
+\subsection{Numerical validation}
+\begin{itemize}
+ \item random initial conditions, a few time horizons, average of error against the original model with and without callback for each time horizon
+\end{itemize}
+
+\section{Equilibria}
+
+\textbf{LDE}: Quel interet pour ce section? les equilibres sont à pouissance 0..
+
+\subsection{Finding one equilibria}
+\begin{itemize}
+ \item Starting from an initial guess $\tau_0$, \textit{locally} find $\tau_1$ such that the corresponding aligned state is most stable
+ \item From the previously obtained $\tau_1$, compute $\alpha_1$ and use $(\alpha_1, \tau_1)$ as an initial guess to \textit{locally} find an equilibrium $(\alpha_2, \tau_2)$
+ \item \textbf{Remark}: Instead of aligning the arm and the lines, we can also oppose them to find \textit{more unstable} equilibria.
+\end{itemize}
+
+\subsection{Finding all equilibria}
+\begin{itemize}
+ \item Multi-start with $\tau_0 \in [0, \pi]$ -> find 4 equilbriums
+ \item Confirm by starting from $(\alpha_1, \tau_1)$ sampled in $[-\pi, \pi] \times [0, \pi]$
+ \item By symmetry, there are 8
+ \item Plot and discuss symmetries
+\end{itemize}
+
+\subsection{? Numerical analysis}
+\begin{itemize}
+ \item Study their stability: time to double distance in each eigen direction, time for one rotation around the equilibrium
+\end{itemize}
+
+\section{Limit cycles}
+\begin{itemize}
+ \item Observation: for any initial condition, the trajectory seems to converge towards one of two limit cycles
+\end{itemize}
+
+\subsection{Characterisation of the limit cycles}
+\begin{itemize}
+ \item Identify a footprint of the limit cycle for one trajectory in infinite time: average $d\alpha$, average $d\tau$
+ \item Let $c_t(u : t \mapsto u(t)) = \left(\int_0^t \dot \alpha^2, \int_0^t \dot \tau\right)$, and we use $c = c_\infty$, $d\alpha^2$ because mean($d\alpha$) = 0
+\end{itemize}
+
+\subsection{Practically identifying the limit cycle given an initial condition}
+\begin{itemize}
+ \item Let $g_{||}(u) = (\alpha, dq, d\tau)$ and $g_\perp(u) = \sin(\tau / 2)$
+ \item use a \texttt{ContinuousCallback} to track when poincare section $g_\perp = 0$ is crossed, stop $g_{||}(u_n) - g_{||}(u_{n-1}) < \epsilon$ for some small $\epsilon$.
+ \item Compute only $c_T/c(T, g_{||}(u_0))$ with $u$ starting at $u_n$ and $T$ the period (define $T$)
+\end{itemize}
+
+\subsection{? Computing all limit cycles}
+From a sampling of $(\alpha, \tau, \dot \alpha, \dot \tau) \in [-\pi, \pi] \times [\pi, \pi] \times [-V, V] \times [-V, V]$  
+\noindent with $V = \infty$ theoretically but in practice $V = 5$ seems sufficient: argument of length of the eight approx $2 r \Delta\phi$, wind speed = vref, approximate period = $2 r \Delta\theta / vref$, with a margin factor of 4  
+
+\begin{itemize}
+ \item Compute $c$ for each trajectory, plot the 2d characteristics
+\end{itemize}
+
+\subsection{? Clustering and representative limit cycles}
+\begin{itemize}
+ \item How many limit cycles for the original set of parameters ?
+ \item Their periods, looping orientation and average power
+\end{itemize}
+
+\subsection{? Stability analysis}
+\begin{itemize}
+ \item Time to "half the distance" in each eigen direction
+ \item ... cf. Scheeres \& bouquin recommandé par R. Veltz
+\end{itemize}
+
+\section{Revision of the optimisation problem}
+
+\subsection{Expectations from a simpler model (cf. Alain's calculations)}
+
+\subsection{Optimise over one limit cycle}
+\begin{itemize}
+ \item Shooting with + constraint function
+ \item augment state to avoid integration in objective function
+ \item Initialise using a limit cycle : feasible point
+ \item Possible improvement : discretise the trajectory in the constraints instead of calling a solver
+\end{itemize}
+
+\subsection{Optimisation result}
+
+\subsubsection{Convergence}
+\begin{itemize}
+ \item Constraints are satisfied
+ \item Saturated bounds ?
+ \item \% gain on average power
+ \item range on $d\alpha$ for choosing the right generator/gear ratio
+ \item range on $\alpha$: the back of the device is still safely accessible
+ \item range on line tensions: the lines are not too tight/too loose
+ \item Landscape around the optimum: no wavy noise
+\end{itemize}
+
+\subsubsection{Extracting more information}
+\begin{itemize}
+ \item optimal line length for a range of wind speeds
+ \item Sensibility analysis similar to \href{https://www.researchgate.net/figure/llustrative-example-of-one-way-local-sensitivity-analysis-showing-the-effect-of-CAPEX_fig2_350607886}{here}
+\end{itemize}
+
+\section{Conclusion}
+\begin{itemize}
+ \item Make sure the ground is sound
+\end{itemize}
+
+\textbf{LDE}: il me semble que il y a un peu trop de sections et il manque un peu de rationale dans la structure. Je crois que les equilibres il ne faut pas le mentionner. tous simu que pour le modèle reduite (juste à montrer l'equivalence avec le modèle complet dans une section de validation de la dynamique reduite). Passer après la deduction des EoM et validation directement au choses intéressants: cycles limites, opti, étude sensitivité.
