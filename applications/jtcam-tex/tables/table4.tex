@@ -1,21 +1,22 @@
+% WARNING: values: to be checked vs. Alain's computation
 \begin{table}[htbp]
   \centering
   \caption{Comparison of initial and optimized parameters}
   \label{tab:parameter_comparison}
   \begin{tabular}{lrr}
     \toprule
-    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic ptimization} \\
+    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic optimization} \\ 
     \midrule
-    $\ell$ ($\mathrm{m}$)                             & 31.0     & 26.9679  \\
-    $I$ ($\mathrm{kg\cdot m^2}$)                     & 1300.0   & 351.628  \\
-    $b$ ($\mathrm{kg\cdot m^2\cdot s^{-1}\cdot rad^{-1}}$) & 2888.29  & 737.073  \\
-    $\Delta\phi$ ($\mathrm{rad}$)                    & 0.872665 & 0.29     \\
+    $\ell$ (\si{\meter}) & 31.0 & 26.9679 \\ 
+    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 351.628 \\ 
+    $b$ (\si{\newton\meter\second\per\degree}) & 50.4078 & 12.8643 \\ 
+    $\Delta\varphi$ (\si{\degree}) & 50.0 & 16.6158 \\ 
     \midrule
-    Period ($\mathrm{s}$)                            & 2.82807  & 0.949268 \\
-    Objective $P$ ($\mathrm{kW}$)                    & 9.63887  & 12.2534  \\
-    Min tension ($\mathrm{kN}$)                      & 3.35552  & 5.74767  \\
-    Max tension ($\mathrm{kN}$)                      & 8.85567  & 10.8269  \\
-    Max acceleration ($\mathrm{m/s^2}$)              & 517.078  & 938.602  \\
+    Period (\si{\second}) & 2.82808 & 0.949266 \\ 
+    Objective $P$ (\si{\kilo\watt}) & 9.6389 & 12.2534 \\ 
+    Min tension (\si{\kilo\newton}) & 3.35564 & 5.74768 \\ 
+    Max tension (\si{\kilo\newton}) & 8.85562 & 10.8269 \\ 
+    Max acceleration (\si{\meter\per\square\second}) & 517.092 & 938.606 \\ 
     \bottomrule
   \end{tabular}
 \end{table}

@@ -1,16 +1,20 @@
 \begin{table}[thpb]
 \centering
-\caption{Optimization results}
+\caption{Optimization results at $w_0 = \SI{9}{\meter\per\second}$.}
 \begin{tabular}{l S S}
     \toprule
     {Symbol (Unit)} & {Initial Guess} & {Solution} \\
     \midrule
-    $\ell$ (\si{\meter}) & 31.0 & 47.4 \\
-    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 3541.3 \\
-    $b$ (\si{\newton\meter\second\per\radian}) & 4000.0 & 3862.6 \\
+    $\ell$ (\si{\meter}) & 31.0 & 27.0 \\ 
+    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 351.6 \\ 
+    $b$ (\si{\newton\meter\second\per\degree}) & 50.4 & 12.9 \\ 
+    $\Delta\varphi$ (\si{\degree}) & 50.0 & 16.6 \\ 
     \midrule
-    Average power (\si{\kilo\watt}) & 9.05 & 10.21 \\
-    Norm of residual & {$3.7\times10^{-9}$} & {$5.3\times10^{-10}$} \\
+    Average power (\si{\kilo\watt}) & 9.64 & 12.25 \\ 
+    Period (\si{\second}) & 2.83 & 0.95 \\ 
+    Min line tension (\si{\kilo\newton}) & 3.36 & 5.75 \\ 
+    Max line tension (\si{\kilo\newton}) & 8.86 & 10.83 \\ 
+    Norm of residual & {$1.5\times10^{-6}$} & {$5.3\times10^{-6}$} \\ 
     \bottomrule
 \end{tabular}
 \label{tab:opt_results}
