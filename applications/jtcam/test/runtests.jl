@@ -23,8 +23,18 @@ include(joinpath(JTCAM, "paper_cache.jl"))
 include(joinpath(JTCAM, "paper_output.jl"))
 
 function raster_pdf(pdf::AbstractString, out::AbstractString)
-    run(Cmd(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=png16m", "-r150",
-             "-sOutputFile=$out", pdf]))
+    run(
+        Cmd([
+            "gs",
+            "-q",
+            "-dNOPAUSE",
+            "-dBATCH",
+            "-sDEVICE=png16m",
+            "-r150",
+            "-sOutputFile=$out",
+            pdf,
+        ]),
+    )
     return out
 end
 
@@ -58,14 +68,20 @@ end
 function approx_equal(a, b)
     isapprox(a, b; rtol=1e-6, atol=1e-9) && return true
     if a isa AbstractArray && b isa AbstractArray && size(a) == size(b)
-        return all(i -> (isnan(a[i]) && isnan(b[i])) ||
-                        isapprox(a[i], b[i]; rtol=1e-6, atol=1e-9), eachindex(a))
+        return all(
+            i -> (isnan(a[i]) && isnan(b[i])) || isapprox(a[i], b[i]; rtol=1e-6, atol=1e-9),
+            eachindex(a),
+        )
     end
     return isnan(a) && isnan(b)
 end
 
-golden_names() = [splitext(split(line)[2])[1] for line in
-                  readlines(joinpath(REF, "SHA256SUMS")) if !isempty(strip(line))]
+function golden_names()
+    return [
+        splitext(split(line)[2])[1] for
+        line in readlines(joinpath(REF, "SHA256SUMS")) if !isempty(strip(line))
+    ]
+end
 
 @testset "JTCAM paper" begin
     names = golden_names()

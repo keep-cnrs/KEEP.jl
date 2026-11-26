@@ -4,7 +4,7 @@ import LinearAlgebra: norm, normalize, ⋅, ×, dot
 using StaticArrays: SA, SMatrix, @SMatrix, StaticArrays
 import NaNMath as nm
 import OrdinaryDiffEqVerner: Vern9
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 
 import KEEP.PointMass4 as PM4
 using KEEP.PointMassPara
@@ -35,7 +35,9 @@ function scnd_deriv_sample(f, x, v1, v2)
     ## Integration using ForwardDiff is 25% faster compared to AbstractDifferentiation with ForwardDiff backend
     ## jacobian-vector product should be done this way
     # return AD.jacobian(ab, τ2 -> AD.jacobian(ab, τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0)[1], 0.0)[1]
-    return ForwardDiff.derivative(τ2 -> ForwardDiff.derivative(τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0), 0.0)
+    return ForwardDiff.derivative(
+        τ2 -> ForwardDiff.derivative(τ1 -> f(x + τ1 * v1 + τ2 * v2), 0.0), 0.0
+    )
 end
 
 """
@@ -60,13 +62,8 @@ function compute_τhat(τ, p)
     θ, φ = τ_to_θφ(τ, p)
     sin_θ, cos_θ = sincos(θ)
     sin_φ, cos_φ = sincos(φ)
-    return SA[
-        sin_θ*cos_φ,
-        sin_θ*sin_φ,
-        cos_θ
-    ]
+    return SA[sin_θ * cos_φ, sin_θ * sin_φ, cos_θ]
 end
-
 
 @doc raw"""
 (α, τ) -> (R, τ)
@@ -77,7 +74,7 @@ function compute_Rτ(q, p)
     dot_prod = compute_αhat(α) ⋅ compute_τhat(τ, p)
     # ε = 1e-5
     # my_sqrt(x) = sqrt(sqrt(x^2 + ε^2))
-    return SA[L*(dot_prod+nm.sqrt(p.l^2-(1-dot_prod^2))), q[2]]
+    return SA[L * (dot_prod + nm.sqrt(p.l ^ 2 - (1 - dot_prod ^ 2))), q[2]]
 end
 
 @doc raw"""
@@ -87,7 +84,6 @@ function compute_OK(Rτ, p)
     R, τ = Rτ
     return R * compute_τhat(τ, p)
 end
-
 
 @doc raw"""
 Compute du with automatic differentiation: the reference implementation.
@@ -123,10 +119,10 @@ function _dynamics_verified(u, p, t=0)
     rhat = normalize(OK - OA)
 
     # Compute gravity force
-    Fgrav = SA[0, 0, -p.g-p.m_l*p.l] * M * L * T^-2
+    Fgrav = SA[0, 0, -p.g - p.m_l * p.l] * M * L * T^-2
 
     # Compute aerodynamical force
-    wind = SA[abs(OK[3]/(p.z0*L))^(1/p.n_wind), 0, 0] * L * T^-1
+    wind = SA[abs(OK[3] / (p.z0 * L)) ^ (1 / p.n_wind), 0, 0] * L * T^-1
     kite_speed = D_OK * dRτ
     app_wind = wind - kite_speed  # apparent wind, We
 
@@ -153,10 +149,7 @@ function _dynamics_verified(u, p, t=0)
 
     D_OK_D_Rτ = D_OK * D_Rτ
     A = D_OK_D_Rτ .* M .- A_tension
-    b = (ddOK * M +
-        D_OK * ddRτ * M +
-        -b_tension - Fgrav - Faero
-    )
+    b = (ddOK * M + D_OK * ddRτ * M + -b_tension - Fgrav - Faero)
     instantaneous_power = torque * dα
     ddq = (D_OK' * A) \ (-D_OK' * b)
     return SA[dq[1], dq[2], ddq[1], ddq[2], instantaneous_power]
@@ -197,29 +190,26 @@ function _kinematics(α, τ, p)
     p_τ = A * (θp * cθ * cψ - φp * sθ * sψ)
     p_αα = -p_
     p_ατ = A * (θp * cθ * sψ + φp * sθ * cψ)
-    p_ττ = A * ((θpp * cθ - (θp^2 + φp^2) * sθ) * cψ -
-                2θp * φp * cθ * sψ - φpp * sθ * sψ)
+    p_ττ = A * ((θpp * cθ - (θp^2 + φp^2) * sθ) * cψ - 2θp * φp * cθ * sψ - φpp * sθ * sψ)
 
     Rp = R / Δ
     R_α = Rp * p_α
     R_τ = Rp * p_τ
     Rpp = (ELL^2 - A^2) / Δ^3
-    HR = @SMatrix [Rp*p_αα+Rpp*p_α^2  Rp*p_ατ+Rpp*p_α*p_τ
-                   Rp*p_ατ+Rpp*p_α*p_τ Rp*p_ττ+Rpp*p_τ^2]
+    HR = @SMatrix [
+        Rp * p_αα + Rpp * p_α^2 Rp * p_ατ + Rpp * p_α * p_τ
+        Rp * p_ατ + Rpp * p_α * p_τ Rp * p_ττ + Rpp * p_τ^2
+    ]
 
     rhat = SA[sθ * cφ, sθ * sφ, cθ]
     ahat = SA[cos(α), sin(α), zero(α)]
-    rhatp = SA[θp * cθ * cφ - φp * sθ * sφ,
-        θp * cθ * sφ + φp * sθ * cφ,
-        -θp * sθ]
+    rhatp = SA[θp * cθ * cφ - φp * sθ * sφ, θp * cθ * sφ + φp * sθ * cφ, -θp * sθ]
     nrhatp2 = θp^2 + sθ^2 * φp^2
     eθ = SA[cθ * cφ, cθ * sφ, -sθ]
     eφ = SA[-sφ, cφ, zero(θ)]
-    rhatpp = -nrhatp2 * rhat + (θpp - φp^2 * sθ * cθ) * eθ +
-             (φpp * sθ + 2θp * φp * cθ) * eφ
+    rhatpp = -nrhatp2 * rhat + (θpp - φp^2 * sθ * cθ) * eθ + (φpp * sθ + 2θp * φp * cθ) * eφ
 
-    return (; R, Δ, HR, R_α, R_τ, rhat, ahat, rhatp, rhatpp, nrhatp2,
-        θ, φ, θp, φp, A, ELL)
+    return (; R, Δ, HR, R_α, R_τ, rhat, ahat, rhatp, rhatpp, nrhatp2, θ, φ, θp, φp, A, ELL)
 end
 
 "Forces: aerodynamics on kite and lines, weight, and the generator torque."
@@ -232,12 +222,14 @@ function _forces(k, dq, p)
     F_g = SA[0, 0, -p.g - p.m_l * p.l] * M * L * T^-2
 
     Rdot = k.R_α * dq[1] + k.R_τ * dq[2]
-    D_OK = @SMatrix [k.rhat[1] k.R*k.rhatp[1]
-                     k.rhat[2] k.R*k.rhatp[2]
-                     k.rhat[3] k.R*k.rhatp[3]]
+    D_OK = @SMatrix [
+        k.rhat[1] k.R * k.rhatp[1]
+        k.rhat[2] k.R * k.rhatp[2]
+        k.rhat[3] k.R * k.rhatp[3]
+    ]
     kite_speed = D_OK * SA[Rdot, dq[2]]
 
-    wind = SA[abs(OK[3] / (p.z0 * L))^(1 / p.n_wind), 0, 0] * L * T^-1
+    wind = SA[abs(OK[3] / (p.z0 * L)) ^ (1 / p.n_wind), 0, 0] * L * T^-1
     app_wind = wind - kite_speed
     perp = app_wind - (lhat ⋅ app_wind) * lhat
     ew = perp / norm(perp)
@@ -279,19 +271,23 @@ function dynamics(u, p, t=0)
     # the section seed (α = 0, τ = TAU0), where the arm balance is a removable singularity
     mu = k.A * k.R / k.ELL * sin(k.θ) * sin(k.φ - α) + 1e-100
     κ = p.I * M * L^2 / mu
-    Mmat = @SMatrix [M*k.R_α+κ*k.Δ/k.ELL  M*k.R_τ
-                     -κ*k.Δ/k.ELL*k.R_τ   M*k.R^2*k.nrhatp2]
+    Mmat = @SMatrix [
+        M * k.R_α + κ * k.Δ / k.ELL M * k.R_τ
+        -κ * k.Δ / k.ELL * k.R_τ M * k.R^2 * k.nrhatp2
+    ]
 
-    h1 = -M * (dot(dq, k.HR * dq) - k.R * dτ^2 * k.nrhatp2) +
-         k.rhat ⋅ F_a + k.rhat ⋅ F_g - torque * k.Δ / (mu * k.ELL)
-    h2 = -M * (k.R * (2Rdot * dτ * k.nrhatp2 + k.R * dτ^2 * (k.rhatp ⋅ k.rhatpp))) +
-         (k.R * k.rhatp) ⋅ F_a + (k.R * k.rhatp) ⋅ F_g +
-         torque * k.Δ * k.R_τ / (mu * k.ELL)
+    h1 =
+        -M * (dot(dq, k.HR * dq) - k.R * dτ^2 * k.nrhatp2) + k.rhat ⋅ F_a + k.rhat ⋅ F_g -
+        torque * k.Δ / (mu * k.ELL)
+    h2 =
+        -M * (k.R * (2Rdot * dτ * k.nrhatp2 + k.R * dτ^2 * (k.rhatp ⋅ k.rhatpp))) +
+        (k.R * k.rhatp) ⋅ F_a +
+        (k.R * k.rhatp) ⋅ F_g +
+        torque * k.Δ * k.R_τ / (mu * k.ELL)
 
     ddq = Mmat \ SA[h1, h2]
     return SA[dα, dτ, ddq[1], ddq[2], torque * dα]
 end
-
 
 """
 [For post-processing]
@@ -339,15 +335,28 @@ function build_u(; α=0, dα=0, dτ=0, τ=TAU0, W=0.0)
     return build_u(α, τ, dα, dτ, W)
 end
 
-function integrate(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
-    return _integrate(dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
+function integrate(
+    u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...
+)
+    return _integrate(
+        dynamics, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...
+    )
 end
 
 "Integrate with the AD reference dynamics ([`_dynamics_verified`](@ref))."
-function integrate_verified(u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...)
-    return _integrate(_dynamics_verified, u0, tf, p, alg; save_everystep=save_everystep, tol=tol, kwargs...)
+function integrate_verified(
+    u0, tf, p, alg=Vern9(); save_everystep=false, tol=DEFAULT_TOLERANCE, kwargs...
+)
+    return _integrate(
+        _dynamics_verified,
+        u0,
+        tf,
+        p,
+        alg;
+        save_everystep=save_everystep,
+        tol=tol,
+        kwargs...,
+    )
 end
-
-
 
 end  # module

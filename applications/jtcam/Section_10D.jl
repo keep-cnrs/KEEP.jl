@@ -45,7 +45,7 @@ function compute_10D()
     p = PMP.build_para()
     τ0, dτ0 = 1e-10, 10
     u0_10 = PM10.init_u(τ0, dτ0, p)
-    u0_4 = PM4.build_u(α=0, dα=0, dτ=dτ0; τ=τ0)
+    u0_4 = PM4.build_u(; α=0, dα=0, dτ=dτ0, τ=τ0)
     vbp = PMP.build_vbpara(p)
 
     # Projection callback: its tolerance is independent of the integrator tolerance.
@@ -56,14 +56,20 @@ function compute_10D()
     # Physical plots at loose tolerance, to exaggerate the drift of the raw 10D model.
     tf_short, tf, tol = 20, 100, 1e-3
     sol10 = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol)
-    sol10_cb = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol, callback=callback_no_save)
+    sol10_cb = PM10.integrate(
+        u0_10, tf, p, Tsit5(); save_everystep=true, tol, callback=callback_no_save
+    )
     points_per_second = 30
 
     # Interpolated residuals
     tf_long = 1000
     sol10_long = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6)
-    sol10_cb_f = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=false, tol=1e-6, callback=callback)
-    sol10_cb_t = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6, callback=callback_no_save)
+    sol10_cb_f = PM10.integrate(
+        u0_10, tf_long, p, Tsit5(); save_everystep=false, tol=1e-6, callback=callback
+    )
+    sol10_cb_t = PM10.integrate(
+        u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6, callback=callback_no_save
+    )
 
     ts = logrange(1, sol10_long.prob.tspan[2], 501)
     res = [PM10.manifold_residuals!(similar(u0_10, 6), sol10_long(t), p) for t in ts]
@@ -74,7 +80,8 @@ function compute_10D()
 
     # Models converge to the same reference trajectory
     pos10(sol) = [PM10.compute_pos1(u[1:5], sol.prob.p) for u in sol.u]
-    pos4(sol) = [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
+    pos4(sol) =
+        [PM4.compute_OK(PM4.compute_Rτ(u[1:2], sol.prob.p), sol.prob.p) for u in sol.u]
     dist(a, b) = norm.(a .- b)
 
     saveat = range(0, tf_short, 1001)  # sample times
@@ -82,9 +89,27 @@ function compute_10D()
     ref = PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol=1e-14, saveat)
     pref = pos4(ref)
 
-    err10 = [maximum(dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, saveat)), pref)) for tol in tols]
-    err10cb = [maximum(dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, saveat, callback=callback_no_save)), pref)) for tol in tols]
-    err4 = [maximum(dist(pos4(PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol, saveat)), pref)) for tol in tols]
+    err10 = [
+        maximum(
+            dist(pos10(PM10.integrate(u0_10, tf_short, p, Vern9(); tol, saveat)), pref)
+        ) for tol in tols
+    ]
+    err10cb = [
+        maximum(
+            dist(
+                pos10(
+                    PM10.integrate(
+                        u0_10, tf_short, p, Vern9(); tol, saveat, callback=callback_no_save
+                    ),
+                ),
+                pref,
+            ),
+        ) for tol in tols
+    ]
+    err4 = [
+        maximum(dist(pos4(PM4.integrate(u0_4, tf_short, vbp, Vern9(); tol, saveat)), pref))
+        for tol in tols
+    ]
 
     #=
     Max(OK_i(t) - OK_ref(t)), t in [0, t_f]
@@ -95,9 +120,13 @@ function compute_10D()
     =#
 
     ## --- Timing at the production tolerance ---
-    btime4 = @belapsed PM4.integrate($u0_4, $tf, $vbp; save_everystep=true, tol=$tol) seconds = 1
-    btime = @belapsed PM10.integrate($u0_10, $tf, $p; save_everystep=true, tol=$tol) seconds = 1
-    btime_cb = @belapsed PM10.integrate($u0_10, $tf, $p; save_everystep=true, tol=$tol, callback=$callback) seconds = 1
+    btime4 = @belapsed PM4.integrate($u0_4, $tf, $vbp; save_everystep=true, tol=$tol) seconds =
+        1
+    btime = @belapsed PM10.integrate($u0_10, $tf, $p; save_everystep=true, tol=$tol) seconds =
+        1
+    btime_cb = @belapsed PM10.integrate(
+        $u0_10, $tf, $p; save_everystep=true, tol=$tol, callback=$callback
+    ) seconds = 1
 
     ratio_cb = btime_cb / btime
     speedup = btime / btime4
@@ -115,8 +144,27 @@ function compute_10D()
     # construction, and reproduces the 10D configuration while running about speedup times faster than the 10D
     # reference and speedup_cb times faster than the same reference with the projection callback.
 
-    return (; sol10, sol10_cb, tf_short, tf, points_per_second,
-        ts, res, res_cb, ylim, xticks_, yticks_,
-        tols, err10, err10cb, err4,
-        btime4, btime, btime_cb, ratio_cb, speedup, speedup_cb)
+    return (;
+        sol10,
+        sol10_cb,
+        tf_short,
+        tf,
+        points_per_second,
+        ts,
+        res,
+        res_cb,
+        ylim,
+        xticks_,
+        yticks_,
+        tols,
+        err10,
+        err10cb,
+        err4,
+        btime4,
+        btime,
+        btime_cb,
+        ratio_cb,
+        speedup,
+        speedup_cb,
+    )
 end
