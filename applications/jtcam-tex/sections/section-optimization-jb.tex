@@ -60,38 +60,9 @@ The parameters and their bounds are described in Table~\ref{tab:opt_descr}, whil
 Ipopt solves the problem in about a dozen iterations, without a single restoration iteration, meaning it never leaves the feasible region.
 We show the power curve over the limit cycle in Figure~\ref{fig:time_series}: after optimization, the period is significantly increased and about \(13\%\) more power is harvested on average.
 
-\begin{table}[thpb]
-\centering
-\caption{Description of the optimized parameters}
-\begin{tabular}{l S S}
-    \toprule
-    {Symbol (Unit)} & {Lower} & {Upper} \\
-    \midrule
-    $\ell$ (\si{\meter}) & 10.3 & 93.0 \\
-    $I$ (\si{\kilogram\meter\squared}) & 433.3 & 3900.0 \\
-    $b$ (\si{\newton\meter\second\per\radian}) & 1333.3 & 12000.0 \\
-    \bottomrule
-\end{tabular}
-\label{tab:opt_descr}
-\end{table}
+\input{tables/table2}
 
-\begin{table}[thpb]
-\centering
-\caption{Optimization results}
-\begin{tabular}{l S S}
-    \toprule
-    {Symbol (Unit)} & {Initial Guess} & {Solution} \\
-    \midrule
-    $\ell$ (\si{\meter}) & 31.0 & 47.4 \\
-    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 3541.3 \\
-    $b$ (\si{\newton\meter\second\per\radian}) & 4000.0 & 3862.6 \\
-    \midrule
-    Average power (\si{\kilo\watt}) & 9.05 & 10.21 \\
-    Norm of residual & {$3.7\times10^{-9}$} & {$5.3\times10^{-10}$} \\
-    \bottomrule
-\end{tabular}
-\label{tab:opt_results}
-\end{table}
+\input{tables/table3}
 
 \begin{figure}[thpb]
     \centering
@@ -246,27 +217,7 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
 
 
 
-\begin{table}[htbp]
-  \centering
-  \caption{Comparison of initial and optimized parameters}
-  \label{tab:parameter_comparison}
-  \begin{tabular}{lrr}
-    \toprule
-    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic ptimization} \\
-    \midrule
-    $\ell$ ($\mathrm{m}$)                             & 31.0     & 26.9679  \\
-    $I$ ($\mathrm{kg\cdot m^2}$)                     & 1300.0   & 351.628  \\
-    $b$ ($\mathrm{kg\cdot m^2\cdot s^{-1}\cdot rad^{-1}}$) & 2888.29  & 737.073  \\
-    $\Delta\phi$ ($\mathrm{rad}$)                    & 0.872665 & 0.29     \\
-    \midrule
-    Period ($\mathrm{s}$)                            & 2.82807  & 0.949268 \\
-    Objective $P$ ($\mathrm{kW}$)                    & 9.63887  & 12.2534  \\
-    Min tension ($\mathrm{kN}$)                      & 3.35552  & 5.74767  \\
-    Max tension ($\mathrm{kN}$)                      & 8.85567  & 10.8269  \\
-    Max acceleration ($\mathrm{m/s^2}$)              & 517.078  & 938.602  \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\input{tables/table4}
 
 \begin{figure}[thpb]
     \centering

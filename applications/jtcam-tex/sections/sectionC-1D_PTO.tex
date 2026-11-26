@@ -68,34 +68,4 @@ Thus, the power take-off per unit area of kite \(pto\) by the KEEP device can be
 The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters with \(T_s = 1000\text{ N/m\textsuperscript{2}}\), the KEEP device achieves a maximum power take-off of nearly \(3.6\text{ kW/m\textsuperscript{2}}\), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are approximately \(646\text{ kg m\textsuperscript{2}}\) and \(2300\text{ N m s}\) respectively.
 
 
-%% BEGIN TABLE 1
-
-\begin{table}[thpb]
-\centering
-\caption{Parameter Description and Values}
-\label{tab:params}
-\begin{tabular}{l p{3.2cm} r l}
-    \toprule
-    {Symbol} & {Description} & {Value} & {Unit} \\
-    \midrule
-    $a$ & Arm length & $2$ & \si{\meter} \\ 
-    $b$ & Arm braking coefficient & $4000$ & \si{\newton\meter\second\per\radian} \\ 
-    $C_D$ & Kite drag coefficient & $C_L / 7$ &  \\ 
-    $C_{D,\ell}$ & Line drag coefficient & $0$ &  \\ 
-    $C_L$ & Kite lift coefficient & $0.6$ &  \\ 
-    $d_\ell$ & Line diameter & $0.003$ & \si{\meter} \\ 
-    $g$ & Gravity & $9.81$ & \si{\meter\per\square\second} \\ 
-    $I$ & Arm inertia & $1300$ & \si{\kg\square\meter} \\ 
-    $\ell$ & Line length & $31$ & \si{\meter} \\ 
-    $m$ & Kite mass & $6$ & \si{\kg} \\ 
-    $S$ & Kite surface & $10$ & \si{\square\meter} \\ 
-    $w_0$ & Wind reference speed & $9$ & \si{\meter\per\second} \\ 
-    $z_0$ & Wind reference altitude & $10$ & \si{\meter} \\ 
-    $\Delta\theta$ & Lemniscate polar half-height & $6\pi / 180$ & \si{\radian} \\ 
-    $\Delta\phi$ & Lemniscate azimuthal half-width & $50\pi / 180$ & \si{\radian} \\ 
-    $\theta_0$ & Lemniscate mean polar angle & $65\pi / 180$ & \si{\radian} \\ 
-    $\rho_a$ & Air density & $1.225$ & \si{\kg\per\cubic\meter} \\ 
-    $\rho_\ell$ & Line density & $707$ & \si{\kg\per\cubic\meter} \\  
-    \bottomrule
-\end{tabular}
-\end{table}
+\input{tables/table1}
