@@ -800,8 +800,9 @@ function run_optimization(; fast::Bool=false)
     @info "opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles"
     dtheta = dtheta_study(p_ref, dtheta_angles)
 
-    (; stats=dtheta_opt, lost_below=dtheta_lost) = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
+    dsweep = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
         nominal=rad2deg(p_ref.Δθ), iters=it_dtheta, step=fast ? 3.0 : DTHETA_STEP)
+    dtheta_opt, dtheta_lost = dsweep.stats, dsweep.lost_below
 
     LANDSCAPE = landscape(p_ref, SYMS; lower, upper, npoints=fast ? 5 : 21)
 
