@@ -40,7 +40,7 @@ const LATEX_TO_UNICODE = Dict(
     raw"\rho" => "ρ",
     raw"\theta" => "θ",
     raw"\Delta" => "Δ",
-    raw"\phi" => "φ"
+    raw"\phi" => "φ",
 )
 
 function eor_transform(sym)
@@ -69,19 +69,43 @@ function print_param_table(p)
         Parameter(:g, "g", "Gravity", raw"\meter\per\square\second", nothing),
         Parameter(:z0, "z_0", "Wind reference altitude", raw"\meter", nothing),
         Parameter(:w0, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
-        Parameter(:b, "b", "Arm braking coefficient",
-            raw"\newton\meter\second\per\degree", f"{p.b / rad2deg(1):.9g}"),
-        Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle",
-            raw"\degree", f"{rad2deg(p.θ0):.0f}"),
-        Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height",
-            raw"\degree", f"{rad2deg(p.Δθ):.0f}"),
-        Parameter(:Δφ, raw"\Delta\phi", "Lemniscate azimuthal half-width",
-            raw"\degree", f"{rad2deg(p.Δφ):.0f}"),
+        Parameter(
+            :b,
+            "b",
+            "Arm braking coefficient",
+            raw"\newton\meter\second\per\degree",
+            f"{p.b / rad2deg(1):.9g}",
+        ),
+        Parameter(
+            :θ0,
+            raw"\theta_0",
+            "Lemniscate mean polar angle",
+            raw"\degree",
+            f"{rad2deg(p.θ0):.0f}",
+        ),
+        Parameter(
+            :Δθ,
+            raw"\Delta\theta",
+            "Lemniscate polar half-height",
+            raw"\degree",
+            f"{rad2deg(p.Δθ):.0f}",
+        ),
+        Parameter(
+            :Δφ,
+            raw"\Delta\phi",
+            "Lemniscate azimuthal half-width",
+            raw"\degree",
+            f"{rad2deg(p.Δφ):.0f}",
+        ),
     ]
 
-    sort!(params, by=x -> eor_transform(x.sym))
+    sort!(params; by=x -> eor_transform(x.sym))
     table_rows = map(params) do p_item
-        val = isnothing(p_item.value_override) ? f"{p[p_item.key]:.9g}" : p_item.value_override
+        val = if isnothing(p_item.value_override)
+            f"{p[p_item.key]:.9g}"
+        else
+            p_item.value_override
+        end
         unit_col = isempty(p_item.unit) ? "" : raw"\si{" * p_item.unit * "}"
         f"    ${p_item.sym}$ & {p_item.descr} & ${val}$ & {unit_col} \\\\ "
     end
@@ -101,7 +125,7 @@ function print_param_table(p)
 \end{tabular}
 \end{table}"""
 
-    println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
+    return println("%% BEGIN TABLE 1\n\n", table_str, "\n\n%% END TABLE 1")
 end
 
 ## ---------------------------------------------------------------------------
@@ -125,7 +149,9 @@ equilibria.
 Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
 and seed positions / unit field directions for the arrows.
 """
-function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+function streamlines(
+    f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0
+)
     gx, gy = gridsize
     xmin, xmax = xlims
     ymin, ymax = ylims
@@ -151,8 +177,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
         k3 === nothing && return nothing
         k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
         k4 === nothing && return nothing
-        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
-            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+        return (
+            x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]),
+        )
     end
     line_x, line_y = Float32[], Float32[]
     ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
@@ -185,7 +213,10 @@ function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=
                 x = step_rk4(x, d, stepsize)
                 x === nothing && break
                 (xmin ≤ x[1] ≤ xmax && ymin ≤ x[2] ≤ ymax) || break
-                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                idx = (
+                    clamp(searchsortedlast(rx, x[1]), 1, gx),
+                    clamp(searchsortedlast(ry, x[2]), 1, gy),
+                )
                 if idx != ccur
                     mask[idx...] || break
                     mask[idx...] = false
@@ -218,7 +249,7 @@ end
 # Same flow map as the shared Φ_map (paper_core.jl), kept under the section's
 # original name for the eigenvalue derivation in the convergence caption.
 function Φ(x, T; vbp)
-    Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
+    return Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
 end
 
 ## Eight-trajectory in YZ plane
@@ -363,7 +394,7 @@ b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from 
     ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
 
     ## All eigen values
-    dyn = (u) -> PM4.dynamics(PM4.build_u(α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
+    dyn = (u) -> PM4.dynamics(PM4.build_u(; α=u[1], τ=u[2], dα=u[3], dτ=u[4]), vbp)[1:4]
 
     ss_ = sort([q for q in ss if q[2] > 0]; by=q -> (!is_down(q), !is_center(q, vbp)))  # one left member per symmetric pair: down-center, down-side, up-center, up-side
     evs = [Complex.(eigvals(Array(ForwardDiff.jacobian(dyn, [q..., 0, 0])))) for q in ss_]
@@ -376,9 +407,11 @@ b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from 
     N_eq, r_eq, t_eq = 100, π / 10, 1
     traj_qs = Vector{Vector{Vector{Float64}}}()
     for q in ss
-        for θ in range(0, 2π; length=N_eq + 1)[1:(end-1)]
+        for θ in range(0, 2π; length=N_eq + 1)[1:(end - 1)]
             q0 = q .+ r_eq .* [cos(θ), sin(θ)]
-            local sol = PM4.integrate(PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true)
+            local sol = PM4.integrate(
+                PM4.build_u(; α=q0[1], τ=q0[2]), t_eq, vbp; save_everystep=true
+            )
             qs = [rad2deg.(sol(t)[1:2]) for t in range(0, sol.t[end], 10)]  # interpolated (α, τ) on a grid
             push!(traj_qs, qs)
         end
@@ -414,15 +447,25 @@ b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from 
     n_max = 11
     tol_start, tol_end = 1e-2, 10LC_CONV_TOL
     function convergence_data(dτ, ntrace; tf=50)
-        s_ref = PM4.integrate(PM4.build_u(; dτ), tf, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
+        s_ref = PM4.integrate(
+            PM4.build_u(; dτ), tf, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL
+        )
         u_infty = s_ref.u[end]
-        distances = [LC.distance_on_section(u, u_infty) for u in s_ref.u[1:(end-1)]][1:min(end, n_max-1)]
+        distances = [LC.distance_on_section(u, u_infty) for u in s_ref.u[1:(end - 1)]][1:min(end, n_max - 1)]
         slope = get_slope(distances; tol_start, tol_end)
         i1 = findfirst(<(tol_start), distances)
         perturbed = Vector{Vector{Float64}}()
         if ntrace > 0
-            for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
-                s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
+            for (α, τ) in
+                eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+                s = PM4.integrate(
+                    PM4.build_u(; α, τ, dτ),
+                    tf,
+                    vbp;
+                    callback=CB,
+                    save_end=false,
+                    tol=LC_CONV_TOL,
+                )
                 push!(perturbed, [LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16)
             end
         end
@@ -445,8 +488,12 @@ b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from 
     # and uses `Φ_map`, identical to this section's old `Φ` and `floquet_rate`.
     cycles = NamedTuple[]
     for (dτ, label) in ((1, "D(τ) > 0"), (-1, "D(τ) < 0"))
-        local sol = PM4.integrate(PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL)
-        local distances = [LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end-1)]][1:10]
+        local sol = PM4.integrate(
+            PM4.build_u(; dτ), 50, vbp; callback=CB, save_end=false, tol=LC_CONV_TOL
+        )
+        local distances = [
+            LC.distance_on_section(u, sol.u[end]) for u in sol.u[1:(end - 1)]
+        ][1:10]
         local fr = floquet_rate(sol, vbp)
         local rate, λ, T = fr.slope, fr.λ, fr.T
         local secant = get_slope(distances; tol_start=1e-2, tol_end=10LC_CONV_TOL)
@@ -454,8 +501,15 @@ b ≈ {p0.b / rad2deg(1):.2f} N m deg s⁻¹, set by the kinetic criterion from 
         push!(cycles, (; dτ, label, distances, secant, rate, λ, T))
     end
 
-    cycle_lines = [join((f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
-        f"T = {c.T:.6f}, λ = {c.λ:.4g}"), ", ") for c in cycles]
+    cycle_lines = [
+        join(
+            (
+                f"{c.label}: secant slope = {c.secant:.3f}, Floquet slope = {c.rate:.3f}",
+                f"T = {c.T:.6f}, λ = {c.λ:.4g}",
+            ),
+            ", ",
+        ) for c in cycles
+    ]
     @info f"""Each revolution, the distance is divided by 10^slope. The eigenvalues λ are the dominant non-unit Floquet multipliers found with differentiation.
 {join(cycle_lines, '\n')}"""
 
@@ -503,11 +557,15 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
     BK_NSEEDS = 100  # Halton points in the fundamental domain
 
     # S is an exact symmetry: f(S u) = S f(u), the mirror acting on velocities.
-    sym_err = maximum([(0.3, 0.7, 0.4, 1.2), (-1.1, -2.0, -0.9, -0.5),
-        (2.5, 3.0, 1.7, 2.2), (-2.9, -3.0, -3.0, -2.0)]) do (α, τ, dα, dτ)
+    sym_err = maximum([
+        (0.3, 0.7, 0.4, 1.2),
+        (-1.1, -2.0, -0.9, -0.5),
+        (2.5, 3.0, 1.7, 2.2),
+        (-2.9, -3.0, -3.0, -2.0),
+    ]) do (α, τ, dα, dτ)
         v = PM4.dynamics(PM4.build_u(α, τ, dα, dτ, 0.0), vbp)
         w = PM4.dynamics(PM4.build_u(-α, τ + π, -dα, dτ, 0.0), vbp)
-        norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
+        return norm(vec4(w) - [-v[1], v[2], -v[3], v[4]])
     end
     @assert sym_err < 1e-10 "S is not a symmetry of the model (residual $sym_err)"
 
@@ -518,7 +576,9 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
     # `same_cycle` and `npar` are shared helpers from paper_core.jl.
     search_prob = ODEProblem(f_search!, zeros(4), (0.0, 1.0), vbp)
     section = BK.SectionSS([0.0, 1.0, 0.0, 0.0], [0.0, TAU0, 0.0, 0.0])
-    sh = BK.Shooting(search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000)
+    sh = BK.Shooting(
+        search_prob, Vern9(), 1, section; abstol=1e-10, reltol=1e-10, maxiters=20_000
+    )
 
     # BK's shooting closes on u(T) = u(0); the twist is constant, so only the τ row of
     # the closure block changes and the Jacobian stays BK's.
@@ -528,14 +588,21 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
         tw = TwistedShooting(sh, cycle_guess(sense > 0 ? lc_p : lc_m), sense * 2π)
         s = BK.solve(tw, BK.Newton(), npar)
         @assert BK.converged(s) "reference cycle (D(τ) $sense) not recovered by shooting"
-        (sense=sense, x=collect(s.u), state=root_state(s.u), res=norm(BK.residual(tw, s.u, vbp), Inf))
+        return (
+            sense=sense,
+            x=collect(s.u),
+            state=root_state(s.u),
+            res=norm(BK.residual(tw, s.u, vbp), Inf),
+        )
     end
 
     cb_turn = LC.build_poincare_callback(Inf)  # stop at the first crossing
     "Shooting guess from the section state u0: one turn of the true flow."
     function turn_guess(u0)
         tf = 4π / clamp(abs(u0[4]), 0.5, BK_M)
-        local sol = PM4.integrate(u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000)
+        local sol = PM4.integrate(
+            u0, tf, vbp; callback=cb_turn, save_end=false, tol=1e-6, maxiters=50_000
+        )
         length(sol.t) < 2 && return nothing  # no full turn in the box
         return vcat(vec4(sol.u[end]), sol.t[end])
     end
@@ -559,11 +626,14 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
             return nothing
         end
         all(abs(u[3]) <= BK_M && abs(u[4]) <= BK_M for u in traj.u) || return nothing
-        norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 || return nothing
+        norm(LC.endpoint_residuals(traj; sense=sense > 0 ? (+) : (-)), Inf) < 1e-6 ||
+            return nothing
         return (x=x, state=st)
     end
 
-    seeds = eachcol(sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample()))
+    seeds = eachcol(
+        sample(BK_NSEEDS, [0.0, -π, -BK_M, -BK_M], [π, π, BK_M, BK_M], HaltonSample())
+    )
 
     found = NamedTuple[]
     attempts = zeros(Int, 2)
@@ -579,7 +649,10 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
             n_guess[] += 1
             local r = find_cycle(sense, defOp, guess)
             r === nothing && continue
-            (same_cycle(r.state, ref.state) || any(f -> same_cycle(f.state, r.state), found)) && continue
+            (
+                same_cycle(r.state, ref.state) ||
+                any(f -> same_cycle(f.state, r.state), found)
+            ) && continue
             push!(defOp, copy(r.x))
             push!(found, r)
         end
@@ -590,10 +663,21 @@ D(τ) < 0 : {last(last(lc_m.u)) / 1000last(lc_m.t):.2f} kW,
     cb_conv = LC.build_poincare_callback(1e-8)
     qmc = zeros(Int, 3)  # D(τ) > 0, D(τ) < 0, none
     for u0 in seeds
-        local sol = PM4.integrate(PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0), 60, vbp;
-            callback=cb_conv, save_end=false, tol=1e-8, maxiters=1_000_000)
+        local sol = PM4.integrate(
+            PM4.build_u(u0[1], u0[2], u0[3], u0[4], 0.0),
+            60,
+            vbp;
+            callback=cb_conv,
+            save_end=false,
+            tol=1e-8,
+            maxiters=1_000_000,
+        )
         u = sol.u[end]
-        d = all(isfinite, u) ? (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0))) : (Inf, Inf)
+        d = if all(isfinite, u)
+            (LC.distance_on_section(u, lc_p(0.0)), LC.distance_on_section(u, lc_m(0.0)))
+        else
+            (Inf, Inf)
+        end
         k = argmin(d)
         qmc[minimum(d) < 1e-3 ? k : 3] += 1
     end
@@ -615,11 +699,51 @@ Quasi-Monte-Carlo ({length(seeds)} Halton seeds, stable cycles only): {qmc[1]} �
     # Local closures (f, dyn) and the callback are not returned: they cannot
     # be serialised into the cross-process results cache. paper.jl only needs
     # the arrays, scalars and ODE solutions below.
-    return (; p0, vbp, line_x, line_y, ax, ay, au, av, N, αs, τs, dd, ss,
-        ss_downwind, ss_upwind, ss_, evs, all_aligned,
-        N_eq, r_eq, t_eq, traj_qs, sol,
-        LC_CONV_TOL, conv, cycles, cycle_lines,
-        lc_p, lc_m, n_splits, yz_p, yz_m, c, δ,
-        sym_err, BK_M, BK_NSEEDS, refs, seeds, found, attempts, n_guess, qmc,
-        ref_res, inventory_note)
+    return (;
+        p0,
+        vbp,
+        line_x,
+        line_y,
+        ax,
+        ay,
+        au,
+        av,
+        N,
+        αs,
+        τs,
+        dd,
+        ss,
+        ss_downwind,
+        ss_upwind,
+        ss_,
+        evs,
+        all_aligned,
+        N_eq,
+        r_eq,
+        t_eq,
+        traj_qs,
+        sol,
+        LC_CONV_TOL,
+        conv,
+        cycles,
+        cycle_lines,
+        lc_p,
+        lc_m,
+        n_splits,
+        yz_p,
+        yz_m,
+        c,
+        δ,
+        sym_err,
+        BK_M,
+        BK_NSEEDS,
+        refs,
+        seeds,
+        found,
+        attempts,
+        n_guess,
+        qmc,
+        ref_res,
+        inventory_note,
+    )
 end

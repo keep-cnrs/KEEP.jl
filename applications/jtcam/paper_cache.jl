@@ -31,8 +31,12 @@ end
 # of the hash so a rename is detected as a change.
 function _digest_keep_src()
     root = normpath(joinpath(@__DIR__, "..", "..", "src"))
-    files = sort(String[joinpath(dp, f) for (dp, _, fs) in walkdir(root) for f in fs
-                        if endswith(f, ".jl")])
+    files = sort(
+        String[
+            joinpath(dp, f) for (dp, _, fs) in walkdir(root) for
+            f in fs if endswith(f, ".jl")
+        ],
+    )
     buf = IOBuffer()
     for f in files
         write(buf, relpath(f, root))
@@ -70,7 +74,7 @@ function load_or_compute()
     results = compute_all()
     mkpath(dirname(path))
     open(path, "w") do io
-        serialize(io, results)
+        return serialize(io, results)
     end
     return results
 end

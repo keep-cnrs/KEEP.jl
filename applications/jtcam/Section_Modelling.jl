@@ -44,8 +44,8 @@ function compute_modelling()
 
     # mesh as flat line segments (GR's wireframe chokes on matrix grids); a mesh
     # rather than a surface so the self-intersecting interior stays visible
-    lg = range(0, 2π, length=120)  # points along each grid line
-    lk = range(0, 2π, length=40)   # grid lines
+    lg = range(0, 2π; length=120)  # points along each grid line
+    lk = range(0, 2π; length=40)   # grid lines
     xs = Float64[]
     ys = Float64[]
     zs = Float64[]
@@ -71,7 +71,7 @@ function compute_modelling()
     end
 
     # set of possible arm-tip positions: circle of radius a in the xy-plane
-    θc = range(0, 2π, length=200)
+    θc = range(0, 2π; length=200)
 
     ## Parametrisation in tau
     # TODO [use the plot from applications/ecc2026]
@@ -81,7 +81,7 @@ function compute_modelling()
     dx, dy = 1 / 4, 1 / 2
     up_col, down_col = 1, 2
 
-    τ = range(0, 360, length=501)
+    τ = range(0, 360; length=501)
     θ = τ -> sind(2 * τ)
     φ = τ -> sind(τ)
     phi_vals = φ.(τ)
@@ -89,7 +89,23 @@ function compute_modelling()
 
     # θ and φ are intentionally not returned: local closures cannot be
     # serialised across processes. paper.jl uses sind(2τ) / sind(τ) directly.
-    return (; a, l, β0, kite_pos, xs, ys, zs, θc,
-        τ_φ, τ_θ, dx, dy, up_col, down_col,
-        τ, phi_vals, theta_vals)
+    return (;
+        a,
+        l,
+        β0,
+        kite_pos,
+        xs,
+        ys,
+        zs,
+        θc,
+        τ_φ,
+        τ_θ,
+        dx,
+        dy,
+        up_col,
+        down_col,
+        τ,
+        phi_vals,
+        theta_vals,
+    )
 end

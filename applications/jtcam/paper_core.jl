@@ -11,7 +11,7 @@ using BifurcationKit
 const BK = BifurcationKit
 using QuasiMonteCarlo: sample, HaltonSample
 using LinearAlgebra: norm, eigvals, ×
-import ForwardDiff
+using ForwardDiff: ForwardDiff
 
 # Work done by the generator is measured from the arm velocity; the absolute
 # velocity of the kite is needed for acceleration and curvature diagnostics.
@@ -23,8 +23,17 @@ end
 # Metrics of one limit cycle. `nothing` means no admissible orbit was found:
 # return NaN rather than crashing so parameter sweeps can keep marching.
 function cycle_metrics(sol; n=1001)
-    sol === nothing && return (; P=NaN, period=NaN, Tmin=NaN, Tmax=NaN, αmax=NaN,
-        amax=NaN, vmax=NaN, κmax=NaN, Rmin=NaN)
+    sol === nothing && return (;
+        P=NaN,
+        period=NaN,
+        Tmin=NaN,
+        Tmax=NaN,
+        αmax=NaN,
+        amax=NaN,
+        vmax=NaN,
+        κmax=NaN,
+        Rmin=NaN,
+    )
     ts = range(sol.t[1], sol.t[end], n)
     us = sol.(ts)
     p = sol.prob.p
@@ -34,35 +43,41 @@ function cycle_metrics(sol; n=1001)
     acc = PM4.kite_acceleration.(us, Ref(p))
     κ = [norm(v × a) / max(norm(v)^3, 1e-12) for (v, a) in zip(vel, acc)]
     return (;
-        P = sol.u[end][5] / sol.t[end],
-        period = sol.t[end],
-        Tmin = minimum(tension[ok]),
-        Tmax = maximum(tension[ok]),
-        αmax = maximum(u -> abs(rem2pi(u[1], RoundNearest)), us),
-        amax = maximum(norm, acc),
-        vmax = maximum(norm, vel),
-        κmax = maximum(κ),
-        Rmin = 1 / maximum(κ),
+        P=sol.u[end][5] / sol.t[end],
+        period=sol.t[end],
+        Tmin=minimum(tension[ok]),
+        Tmax=maximum(tension[ok]),
+        αmax=maximum(u -> abs(rem2pi(u[1], RoundNearest)), us),
+        amax=maximum(norm, acc),
+        vmax=maximum(norm, vel),
+        κmax=maximum(κ),
+        Rmin=1 / maximum(κ),
     )
 end
 
 # Keep a warm-started shooting guess inside the solver's admissible box.
 clamp_guess(::Nothing) = (;)
 function clamp_guess(s)
-    (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6),
-       dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6),
-       dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6),
-       tf=clamp(s.tf, 1.1e-3, 99.0),
-       P=clamp(s.P, 1.1e-3, 9.9e4))
+    return (;
+        α0=clamp(s.α0, -π + 1e-6, π - 1e-6),
+        dα0=clamp(s.dα0, -100 + 1e-6, 100 - 1e-6),
+        dτ0=clamp(s.dτ0, 1e-6, 100 - 1e-6),
+        tf=clamp(s.tf, 1.1e-3, 99.0),
+        P=clamp(s.P, 1.1e-3, 9.9e4),
+    )
 end
 
 # Floquet analysis of the Poincaré map: the sub-unit multiplier gives the
 # exponential convergence rate toward the limit cycle, in digits per revolution.
 const CB_POINC = LC.build_poincare_callback(eps(1.0))
-Φ_map(x, T; vbp) = Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
+function Φ_map(x, T; vbp)
+    return Array(PM4.integrate(PM4.build_u(x[1], x[2], x[3], x[4], 0.0), T, vbp).u[end])[1:4]
+end
 function floquet_rate(sol, vbp)
     u0, T = LC.unpack_shooting(LC.build_shooting(sol))
-    μ = eigvals(Matrix(ForwardDiff.jacobian(x -> Φ_map(x, T; vbp), collect(Array(u0))[1:4])))
+    μ = eigvals(
+        Matrix(ForwardDiff.jacobian(x -> Φ_map(x, T; vbp), collect(Array(u0))[1:4]))
+    )
     λ = maximum(abs, μ[abs.(μ) .< 0.5])
     return (; slope=-log10(λ), λ, T)
 end
@@ -88,13 +103,17 @@ BK.getlens(w::TwistedShooting) = BK.getlens(w.sh)
 BK.getparam(w::TwistedShooting) = BK.getparam(w.sh)
 BK.getu0(w::TwistedShooting) = w.u0
 BK.getdelta(w::TwistedShooting) = BK.getdelta(w.sh)
-BK.residual(w::TwistedShooting, x, p) = (out = BK.po_residual(w.sh, x, p); out[end-3] -= w.twist; out)
+function BK.residual(w::TwistedShooting, x, p)
+    return (out=BK.po_residual(w.sh, x, p); out[end - 3] -= w.twist; out)
+end
 BK.jacobian(w::TwistedShooting, x, p) = BK.po_jacobian(w.sh, x, p)
 root_state(x) = (α=rem2pi(x[1], RoundNearest), dα=x[3], dτ=x[4], T=x[5])
-const npar = BK.NewtonPar(tol=1e-9, max_iterations=15, verbose=false)
+const npar = BK.NewtonPar(; tol=1e-9, max_iterations=15, verbose=false)
 function same_cycle(a, b)
-    abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 &&
-    abs(a.dα - b.dα) < 1e-4 && abs(a.dτ - b.dτ) < 1e-4 && abs(a.T - b.T) < 1e-4
+    return abs(rem2pi(a.α - b.α, RoundNearest)) < 1e-4 &&
+           abs(a.dα - b.dα) < 1e-4 &&
+           abs(a.dτ - b.dτ) < 1e-4 &&
+           abs(a.T - b.T) < 1e-4
 end
 
 # Optimization study settings, shared by every section that touches Θ.
