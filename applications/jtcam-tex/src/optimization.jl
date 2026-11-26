@@ -35,8 +35,9 @@ const TOL = 1e-5
 # wall-clock time is only a safety net that is not expected to bind.
 const MAX_ITER = 300
 const SWEEP_MAX_ITER = 150
-const DTHETA_MAX_ITER = (1000, 1000, 1000, 2000)  # one limit per start, see `dtheta_opt_sweep`;
-# 150/300 hit max_iter at 2, 4 and 8 deg (CI run 45875820208)
+const DTHETA_MAX_ITER = 300   # per continuation step of `dtheta_opt_sweep` (warm start)
+const DTHETA_STEP = 0.5       # largest continuation step in Δθ (deg)
+const DTHETA_MIN_STEP = 0.05  # a step that fails is halved down to this (deg)
 const WALL_SAFETY = 3600.0
 const WIND_REF = 9.0
 const SENSE = +
@@ -241,78 +242,68 @@ function dtheta_study(p, angles_deg; n=2001)
 end
 
 """
-Δθ sweep with re-optimization: at each absolute angle (degrees) in `angles_deg`,
-set Δθ and re-optimize `syms` inside `lower`/`upper`, marching outward from the
-nominal angle `i0`. The objective is multimodal and a single start is not
-reliable: 4° needs the nominal cycle states as initial guess, and at 2° a plain
-start from 4° converges to a box-corner local optimum (7.3 kW against 12.8). So
-each angle tries, in order, the neighbour's optimum with the neighbour's cycle
-states, the same parameters cold, `p_ref` with the nominal's states, and `p_ref`
-cold (the cycle-state guess can be worse than none at a distant angle), keeps
-the best converged average power, and stops as soon as one beats the fixed-`Θ`
-value at that angle (which is always feasible, so nothing below it can be the
-optimum); `iters` are the per-attempt iteration limits. A point where every start
-fails is reported as `NaN`, not as a gain. Statistics come from `dtheta_study`
-at the solved point, i.e. from the same dτ > 0 cycle as the fixed curve.
+Δθ sweep with re-optimization, by continuation: march outward from the nominal
+angle `nominal` (degrees, where `p_ref` is the optimum) to each angle of
+`angles_deg`, in steps of at most `step` degrees, and re-optimize `syms` inside
+`lower`/`upper` at every step from the previous optimum, with its cycle states as
+Ipopt's initial guess. Cold starts away from the nominal drift to the corners of
+the loose `Θ` box (I, b up to 1e6) and fail; small warm-started steps stay on
+the nominal branch. A failed step is retried with half the step, down to
+`min_step`; below it, the remaining angles on that side are reported as `NaN`,
+not as a gain. `iters` is the per-step iteration limit. Holding `Θ` at the
+nominal is always feasible, so a converged point below the fixed-`Θ` value is
+flagged (another branch). Statistics come from `dtheta_study` at the solved
+point, i.e. from the same dτ > 0 cycle as the fixed curve.
 """
-function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; i0,
-    iters=DTHETA_MAX_ITER, rtol=1e-3)
-    n = length(angles_deg)
-    stats = Vector{Any}(undef, n)
-    p_at = Vector{Any}(undef, n)
-    sols = Vector{Any}(undef, n)
-    function attempt(i, p0, g, max_iter)
+function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; nominal,
+    step=DTHETA_STEP, min_step=DTHETA_MIN_STEP, iters=DTHETA_MAX_ITER, rtol=1e-3)
+    function attempt(a, p0, g)
         q = copy(p0)
-        q.Δθ = deg2rad(angles_deg[i])
+        q.Δθ = deg2rad(a)
         try
             solution, st, _ = with_logger(NullLogger()) do
                 OPT.optimize(q, syms, lower, upper; sense=SENSE, tol=TOL,
-                    max_iter=max_iter, max_wall_time=WALL_SAFETY, initial_guess=g)
+                    max_iter=iters, max_wall_time=WALL_SAFETY, initial_guess=g)
             end
             p = copy(q)
             p[syms] .= solution.params[syms]
-            return (p=p, status=st.status, sol=solution, P=solution.P)
+            return (p=p, ok=st.status == :first_order, sol=solution, P=solution.P, iter=st.iter)
         catch
-            return (p=copy(p0), status=:error, sol=nothing, P=NaN)
+            return (p=copy(p0), ok=false, sol=nothing, P=NaN, iter=0)
         end
     end
-    function run!(i, prev)
-        @info "  Δθ re-optimization $(i)/$(n): $(angles_deg[i])°"
-        fixed = only(dtheta_study(p_ref, [angles_deg[i]]))   # Θ held at the nominal
-        starts = prev === nothing ? ((p_ref, (;)),) :
-            ((prev.p, clamp_guess(prev.sol)), (prev.p, (;)),
-             (p_ref, clamp_guess(sols[i0])), (p_ref, (;)))
-        starts = unique(starts)  # next to the nominal, prev.p is p_ref: no repeated start
-        best = nothing
-        for (k, (start, g)) in enumerate(starts)
-            r = attempt(i, start, g, iters[k])
-            if r.status == :first_order &&
-               (best === nothing || best.status != :first_order || r.P > best.P)
-                best = r
-            elseif best === nothing
-                best = r
+    failed(a) = (; Δθ=a, P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, period=NaN)
+    function record(a, cur)
+        fixed = only(dtheta_study(p_ref, [a]))   # Θ held at the nominal
+        cur.P < fixed.P * (1 - rtol) &&
+            @warn "re-optimization at Δθ = $(a)° is below the fixed Θ ($(round(fixed.P / 1000; digits=3)) kW): another branch" cur.P
+        return only(dtheta_study(cur.p, [a]))
+    end
+    # the nominal point itself: p_ref is the optimum there, solve once for its cycle states
+    start = attempt(nominal, p_ref, (;))
+    start.ok || @warn "Δθ continuation: the nominal re-optimization at $(nominal)° does not converge"
+    stats = Vector{Any}(undef, length(angles_deg))
+    for side in (-1, +1)
+        # the nominal angle itself (zero steps) goes with the right side
+        idx = findall(a -> side < 0 ? a < nominal - 1e-9 : a >= nominal - 1e-9, angles_deg)
+        sort!(idx; by=i -> abs(angles_deg[i] - nominal))
+        cur, a, h, lost = start, nominal, step, !start.ok
+        for i in idx
+            target = angles_deg[i]
+            while !lost && abs(target - a) > 1e-9
+                next = a + side * min(h, abs(target - a))
+                r = attempt(next, cur.p, clamp_guess(cur.sol))
+                if r.ok
+                    cur, a, h = r, next, min(step, 2h)
+                else
+                    h /= 2
+                    h < min_step && (lost = true;
+                        @warn "Δθ continuation lost at $(round(next; digits=3))° (from $(a)°)")
+                end
             end
-            k == length(starts) && break
-            # Holding Θ at the nominal is always feasible, so a converged point below
-            # the fixed-Θ value at this angle is another branch: try the next start.
-            best.status == :first_order && best.P >= fixed.P * (1 - rtol) && break
+            stats[i] = lost ? failed(target) : record(target, cur)
+            @info "  Δθ = $(target)°: " * (lost ? "failed" : "P = $(round(stats[i].P / 1000; digits=3)) kW")
         end
-        if best.status != :first_order || best.P < fixed.P * (1 - rtol)
-            @warn "re-optimization at Δθ = $(angles_deg[i])° does not beat the fixed Θ ($(round(fixed.P / 1000; digits=3)) kW)" best.status best.P
-        end
-        p_at[i], sols[i] = best.p, best.sol
-        # A timed-out solve leaves half-converged parameters: report a gap rather than a
-        # bogus power for a point that was never solved.
-        stats[i] = best.status == :first_order ? only(dtheta_study(best.p, [angles_deg[i]])) :
-            (; Δθ=angles_deg[i], P=NaN, Tmin=NaN, Tmax=NaN, amax=NaN, period=NaN)
-        return nothing
-    end
-    run!(i0, nothing)
-    for i in (i0-1):-1:1
-        run!(i, (p=p_at[i+1], sol=sols[i+1]))       # walk left from the nominal
-    end
-    for i in (i0+1):n                               # restart at the nominal
-        run!(i, (p=(i == i0+1 ? p_ref : p_at[i-1]), sol=(i == i0+1 ? sols[i0] : sols[i-1])))
     end
     return stats
 end
@@ -524,7 +515,7 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep)
 end
 
 """
-Table 4: initial guess ("PTO initialization", the power-take-off sizing point) against
+Table 4: the initial guess (I = 1300, b = I ω: not the PTO optimum of the 1D estimate) against
 the dynamic optimum, with the statistics of their limit cycles.
 """
 function comparison_table(p_init, p_opt)
@@ -549,7 +540,7 @@ function comparison_table(p_init, p_opt)
         raw"  \label{tab:parameter_comparison}",
         raw"  \begin{tabular}{lrr}",
         raw"    \toprule",
-        raw"    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic optimization} \\ ",
+        raw"    Parameter & \multicolumn{1}{c}{Initial guess} & \multicolumn{1}{c}{Dynamic optimization} \\ ",
         raw"    \midrule",
         rows...,
         raw"    \bottomrule",
@@ -753,7 +744,7 @@ end
 function run_optimization(; fast::Bool=false)
     my_defaults()
     # fast: tiny iteration limits and grids, only to test the workflow (results are not the paper's)
-    it_ref, it_sweep, it_dtheta = fast ? (40, 25, (25, 25, 25, 25)) : (MAX_ITER, SWEEP_MAX_ITER, DTHETA_MAX_ITER)
+    it_ref, it_sweep, it_dtheta = fast ? (40, 25, 25) : (MAX_ITER, SWEEP_MAX_ITER, DTHETA_MAX_ITER)
     files = String[]
 
     p_start = PMP.build_para(w0=WIND_REF)
@@ -775,7 +766,7 @@ function run_optimization(; fast::Bool=false)
     dtheta = dtheta_study(p_ref, dtheta_angles)
 
     dtheta_opt = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
-        i0=argmin(abs.(dtheta_angles .- rad2deg(p_ref.Δθ))), iters=it_dtheta)
+        nominal=rad2deg(p_ref.Δθ), iters=it_dtheta, step=fast ? 3.0 : DTHETA_STEP)
 
     LANDSCAPE = landscape(p_ref, SYMS; lower, upper, npoints=fast ? 5 : 21)
 
