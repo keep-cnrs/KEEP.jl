@@ -119,18 +119,18 @@ Furthermore, the minimum line tension remains positive, confirming \emph{a poste
 
 \subsection{Curvature of the kite trajectory} \label{sec:opt-curvature}
 
-Besides power, a design has to be compatible with the flight of the kite: the turns of the curve \(t\mapsto\OK(t)\) it describes must not be too strong.
+Besides power, a design has to be compatible with the flight of the kite: the turns of the curve \(t\mapsto\vb r(t)\) it describes must not be too strong.
 We therefore derive upper bounds on the curvature \(\kappa\) of this curve; the computations and proofs are given in Appendix~\ref{app:curv}.
 
 \paragraph{Setting.}
-Recall that the kite position is \(\OK = r\,\vu r(\tau)\), where \(\vu r\) is the spherical eight \eqref{eq:sphere_Model_Deriv}--\eqref{eq:traject_Model_Deriv}, a closed curve on the unit sphere with \(0<\theta_0-\Delta\theta\) and \(\theta_0+\Delta\theta<\pi\), and where \(r\) solves the line-length constraint:
+Recall that the kite position is \(\vb r = r\,\vu r(\tau)\), where \(\vu r\) is the spherical eight \eqref{eq:sphere_Model_Deriv}--\eqref{eq:traject_Model_Deriv}, a closed curve on the unit sphere with \(0<\theta_0-\Delta\theta\) and \(\theta_0+\Delta\theta<\pi\), and where \(r\) solves the line-length constraint:
 \begin{equation}
     r = p + \sqrt{p^2+\ell^2-a^2}, \qquad p = a\,g, \qquad g = \sin\theta\cos(\phi-\alpha),
 \end{equation}
 so that \(\ell-a\le r\le\ell+a\), and \(r\equiv\ell\) when \(a=0\).
 We write \(\varepsilon = a/\ell\) and \(\varepsilon' = a/\sqrt{\ell^2-a^2}\).
 The kite trajectory is drawn on the \emph{cone} \(\mathscr C = \{r\,\vu r(\tau) : r>0,\ \tau\in\mathbf{S}^1\}\), the conical hull of the spherical eight.
-Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\OK'\times\OK''}/\norm{\OK'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
+Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\vb r'\times\vb r''}/\norm{\vb r'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
 It depends on \(\ell\), \(\Delta\theta\), \(\Delta\phi\), \(\theta_0\), \(a\), and on the arm law through \(\alpha,\alpha',\alpha''\); for \(a=0\), only on \(\ell,\Delta\theta,\Delta\phi,\theta_0\).
 
 \paragraph{Curvature formula.}
@@ -153,7 +153,7 @@ Formula \eqref{eq:curv-formula} is the decomposition \(\kappa^2 = \kappa_n^2 + (
     \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathscr C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
 \end{equation}
 where \(\beta\) is the angle between the trajectory and the generator.
-The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\OK}\) along the cycle.
+The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\vb r}\) along the cycle.
 The surface therefore bounds \(\kappa\) from below only, by \(\abs{\kappa_n}\); this lower bound vanishes at the inflection points of the eight, where \(\kappa_g=0\), and it gives no upper bound.
 
 \paragraph{Without arm.}

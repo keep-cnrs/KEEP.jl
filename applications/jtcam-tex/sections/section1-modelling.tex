@@ -18,16 +18,16 @@ For a better handling of the kite, the lines are longer than \SI{10}{\meter}, wh
 \end{equation}
 The position of the arm tip is
 \begin{equation}
-    \vb a = \OA = a\,\vu a(\alpha), \qquad \vu a(\alpha) = \begin{pmatrix} \cos\alpha \\ \sin\alpha \\ 0 \end{pmatrix},
+    \vb a = a\,\vu a(\alpha), \qquad \vu a(\alpha) = \begin{pmatrix} \cos\alpha \\ \sin\alpha \\ 0 \end{pmatrix},
 \end{equation}
 where \(\alpha\in\mathbf{S}^1\) is the angle of the arm with the \(x\)-axis.
 As \(\alpha\) varies, \(A\) runs along the horizontal circle \(\mathscr{A}\) of centre \(O\) and radius \(a\).
-The position of the kite, \(\vb r = \OK\), is restricted by two geometric constraints of a different nature: a prescribed one, which forces the kite to fly along a figure eight, and a mechanical one, due to the arm and the lines.
+The position of the kite, \(\vb r\), is restricted by two geometric constraints of a different nature: a prescribed one, which forces the kite to fly along a figure eight, and a mechanical one, due to the arm and the lines.
 
 \begin{figure}
   \centering
   \includestandalone[width=0.6\textwidth]{figs/configuration}
-  \caption{Configuration of the system. The vector $\OA$ represents the arm, connected at point $A$ (tip of the arm) to the kite $K$ by the lines $\AK$.}
+  \caption{Configuration of the system. The vector $\vb a$ represents the arm, connected at point $A$ (tip of the arm) to the kite $K$ by the lines $\boldsymbol{\ell}$.}
   \label{fig:config}
 \end{figure}
 
@@ -71,7 +71,7 @@ It is a ruled, developable surface (see Section~\ref{sec:opt-curvature}), smooth
   \label{fig:cone_eight}
 \end{figure}
 
-The pair \((r,\tau)\) provides coordinates on \(\mathscr{C}\): \(r = \norm{\OK}\) is the distance to \(O\), and \(\tau\) labels the generator.
+The pair \((r,\tau)\) provides coordinates on \(\mathscr{C}\): \(r = \norm{\vb r}\) is the distance to \(O\), and \(\tau\) labels the generator.
 At \(K = r\,\vu r(\tau)\), the tangent plane to \(\mathscr{C}\) is spanned by \(\vu r\) and \(\vu r'\), which are orthogonal, and the unit normal is
 \begin{equation} \label{eq:cone-normal}
     \vu n = \frac{\vu r\times\vu r'}{v}.
@@ -80,7 +80,7 @@ Thus, the trajectory \(t\mapsto\vb r(t) = r(t)\,\vu r(\tau(t))\) of the kite is 
 Its radial projection \(\vu r(\tau(t))\) onto the unit sphere runs along the eight, with the time law \(t\mapsto\tau(t)\), whereas its distance \(r(t)\) to \(O\) is fixed by the arm and the lines, as we now explain.
 
 \paragraph{The spindle torus.}
-The lines impose \(\norm{\AK} = \ell\): the kite lies on the sphere of radius \(\ell\) centred at \(A\).
+The lines impose \(\norm{\vb r - \vb a} = \ell\): the kite lies on the sphere of radius \(\ell\) centred at \(A\).
 As \(A\) runs along \(\mathscr{A}\), this sphere sweeps a torus of revolution \(\mathscr{T}\) about \(\Delta\), of major radius \(a\) and minor radius \(\ell\).
 By \eqref{eq:ineq-l-a}, its generating circle crosses the axis: \(\mathscr{T}\) is a \emph{spindle torus} (Fig.~\ref{fig:spindle_torus}).
 In a meridian half-plane, with \(\rho\geq0\) the distance to the axis and \(z\) the altitude, it consists of two sheets that meet at the poles \((\rho,z) = (0,\pm\sqrt{\ell^2-a^2})\):
@@ -110,7 +110,7 @@ For \(a=0\), both sheets reduce to the sphere of radius \(\ell\), and so does \(
 
 \paragraph{Kinematic map.}
 The kite therefore lies on the intersection \(\mathscr{C}\cap\mathscr{S}\).
-Its distance to \(O\) follows from the loop closure: with \(\boldsymbol{\ell} = \AK\),
+Its distance to \(O\) follows from the loop closure: with \(\boldsymbol{\ell}\) the vector from \(A\) to \(K\),
 \begin{equation} \label{eq:loop}
     \boldsymbol{\ell} = \vb r - \vb a, \qquad \norm{\boldsymbol{\ell}} = \ell,
 \end{equation}
