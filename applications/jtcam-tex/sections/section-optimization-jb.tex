@@ -1,4 +1,6 @@
 \section{Optimization} \label{sec:optimization}
+% numbers quoted below are generated with the tables (main.jl)
+\input{tables/numbers}
 
 We designed this model to evaluate the average power output of KEEP.
 %\alter{add a label to the dynamical analysis section and reference it}
@@ -27,7 +29,7 @@ Without loss of generality, we fix the phase by imposing \(\tau(0) = 0\), so tha
 The sign determines the direction of travel of the kite: it rises either on the sides of the eight (\(\tau(t_f) = +2\pi\)) or in its center (\(\tau(t_f) = -2\pi\)).
 To avoid the lines sliding against each other, we choose the former.
 
-We optimize the line length \(\ell\), the arm inertia \(I\) and the braking coefficient \(b\) of the generator, and denote by \(\Theta = (\ell, I, b)\) the vector of design parameters.
+We optimize the line length \(\ell\), the arm inertia \(I\), the braking coefficient \(b\) of the generator and the half-width \(\Delta\varphi\) of the eight, and denote by \(\Theta = (\ell, I, b, \Delta\varphi)\) the vector of design parameters; the half-height \(\Delta\theta = \DthetaFixed^\circ\) of the eight is held fixed.
 The optimization problem reads
 \begin{equation} \label{eq:opt-problem}
 W_f / t_f \underset{\substack{\alpha_0, \dot{\alpha}_0, \dot{\tau}_0 \\ W_f, t_f \\ \Theta}}{\longrightarrow} \max
@@ -52,13 +54,14 @@ Starting from a physically reasonable set of parameters \(\Theta_0\), we compute
 
 \paragraph{Implementation.}
 The problem is modelled with ADNLPModels.jl \cite{migot2021adnlpmodels}, which computes all required derivatives algorithmically with ForwardDiff.jl \cite{RevelsLubinPapamarkou2016}.
-It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(10^{-8}\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
-The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(10^{-9}\) with Tsit5 \cite{tsitouras2011rk54}, a Runge--Kutta 5(4) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(\IpoptTol\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
+The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(\IvpTol\) with Vern9, Verner's Runge--Kutta 9(8) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+% TODO cite Verner's paper (reference to be checked before adding)
 %\alter{Ipopt requires a bounding box; we give it as large as possible to avoid saturating a bound.}
 The parameters and their bounds are described in Table~\ref{tab:opt_descr}, while the result of the optimization is presented in Table~\ref{tab:opt_results}.
 %\alter{ECC run: 11 iterations, \SI{0.5}{\second} on an M2 MacBook Air, but at tolerance \(10^{-6}\); update iteration count and timing for \(10^{-8}\)}
-Ipopt solves the problem in about a dozen iterations, without a single restoration iteration, meaning it never leaves the feasible region.
-We show the power curve over the limit cycle in Figure~\ref{fig:time_series}: after optimization, the period is significantly increased and about \(13\%\) more power is harvested on average.
+Ipopt solves the problem in \IpoptIter{} iterations.
+We show the limit cycles before and after optimization in Figure~\ref{fig:time_series}: the period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power from \SI{\PowerInit}{\kilo\watt} to \SI{\PowerOpt}{\kilo\watt} (\(+\PowerGain\%\)).
 
 \input{tables/table2}
 
@@ -67,39 +70,37 @@ We show the power curve over the limit cycle in Figure~\ref{fig:time_series}: af
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/optimization_timeseries_all.pdf}
-    % TODO ce plots n'exist plus, il y a toutes les séries temporelles dans un seul plot maintenant
-    \caption{Power generation curves over the normalized time comparing the initial guess (black) to the optimized limit cycle (red).
-    Solid lines represent instantaneous power, while the horizontal dotted lines indicate the average power generated over the cycle.
-    After optimization, the period is significantly increased, resulting in approximately 13\% more power harvested on average.}
+    \caption{Limit cycles for the initial guess (PTO optimum, left) and the optimized parameters (dynamic optimum, right): angles and angular velocities (top), instantaneous and average power (middle), line tension (bottom).
+    The period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power increases by \(\PowerGain\%\).}
     \label{fig:time_series}
 \end{figure}
 
 \subsection{Optimal design as a function of wind speed} \label{sec:opt-wind}
 
 Since the optimization converges quickly, we repeat the procedure for a range of reference wind speeds \(w_0\).
-For each integer wind speed from \SIrange{5}{15}{\meter\per\second}, we find the set of parameters (Figure~\ref{fig:parameterized_optimization_params}) that maximizes power (Figure~\ref{fig:parameterized_optimization_power}) and show the corresponding minimum and maximum line tension over the limit cycle (Figure~\ref{fig:parameterized_optimization_tension}).
-For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{10}{\meter\per\second}.
-This set of parameters proves strongly resilient across a wide range of wind speeds (\(\pm 50\%\)), as it yields nearly as much power as the actual optimum (with a difference of less than \(5\%\)), with only a slight increase in tension.
+For each integer wind speed from \SIrange{\SweepWindMin}{\SweepWindMax}{\meter\per\second}, we find the set of parameters (Figure~\ref{fig:parameterized_optimization_params}) that maximizes power (Figure~\ref{fig:parameterized_optimization_power}) and show the corresponding minimum and maximum line tension over the limit cycle (Figure~\ref{fig:parameterized_optimization_tension}).
+For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{\WindRef}{\meter\per\second}.
+Over this whole range, this fixed set of parameters yields at most \(\SweepMaxLoss\%\) less power than the actual optimum, with a maximum line tension at most \(\SweepMaxTensionIncrease\%\) higher.
 %\alter{landscape of the objective around the optimum: no asymmetry, just aim for the middle?}
 There is thus no need to adapt the geometry to the wind speed.
 The system exhibits quasilinear scaling along this parameterized optimization, even though the length of the arm (and other parameters) is kept constant, which makes it impossible to scale the model perfectly to wind speed.
-We observe the following approximate trends:
+Least-squares power laws along the optimized sweep give the following trends:
 \begin{itemize}
-    \item power is proportional to the cube of wind speed, consistent with the scaling of wind power;
-    \item tension is proportional to the square of wind speed;
-    \item line length \(\ell\) and arm inertia \(I\) are both ratios of first-order polynomials in wind speed;
-    \item the arm braking coefficient \(b\) is proportional to wind speed;
-    \item (not shown) the period is inversely proportional to wind speed.
+    \item the average power grows like \(w_0^{\ExpPower}\), to be compared with the \(w_0^3\) scaling of wind power;
+    \item the maximum line tension grows like \(w_0^{\ExpTension}\);
+    \item the line length \(\ell\) and the arm inertia \(I\) vary as shown in Figure~\ref{fig:parameterized_optimization_params};
+    \item the arm braking coefficient \(b\) grows like \(w_0^{\ExpBrake}\);
+    \item (not shown) the period varies like \(w_0^{\ExpPeriod}\).
 \end{itemize}
 
 The maximum line tension defines the strength requirements for the kite fabric and lines.
-Furthermore, the minimum line tension remains positive, confirming \emph{a posteriori} the modeling assumption that the lines are always in tension and never exert compression on the arm.
+Furthermore, the minimum line tension remains above \SI{\SweepMinTension}{\kilo\newton} over the whole sweep, confirming \emph{a posteriori} the modeling assumption that the lines are always in tension and never exert compression on the arm.
 
 \begin{figure}[thpb]
   \centering
   \includegraphics{figs/optimization_wind_sweep_power.pdf}
   \caption{Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed \(w_0\) is varied.
-  The reference curve is generated by fixing the design parameters to the optimal values for \(w_0 = \SI{10}{\meter\per\second}\).}
+  The reference curve is generated by fixing the design parameters to the optimal values for \(w_0 = \SI{\WindRef}{\meter\per\second}\).}
   \label{fig:parameterized_optimization_power}
 \end{figure}
 
@@ -113,7 +114,7 @@ Furthermore, the minimum line tension remains positive, confirming \emph{a poste
 \begin{figure}[thpb]
   \centering
   \includegraphics{figs/optimization_wind_sweep_params.pdf}
-  \caption{Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for \(w_0 = \SI{10}{\meter\per\second}\) (black dashed lines).}
+  \caption{Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for \(w_0 = \SI{\WindRef}{\meter\per\second}\) (black dashed lines).}
   \label{fig:parameterized_optimization_params}
 \end{figure}
 
@@ -210,9 +211,9 @@ With \(K = \sqrt{1+\kappa_g^2}\), for a fixed eight and a fixed arm law with bou
 uniformly in \(\tau\): the arm rescales the arm-free curvature by \(\ell/r\) and adds the contribution of the second derivative of \(g\) (hence of \(\alpha''\)) along the eight.
 
 \paragraph{Example (without arm).}
-For the eight of Table~\ref{tab:params} (\(\Delta\theta=6^\circ\), \(\Delta\phi=50^\circ\), \(\theta_0=65^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq18.03\), hence \(\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2}/\ell \simeq 18.06/\ell\) for \(a=0\): at the lobe tips, the radius of curvature of the trajectory is about \(\ell/18\), \emph{i.e.} about \SI{2.6}{\meter} for \(\ell=\SI{47.4}{\meter}\), the optimized length of Table~\ref{tab:opt_results}.
+For the optimized eight of Table~\ref{tab:opt_results} (\(\Delta\theta=\DthetaFixed^\circ\), \(\Delta\phi=\DphiOpt^\circ\), \(\theta_0=\ThetaZero^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq\CurvTipKg\), hence \(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq \CurvTipK\) at the lobe tips for \(a=0\).
 This value at the tip is exact: it follows from the formulas above, with no approximation.
-That the tips are where the turn is sharpest is, however, only a \emph{numerical observation}, not a proven fact: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq18.09\), reached slightly before the tip (at \(\tau\simeq1.560\) instead of \(\pi/2\)), about \(0.15\%\) above the tip value.
+The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
 The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:curv-bound} is proven.
 
 
@@ -248,7 +249,7 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
   \centering
   \includegraphics{figs/optimization_wind_sweep_power.pdf}
   \caption{Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed $w_0$ is varied.
-  The reference curve is generated by fixing the design parameters to the optimal values for a $w_0 = \SI{10}{\meter\per\second}$.}
+  The reference curve is generated by fixing the design parameters to the optimal values for a $w_0 = \SI{\WindRef}{\meter\per\second}$.}
   \label{fig:parameterized_optimization_power}
 \end{figure}
 
@@ -262,7 +263,7 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
 \begin{figure}[thpb]
   \centering
   \includegraphics{figs/optimization_wind_sweep_params.pdf}
-  \caption{Optimal parameters for each wind speed (color) and and reference parameters fixed at the optimum for $w_0 = \SI{10}{\meter\per\second}$ (black dashed lines).}
+  \caption{Optimal parameters for each wind speed (color) and and reference parameters fixed at the optimum for $w_0 = \SI{\WindRef}{\meter\per\second}$ (black dashed lines).}
   % At this level of operation and despite relatively strong changes in the environmental parameter, the braking coefficient of the arm behaves linearly with respect to wind speed.
   \label{fig:parameterized_optimization_params}
 \end{figure}

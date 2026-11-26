@@ -60,3 +60,4 @@ Already loaded (`main.tex:7`). Prefer these over raw `\frac`:
 ## Conventions
 
 - `\alter{...}` — WIP note, renders brown. Used for TODOs and placeholders.
+- **Text always coherent with generated data** (jb). Never hard-code in the text a number that `main.jl` computes: quote it through a macro of `tables/numbers.tex` (generated, `\input` at the top of the optimization section), adding the macro to `numbers_tex` in `src/optimization.jl` if needed. After every regeneration, reread the qualitative claims (increase/decrease, "close to", "no need to adapt") against the new values.
