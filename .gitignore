@@ -30,6 +30,8 @@ Manifest*.toml
 **/Manifest*.toml
 # ...except the one inside docs/src/assets
 !docs/src/assets/Manifest*.toml
+# ...and the paper's: it pins the package versions of the generated figures and tables
+!applications/jtcam-tex/Manifest.toml
 
 *.log
 *.csv

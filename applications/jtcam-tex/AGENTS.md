@@ -20,7 +20,8 @@ julia --project=applications/jtcam-tex applications/jtcam-tex/main.jl [sections.
 
 - `sections`: `modelling`, `10d`, `analysis`, `optimization` (default: all).
 - `--fast`: reduced iteration limits and grids, to test the workflow only; the outputs are then **not** the paper's.
-- Writes `figs/<name>.pdf` and `figs/<name>.png`, and `tables/table1-4.tex`; env `JTCAM_OUT_DIR` redirects the outputs (smoke tests).
+- Writes `figs/<name>.pdf` and `figs/<name>.png`, `tables/table1-4.tex` and the macros `tables/numbers.tex`, `tables/numbers_analysis.tex`; env `JTCAM_OUT_DIR` redirects the outputs (smoke tests).
+- `Manifest.toml` is committed (exception in the root `.gitignore`): it pins the package versions of the generated files; CI uses the same Julia version (1.13.4). Update both together.
 - Code in `src/` (`helpers.jl`, `modelling.jl`, `numerics_10d.jl`, `analysis.jl`, `optimization.jl`); optimization uses `KEEP.Optimization.optimize(...; max_iter)`.
 - Plots math labels need `dvipng`; the font is Libertine (OTF, found with `kpsewhich`).
 - `table4.tex` (`tab:parameter_comparison`) carries the warning "values to be checked vs. Alain's computation".
@@ -60,4 +61,4 @@ Already loaded (`main.tex:7`). Prefer these over raw `\frac`:
 ## Conventions
 
 - `\alter{...}` — WIP note, renders brown. Used for TODOs and placeholders.
-- **Text always coherent with generated data** (jb). Never hard-code in the text a number that `main.jl` computes: quote it through a macro of `tables/numbers.tex` (generated, `\input` at the top of the optimization section), adding the macro to `numbers_tex` in `src/optimization.jl` if needed. After every regeneration, reread the qualitative claims (increase/decrease, "close to", "no need to adapt") against the new values.
+- **Text always coherent with generated data** (jb). Never hard-code in the text a number that `main.jl` computes: quote it through a macro of `tables/numbers.tex` (optimization section: `numbers_tex` in `src/optimization.jl`) or `tables/numbers_analysis.tex` (analysis section: `run_analysis` in `src/analysis.jl`), both generated and `\input` in the preamble of `main.tex`; add the macro there if needed. After every regeneration, reread the qualitative claims (increase/decrease, "close to", "no need to adapt") against the new values.

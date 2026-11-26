@@ -118,6 +118,6 @@ We choose $M = 10 \si{\radian\per\second}$ as upper bound; it corresponds to hig
     \centering
     \includegraphics{figs/limit_cycle_convergence}
     \caption{Convergence toward the fixed point on the Poincaré map. The trajectory gets closer to the limit cycle as the number of lemniscate revolutions (a revolution is defined as a sweep over the interval $[0,2\pi]$ for the angle $\tau$) increases.
-    The linear trend in log-linear plot indicates exponential convergence; after each revolution, the distance to the limit decreases by a factor of $10^{2.13}$ (\(\dot \tau > 0\)) or \(10^2.16\) (\(\dot \tau < 0\)), until it stalls near the tolerance of the integration scheme, set at \(10^{-13}\). The colored line is for \(\vb q_0 = (0, 0)\), perturbed trajectories are integrated from \(\vb q_0\) sampled in \([0, 2\pi]^2\).}
+    The linear trend in log-linear plot indicates exponential convergence; after each revolution, the distance to the limit decreases by a factor of \(10^{\ConvRatePlus}\) (\(\dot \tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot \tau < 0\)), until it stalls near the tolerance of the integration scheme, set at \(\ConvTol\). The colored line is for \(\vb q_0 = (0, 0)\), perturbed trajectories are integrated from \(\vb q_0\) sampled in \([0, 2\pi]^2\).}
     \label{fig:limit_cycle_convergence}
 \end{figure}
