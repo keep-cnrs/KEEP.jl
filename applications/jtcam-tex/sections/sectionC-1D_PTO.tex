@@ -13,7 +13,7 @@ The steady-state harmonic solution of \ref{eq:newton_arm_PTO_adim} is
     \alpha = -\frac{\overline{C_M}}{B}\,\cos(\tau+\delta),
 \end{equation}
 where \(B=(1+\overline{b}^2)^{1/2}\) and \(\delta=\arctan \overline{b}\). This last relationship shows that the phase difference between the angular position of the arm and that of the kite is closely linked to the rotor resistance $b$. The mechanical power produced by the device is expressed as
-\begin{equation} \label{eq:power_PTO}
+\begin{equation} \label{eq:inst_power_PTO}
     \dot{W} = b \, \dot \alpha^2=I\,\omega^3\,\overline{b}\,\alpha'^2.
 \end{equation}
 Consequently, the average power produced over a steady-state operating cycle of the KEEP system is given by
@@ -57,15 +57,15 @@ According to \ref{eq:opti_power_PTO}, the maximum average power is achieved when
     \begin{cases} I=\frac{\sqrt{2}\,C_M}{\pi\,\omega^2}  \\  b=I\,\omega=\frac{\sqrt{2}\,C_M}{\pi\,\omega}  \end{cases},
 \end{equation}
 where \(C_M\) and \(\omega\) are given by \ref{eq:C_M_PTO} and \ref{eq:Omega_PTO} respectively, which leads to the following average power:
-\begin{equation} \label{eq:opti_power_PTO}
+\begin{equation} \label{eq:opti_power_PTO_final}
     W_a =\frac{\pi\,C_M\,\omega}{4\,\sqrt{2}}.
 \end{equation}
 Thus, the power take-off per unit area of kite \(pto\) by the KEEP device can be estimated as follows:
-\begin{equation} \label{eq:Vk_PTO}
+\begin{equation} \label{eq:pto_PTO}
     pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,\sqrt{2}\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}.
 \end{equation}
 % TODO reference to a passage in the article (nominal parameters)
-The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters with \(T_s = 1000\text{ N/m\textsuperscript{2}}\), the KEEP device achieves a maximum power take-off of nearly \(3.6\text{ kW/m\textsuperscript{2}}\), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are approximately \(646\text{ kg m\textsuperscript{2}}\) and \(2300\text{ N m s}\) respectively.
+The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are approximately \(\SI{\PtoI}{\kilogram\meter\squared}\) and \(\SI{\PtoB}{\newton\meter\second\per\degree}\) respectively.
 
 
 \input{tables/table1}
