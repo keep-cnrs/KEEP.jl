@@ -18,13 +18,10 @@ Plots.gr()
 # --- Font Setup ---
 function setup_font(font_filename="LinLibertine_R.ttf")
     otf = replace(font_filename, ".ttf" => ".otf")
-    paths = [
-        joinpath(@__DIR__, font_filename),
-        joinpath(expanduser("~/Library/Fonts"), font_filename),
-        joinpath("/usr/share/fonts/truetype/linux-libertine", font_filename),
-        joinpath("/usr/share/fonts/opentype/linux-libertine", font_filename),
-        joinpath(get(ENV, "JTCAM_FONT_DIR", "."), font_filename),
-    ]
+    dirs = [@__DIR__, expanduser("~/Library/Fonts"), get(ENV, "JTCAM_FONT_DIR", "."),
+        "/usr/share/fonts/truetype/linux-libertine", "/usr/share/fonts/opentype/linux-libertine"]
+    # .ttf or .otf (Debian/Ubuntu fonts-linuxlibertine ships the .otf in opentype/)
+    paths = [joinpath(d, f) for d in dirs for f in (font_filename, otf)]
     # the TeX Live copy of the font (the one LaTeX uses for the paper), when kpsewhich knows it
     for name in (font_filename, otf)
         try
@@ -43,6 +40,8 @@ function setup_font(font_filename="LinLibertine_R.ttf")
         end
     end
 
+    # in CI, a silent fallback would commit figures in the wrong font
+    get(ENV, "CI", "") == "true" && error("$font_filename (or .otf) not found")
     @warn "$font_filename not found. Drop it in ~/Library/Fonts/ or beside this script, or set JTCAM_FONT_DIR. Falling back to 'times'."
     return "times"
 end

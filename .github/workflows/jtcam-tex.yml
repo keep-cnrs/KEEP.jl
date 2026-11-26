@@ -46,7 +46,7 @@ jobs:
       - name: System packages (latex + dvipng for the math labels of the Plots figures, Libertine font)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-fonts-extra dvipng
+          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-fonts-extra fonts-linuxlibertine dvipng
       - name: Instantiate
         run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
       - name: Regenerate figures and tables

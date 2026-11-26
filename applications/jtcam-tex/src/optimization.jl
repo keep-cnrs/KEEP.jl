@@ -457,7 +457,7 @@ function comparison_table(p_init, p_opt)
         raw"  \label{tab:parameter_comparison}",
         raw"  \begin{tabular}{lrr}",
         raw"    \toprule",
-        raw"    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic optimization} \\",
+        raw"    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic optimization} \\ ",
         raw"    \midrule",
         rows...,
         raw"    \bottomrule",
