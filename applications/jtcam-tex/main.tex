@@ -47,23 +47,24 @@
 \tableofcontents
 \clearpage
 
-% \include{sections/outline}
-% \include{sections/outline_v2}
+% \input{sections/outline}
+% \input{sections/outline_v2}
 
 % TODO flushend is not working on https://texleaf.inria.fr, but works on local install
 % TODO acronyms should be displayed somewhere -- they are not
 
-\include{sections/section1-modelling}
-\include{sections/sectionC-1D_PTO}
-\include{sections/section2-dynamical-analysis}
-\include{sections/section-optimization-jb}
-%\include{sections/section-optimization-draft}
+\input{sections/introduction}
+\input{sections/section1-modelling}
+\input{sections/sectionC-1D_PTO}
+\input{sections/section2-dynamical-analysis}
+\input{sections/section-optimization-jb}
+%\input{sections/section-optimization-draft}
 
 \appendix
-\include{sections/sectionA-10D}
-\include{sections/sectionB-explicit-ddq}
-\include{sections/appendix-eight}
-\include{sections/annex-curv}
+\input{sections/sectionA-10D}
+\input{sections/sectionB-explicit-ddq}
+\input{sections/appendix-eight}
+\input{sections/annex-curv}
 
 % TEST CITATION -- remove once biblatex/biber pipeline is confirmed working
 Test citation \cite{delebecque:hal-02090402}.
