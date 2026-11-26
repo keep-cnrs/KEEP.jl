@@ -221,7 +221,9 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
 \begin{figure}[thpb]
     \centering
         \includegraphics{figs/optimization_dtheta.pdf}
-    \caption{Average power and line tension and acceleration as $\Delta \theta$ varies. 6° gives a good combination of average power (higher is better) and line tension (lower is better).}
+    \caption{Average power (left, normalized by its value \(P^*\) at the nominal \(\Delta\theta=\DthetaFixed^\circ\)) and min--max line tension (right) as \(\Delta\theta\) varies, with \(\Theta\) held at the optimum (points) and re-optimized at each angle (line with triangles, shaded envelope).
+    \(\Theta\) is re-optimized by continuation from the nominal angle, in warm-started steps of at most \SI{\DthetaStep}{\degree}; it does not converge below \(\DthetaOptMin^\circ\).
+    With \(\Theta\) held, the power peaks at the nominal angle and loses \SI{\DthetaFixedLoss}{\percent} at \(\DthetaMax^\circ\); re-optimized, it decreases steadily with \(\Delta\theta\), from \SI{+\DthetaOptGain}{\percent} at \(\DthetaOptMin^\circ\) to \SI{-\DthetaOptLoss}{\percent} at \(\DthetaMax^\circ\).}
     \label{fig:opt-dtheta}
 \end{figure}
 
