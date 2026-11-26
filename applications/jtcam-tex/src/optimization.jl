@@ -629,7 +629,8 @@ The power and line-tension panels of the Δθ sweep, side by side: Δθ in degre
 2° to 20° in steps of 2°, which includes the nominal angle. The power is
 normalized by its value at the nominal with Θ fixed, so the two conditions meet
 at 1 there and the gap between them is what holding Θ costs. Θ held at the
-optimum is drawn as black points, Θ re-optimized at each angle as a black line;
+optimum is drawn as black points, Θ re-optimized at each angle as a black line
+with triangles (no legend: see the caption);
 the tension panel draws both min–max envelopes, the fixed one as points and the
 re-optimized one filled. A `guides.line` band marks the nominal angle.
 """
@@ -647,11 +648,14 @@ function plot_dtheta(dtheta, dopt, guides, mark)
 
     # power relative to its value at the nominal Δθ with Θ fixed, so the nominal
     # sits at 1 on both curves and the axis runs from 0 to the peak
-    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, label="Θ fixed",
-        ylabel="P / P*", xlabel="Δθ (deg)", ylims=(0, 1.03max(1, maximum(Pn_opt))),
-        yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=:topright)
+    # no legend: GR draws legend markers at 0.8 × the legend font size, whatever
+    # `markersize`, so with `thickness_scaling` they dwarf the data; the caption
+    # gives the encoding instead
+    f1 = plot(ang, Pn; style..., seriestype=:scatter, ms=4, label="",
+        ylabel="P / P*", xlabel="Δθ (deg)", ylims=(0, 1.03max(1, maximum(filter(isfinite, Pn_opt); init=1))),
+        yticks=([0, 0.5, 1], ["0", "0.5", "1"]), legend=false)
     # markers: a converged angle between two failed ones (NaN) still shows
-    plot!(f1, ang, Pn_opt; style..., markershape=:utriangle, ms=4, label="Θ re-optimized")
+    plot!(f1, ang, Pn_opt; style..., markershape=:utriangle, ms=4, label="")
 
     f2 = plot(ang, Tmax0; style..., seriestype=:scatter, ms=4, label="",
         ylabel="Line tension (kN)", xlabel="Δθ (deg)")
