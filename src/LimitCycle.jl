@@ -28,6 +28,7 @@ using Clustering: dbscan
 using Setfield
 using Statistics: mean
 using QuasiMonteCarlo: sample, HaltonSample
+import ForwardDiff
 
 import KEEP: DEFAULT_TOLERANCE, TAU0
 import KEEP.PointMass4 as PM4
@@ -39,6 +40,7 @@ export build_poincare_callback,
     shooting_residuals,
     shoot,
     compute_limit_cycle,
+    refine_shooting,
     average_power,
     unpack_shooting,
     all_limit_cycles
@@ -155,14 +157,69 @@ function shoot(shooting, vbp; tol=DEFAULT_TOLERANCE, kwargs...)
 end
 
 """
+    refine_shooting(shooting, vbp; sense, tol, maxiter=8, target=tol / 100)
+
+Refine `shooting = [α0, dα0, dτ0, T]` by Newton's method on the closure residual
+`endpoint_residuals(shoot(shooting))` (4 equations, 4 unknowns, Jacobian by
+ForwardDiff through the integrator), with a backtracking line search on the max
+norm of the residual. Stop below `target`, after `maxiter` iterations, or when no
+step decreases the residual.
+
+Settling by integration converges only linearly to the cycle, and stops on the
+distance between two successive crossings, not on the distance to the cycle: the
+shooting it gives closes up to an error that depends on the contraction rate and on
+floating-point details. Newton converges quadratically from it, so the refined cycle
+closes at the level of the integration tolerance (issue #79).
+
+Return `(shooting, residual)`. The refined shooting is only kept if it decreases the
+residual, keeps the sign of `dτ0` and has `T > 0`; otherwise the input is returned,
+so that refining never makes a cycle worse."""
+function refine_shooting(shooting, vbp; sense, tol=DEFAULT_TOLERANCE, maxiter=8, target=tol / 100)
+    F(s) = endpoint_residuals(shoot(s, vbp; tol=tol); sense=sense)
+    valid(s) = sign(s[3]) == sign(shooting[3]) && s[4] > 0
+    s, r = shooting, F(shooting)
+    res = maximum(abs, r)
+    for _ in 1:maxiter
+        res <= target && break
+        δ = try
+            ForwardDiff.jacobian(F, s) \ r
+        catch
+            break  # singular Jacobian (non-hyperbolic cycle) or failed integration
+        end
+        improved = false
+        t = 1.0
+        while t >= 1 / 64
+            s_new = s - t * δ
+            if valid(s_new)
+                r_new = F(s_new)
+                res_new = maximum(abs, r_new)
+                if res_new < res
+                    s, r, res, improved = s_new, r_new, res_new, true
+                    break
+                end
+            end
+            t /= 2
+        end
+        improved || break
+    end
+    return s, res
+end
+
+"""
 Compute a limite cycle by integrating from u0.
 
+The shooting obtained by settling is refined by [`refine_shooting`](@ref) unless
+`refine = false`.
+
 Return its shooting parameters [α0, dα0, dτ0, T]."""
-function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, kwargs...)
+function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, refine=true, kwargs...)
     cb = build_poincare_callback(10tol)
     sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
     shooting = build_shooting(sol)
     shooting === nothing && return nothing
+    if refine
+        shooting, _ = refine_shooting(shooting, vbp; sense=shooting[3] > 0 ? (+) : (-), tol=tol)
+    end
     lc = shoot(shooting, vbp; tol=tol, kwargs...)
     # `build_shooting` keeps the last two section crossings, which are unrelated when the
     # trajectory has not settled: check that what comes back closes on itself, in the
@@ -212,7 +269,7 @@ function all_limit_cycles(vbp; αmin=0., αmax=1π, vmax=10, N=100, tol=DEFAULT_
     u0s = [SA[α, TAU0, dα, dτ, 0] for (α, dα, dτ) in eachcol(samples)]
     # A seed that diverges, or whose trajectory does not close, returns `nothing` and
     # the clustering cannot use it.
-    rough = [compute_limit_cycle(u0, vbp; tol=sqrt(tol)) for u0 in u0s]
+    rough = [compute_limit_cycle(u0, vbp; tol=sqrt(tol), refine=false) for u0 in u0s]
     rough_shootings = filter(!isnothing, [lc === nothing ? nothing : build_shooting(lc) for lc in rough])
     isempty(rough_shootings) && error("no limit cycle seed converged")
 

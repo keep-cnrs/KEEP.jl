@@ -121,9 +121,16 @@ function compute_results(param, value; syms, p0, p_fixed=p0, lower, upper, sense
     p_opt = copy(p0)
     p_opt[syms] .= solution.params[syms]  # physical units
 
-    # Limit cycle at the optimized parameters
+    # Limit cycle at the optimized parameters. A start that drifts to a corner of the
+    # box can return parameters whose cycle does not close (CI run 45900062200, 7 m/s:
+    # period 8 s): report the start as failed instead of stopping the whole sweep.
     vbp = PMP.build_vbpara(p_opt)
-    lc = LC.compute_limit_cycle(vbp; sense=sense, save_everystep=true, tol=tol)
+    lc = try
+        LC.compute_limit_cycle(vbp; sense=sense, save_everystep=true, tol=tol)
+    catch e
+        @warn "no limit cycle at the optimized parameters: start discarded" param value status = stats.status exception = e
+        return nothing
+    end
     stats_opt = cycle_stats(lc)
 
     return stats_no_opt, stats_opt, collect(p_opt[syms]), stats, solution
@@ -169,6 +176,7 @@ function wind_sweep(syms, p_ref, winds, lower, upper, i_ref; rtol=1e-3, iters=SW
             r = compute_results(:w0, winds[i];
                 syms, p0, p_fixed=p_ref, lower, upper, sense=SENSE, tol=TOL,
                 iters=iters, guess=guess)
+            r === nothing && continue  # no cycle at the optimized parameters
             (!strict || r[4].status == :first_order) || continue  # strict=false: smoke tests keep unconverged points
             (best === nothing || r[2].P > best[2].P) && (best = r)
             # Keeping `p_ref` is always feasible, so the optimum cannot be below the
@@ -301,7 +309,12 @@ function dtheta_opt_sweep(p_ref, syms, angles_deg, lower, upper; nominal,
                         @warn "Δθ continuation lost at $(round(next; digits=3))° (from $(a)°)")
                 end
             end
-            stats[i] = lost ? failed(target) : record(target, cur)
+            stats[i] = lost ? failed(target) : try
+                record(target, cur)
+            catch e  # no closed cycle at the solved point: a gap, not a crash
+                @warn "Δθ = $(target)°: no limit cycle at the re-optimized parameters" exception = e
+                failed(target)
+            end
             @info "  Δθ = $(target)°: " * (lost ? "failed" : "P = $(round(stats[i].P / 1000; digits=3)) kW")
         end
     end
