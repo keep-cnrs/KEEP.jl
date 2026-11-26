@@ -452,7 +452,9 @@ function curvature_stats(p; n=200_000)
     τs = range(0, 2π, n + 1)[1:end-1]
     Ks = K.(τs)
     i = argmax(Ks)
-    return (; kg_tip=κg(π / 2), K_tip=K(π / 2), K_max=Ks[i], τ_max=τs[i])
+    # κ(τ + π) = κ(τ) (κ_g changes sign): report the maximizer modulo π, independent of
+    # which of the two symmetric grid points argmax picks
+    return (; kg_tip=κg(π / 2), K_tip=K(π / 2), K_max=Ks[i], τ_max=mod(τs[i], π))
 end
 
 """

@@ -80,7 +80,6 @@ For each integer wind speed from \SIrange{\SweepWindMin}{\SweepWindMax}{\meter\p
 For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{\WindRef}{\meter\per\second}.
 Over this whole range, this fixed set of parameters yields at most \(\SweepMaxLoss\%\) less power than the actual optimum, with a maximum line tension at most \(\SweepMaxTensionIncrease\%\) higher.
 %\alter{landscape of the objective around the optimum: no asymmetry, just aim for the middle?}
-There is thus no need to adapt the geometry to the wind speed.
 The system exhibits quasilinear scaling along this parameterized optimization, even though the length of the arm (and other parameters) is kept constant, which makes it impossible to scale the model perfectly to wind speed.
 Least-squares power laws along the optimized sweep give the following trends:
 \begin{itemize}
@@ -212,7 +211,7 @@ uniformly in \(\tau\): the arm rescales the arm-free curvature by \(\ell/r\) and
 \paragraph{Example (without arm).}
 For the optimized eight of Table~\ref{tab:opt_results} (\(\Delta\theta=\DthetaFixed^\circ\), \(\Delta\phi=\DphiOpt^\circ\), \(\theta_0=\ThetaZero^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq\CurvTipKg\), hence \(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq \CurvTipK\) at the lobe tips for \(a=0\).
 This value at the tip is exact: it follows from the formulas above, with no approximation.
-The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
+The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\) and, by symmetry, at \(\tau+\pi\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
 The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:curv-bound} is proven.
 
 
