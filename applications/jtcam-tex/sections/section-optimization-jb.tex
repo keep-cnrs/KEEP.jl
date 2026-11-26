@@ -221,9 +221,11 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
 \begin{figure}[thpb]
     \centering
         \includegraphics{figs/optimization_dtheta.pdf}
+    % TODO: figure from the regeneration of 83ae9ca (re-optimization before the continuation of 9d9e302);
+    % at the next regeneration, quote the generated \Dtheta* macros of tables/numbers.tex
     \caption{Average power (left, normalized by its value \(P^*\) at the nominal \(\Delta\theta=\DthetaFixed^\circ\)) and min--max line tension (right) as \(\Delta\theta\) varies, with \(\Theta\) held at the optimum (points) and re-optimized at each angle (line with triangles, shaded envelope).
-    \(\Theta\) is re-optimized by continuation from the nominal angle, in warm-started steps of at most \SI{\DthetaStep}{\degree}; it does not converge below \(\DthetaOptMin^\circ\).
-    With \(\Theta\) held, the power peaks at the nominal angle and loses \SI{\DthetaFixedLoss}{\percent} at \(\DthetaMax^\circ\); re-optimized, it decreases steadily with \(\Delta\theta\), from \SI{+\DthetaOptGain}{\percent} at \(\DthetaOptMin^\circ\) to \SI{-\DthetaOptLoss}{\percent} at \(\DthetaMax^\circ\).}
+    With \(\Theta\) held, the power peaks at the nominal angle.
+    Re-optimized values are shown only where the solver converged.}
     \label{fig:opt-dtheta}
 \end{figure}
 
