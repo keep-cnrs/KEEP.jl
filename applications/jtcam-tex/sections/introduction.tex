@@ -12,13 +12,14 @@ Pumping systems are thus intermittent by design: power is only produced during t
 This project is part of improving the performance of technologies that meet the challenges of the law concerning the energy transition.
 The innovative KEEP (Kite Electrical Energy Production) technology developed at ENSTA enables the production of electrical energy from a kite capturing wind energy.
 \alter{Origin of the project at ENSTA Paris (formerly ENSTA ParisTech): date, team, funding, prototypes and experiments; to be completed with verified references.}
-In KEEP, the lines have a fixed length and are attached to the tip of a rigid arm that rotates in a horizontal plane about a vertical axis.
-The kite flies a figure of eight in the sky, downwind of the arm; the tension of the lines exerts a torque on the arm, which drives a generator through its axis, and the generator brakes the arm in return.
+In KEEP, the kite is attached by four lines, about thirty metres long, to the tip of an arm, about two metres long, which turns a platform about a vertical axis, in one direction and then in the other; the platform drives a generator through a dedicated gear train \cite{Bavoil2024KEEP}.
+The kite flies a figure of eight in the sky, downwind of the arm; the tension of the lines exerts a torque on the arm, which drives the generator, and the generator brakes the arm in return.
 There is no reeling phase: the motion is periodic, and power is produced continuously over the cycle, at the price of a strong coupling between the motion of the kite and that of the arm.
 The first numerical models of the system show an increase of about 50\% in the efficiency of this technology compared to already existing ones.\alter{reference needed for the 50\% claim}
 In the short and medium term, onshore and ship applications with a power production ranging from a few tens to hundreds of kilowatts are targeted, and the extension to offshore production at the megawatt scale, with kites of \SI{1000}{\square\meter}, is an objective.
 The development of the technology builds on the know-how of the kite community in the modelling of kites as auxiliary propulsion for ships \cite{Leloup2014OE} and of the structure of leading edge inflatable kites \cite{Desenclos2023MCM}.
-To reach these targets, the mechanical model of the complete system has to be improved, and its dynamics has to be analysed theoretically, which is the purpose of this paper; it builds on the technical report of the project \cite{Bavoil2024KEEP}.
+To reach these targets, the mechanical model of the complete system has to be improved, and its dynamics has to be analysed theoretically, which is the purpose of this paper.
+It builds on the technical report of the project \cite{Bavoil2024KEEP}, which sets the modelling assumptions used here (rigid lines of constant length, and a point-mass kite, whose attitude is not modelled, moving on a cone over a figure of eight), starts from a model with ten state variables, and reduces it to six and then to four variables, the angle of the arm and the position of the kite along the eight, together with their velocities.
 
 \paragraph{Contributions.}
 We model the kite as a point mass whose trajectory is constrained to a spherical figure of eight, prescribed by its centre and its two half-amplitudes, and whose distance to the tip of the arm is the length of the lines.
@@ -50,3 +51,5 @@ Appendix~\ref{sec:model10D} presents a ten-dimensional model in which the kite a
 Appendix~\ref{sec:explicit-ddq} gives the explicit expression of the accelerations of the reduced model.
 Appendix~\ref{app8} computes the length of the spherical eight, in closed form with elliptic functions and as an expansion for a small half-height, which enters the power take-off estimate of Section~\ref{sec:1D-PTO}.
 Appendix~\ref{app:curv} contains the computations and proofs of the curvature results of Section~\ref{sec:optimization}.
+
+The control of the kite, which removes the constraint that it moves along a prescribed eight and steers it through its aerodynamic force, and eventually through the lengths of its left and right lines, is the final objective of the project \cite{Bavoil2024KEEP} and is left for future work.
