@@ -16,7 +16,7 @@ using KEEP: LimitCycle as LC
 using KEEP: DEFAULT_TOLERANCE, TAU0
 
 using Plots
-using LinearAlgebra: norm, eigvals
+using LinearAlgebra: norm, eigvals, ⋅
 import ForwardDiff
 using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
@@ -303,6 +303,39 @@ function equilibrium_spectra(ss, vbp; is_down, is_center)
     return pairs
 end
 
+"""
+Line tension at the equilibrium `q`, from the balance of the kite at rest, F_a + F_g -
+F_ℓ ℓ̂ normal to the cone: its components on r̂ and on r̂' give two values of F_ℓ, which
+must agree. (`PM4.compute_line_tension` divides by the lever arm of the lines, which
+vanishes at the equilibria: it is 0/0 there.) Returns (; Fl, rel, fold), with `rel` the
+relative gap between the two values and `fold` = sin(φ - α), zero on the fold curves.
+"""
+function equilibrium_tension(q, vbp)
+    k = PM4._kinematics(q[1], q[2], vbp)
+    F_a, F_g, _, _ = PM4._forces(k, (0.0, 0.0), vbp)
+    lhat = (k.R * k.rhat - k.A * k.ahat) / k.ELL
+    F = F_a + F_g
+    Fl_r = (F ⋅ k.rhat) / (lhat ⋅ k.rhat)
+    Fl_t = (F ⋅ k.rhatp) / (lhat ⋅ k.rhatp)
+    return (; Fl=Fl_r, rel=abs(Fl_r - Fl_t) / abs(Fl_r), fold=sin(k.φ - q[1]))
+end
+
+"""
+Gap between the cycle `lc` and its image by σ shifted by the time `th` at which τ has
+moved by ±π (max over the cycle, angles mod 2π); returns (; gap, half = th / T).
+"""
+function sigma_gap(lc; n=200)
+    σ(u) = (-u[1], u[2] + π, -u[3], u[4])
+    T, u0 = lc.t[end], lc.u[1]
+    th = find_zero(t -> lc(t)[2] - (u0[2] + sign(u0[4]) * π), (0.0, T))
+    gap = maximum(range(0, T, n)) do t
+        y, z = σ(lc(t)), lc(mod(t + th, T))
+        maximum(abs, (rem2pi(y[1] - z[1], RoundNearest), rem2pi(y[2] - z[2], RoundNearest),
+            y[3] - z[3], y[4] - z[4]))
+    end
+    return (; gap, half=th / T)
+end
+
 function equilibria_table(pairs)
     rows = map(pairs) do p
         λs = String[]
@@ -523,6 +556,15 @@ function run_analysis(; fast::Bool=false)
         abs(-log10(c.μn) - s) < 0.2 || @warn "convergence rate not close to the Floquet multiplier" s -log10(c.μn)
         c.αmax < 90 || @warn "the text says |α| stays below 90 deg" c.αmax
     end
+    ten = [equilibrium_tension(q, vbp) for q in ss]
+    all(t -> t.rel < 1e-6 && abs(t.fold) < 1e-12, ten) ||
+        @warn "the text says the equilibria lie on the fold curves, with a consistent balance of the kite" ten
+    all(t -> t.Fl > 0, ten) || @warn "the text says the lines are taut at the equilibria"
+    sig = sigma_gap.((lc_p, lc_m))
+    all(g -> g.gap < 1e-7 && abs(g.half - 0.5) < 1e-7, sig) ||
+        @warn "the text says each cycle is invariant under σ with a half-period shift" sig
+    Fl_cyc = [[PM4.compute_line_tension(lc(t), vbp) for t in range(lc.t[1], lc.t[end], 400)] for lc in (lc_p, lc_m)]
+    all(F -> minimum(F) > 0, Fl_cyc) || @warn "the text says the lines stay taut along the cycles"
     n_inv, vmax_inv = 100, 10
     lcs = LC.all_limit_cycles(vbp; N=n_inv, vmax=vmax_inv)
     length(lcs) == 2 || @warn "the text says the inventory finds the two cycles only" n = length(lcs)
@@ -554,6 +596,13 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\FloquetRatePlus}{$(f"{-log10(cyc[1].μn):.2f}")}",
         "\\newcommand{\\FloquetRateMinus}{$(f"{-log10(cyc[2].μn):.2f}")}",
         "\\newcommand{\\FloquetTrivialErr}{$(expo(max(cyc[1].μerr, cyc[2].μerr)))}",
+        "\\newcommand{\\EqTensionMin}{$(f"{minimum(t -> t.Fl, ten):.0f}")}",
+        "\\newcommand{\\EqTensionMax}{$(f"{maximum(t -> t.Fl, ten):.0f}")}",
+        "\\newcommand{\\SigmaGap}{$(expo(maximum(g -> g.gap, sig)))}",
+        "\\newcommand{\\LcTensionMinPlus}{$(f"{minimum(Fl_cyc[1]) / 1000:.2f}")}",
+        "\\newcommand{\\LcTensionMaxPlus}{$(f"{maximum(Fl_cyc[1]) / 1000:.2f}")}",
+        "\\newcommand{\\LcTensionMinMinus}{$(f"{minimum(Fl_cyc[2]) / 1000:.2f}")}",
+        "\\newcommand{\\LcTensionMaxMinus}{$(f"{maximum(Fl_cyc[2]) / 1000:.2f}")}",
         "\\newcommand{\\InvSeeds}{$n_inv}",
         "\\newcommand{\\InvVmax}{$vmax_inv}",
         "\\newcommand{\\InvCount}{$(length(lcs))}",

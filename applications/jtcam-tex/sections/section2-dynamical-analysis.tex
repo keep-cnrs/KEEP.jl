@@ -18,8 +18,9 @@ At such a state, the arm is at rest and the generator exerts no torque, so that 
 In the latter case, the kite lies on one of the edges \(\Gamma_\pm\) of the band of reachable positions, the fold curves \(\alpha = \phi(\tau)\) (arm pointing towards the kite, downwind arm) and \(\alpha = \phi(\tau) + \pi\) (arm pointing away from the kite, upwind arm) of Section~\ref{sec:model-geometry}.
 The arm and the lines are then in the same vertical plane.
 The equilibria are therefore searched for on the fold curves: along each of them, the norm of the acceleration is minimized in \(\tau\) from 100 initial values, and the minimizers are refined by a nonlinear solver on the full system~\eqref{eq:equilibria}, then completed by symmetry.
-% TODO math: the line tension (eq:f_lines) is 0/0 on the fold curves; show that ddq has a finite limit there (sectionB-explicit-ddq), and check F_l >= 0 at the equilibria (not computed by main.jl)
-\alter{Check that the lines are taut (\(F_\ell > 0\)) at the equilibria found below: the tension is not computed by \texttt{main.jl}.}
+% TODO math: the line tension (eq:f_lines) is 0/0 on the fold curves; show that ddq has a finite limit there (sectionB-explicit-ddq)
+All the equilibria found lie on the fold curves, to rounding error, and none has slack lines.
+As the formula~\eqref{eq:f_lines} is singular there, the tension at an equilibrium is obtained from the balance of the kite at rest, \(\vb F_a + \vb F_g + \vb F_\ell\) normal to the cone by~\eqref{eq:newton_kite} and~\eqref{eq:cone_constraint}: its components along \(\vu r\) and \(\vu r'\) give two values of \(F_\ell\), which agree, between \SI{\EqTensionMin}{\newton} and \SI{\EqTensionMax}{\newton}.
 
 The solutions of~\eqref{eq:equilibria} lie at the intersections of the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), shown in Fig.~\ref{fig:equilibria-phase-space}: the nullclines of \(\ddot\tau\) cross the torus \(\mathbf{T}^2\) of configurations horizontally, those of \(\ddot\alpha\) vertically, and they meet at \(\EqCount\) points.
 The symmetry~\eqref{eq:symmetry} maps an equilibrium \((\alpha, \tau)\) onto the equilibrium \((-\alpha, \tau + \pi)\), with the kite on the other side of the plane of the wind, so that the equilibria come in \(\EqCount/2\) pairs.
@@ -107,7 +108,8 @@ Along them, the arm swings by at most \ang{\LcAlphaMaxPlus} and \ang{\LcAlphaMax
 The cycle with \(\dot\tau > 0\) is the starting point of the optimization of Section~\ref{sec:optimization}.
 The symmetry~\eqref{eq:symmetry} preserves the sign of \(\dot\tau\), so that it maps each cycle onto a cycle with the same direction of travel, and does not exchange the two cycles; no symmetry of the system reverses the direction of travel, as it would have to exchange a kite climbing through the centre of the eight with a kite diving through it, which gravity, the wind shear and the shape of the eight on the sphere distinguish.
 % TODO math: confirm that the system has no symmetry reversing the direction of travel (only sigma is known)
-% TODO check numerically that each cycle is invariant under sigma (shifted by half a period), as uniqueness implies; not computed by main.jl
+Each cycle is in fact invariant under~\(\sigma\): \(\sigma(\vb x(t)) = \vb x(t + T/2)\), to within \(\SigmaGap\) along the cycle, so that the second half of a lap is the mirror image of the first through the plane of the wind.
+The lines remain taut along both cycles, as required in Section~\ref{sec:model-forces}, with a tension between \SI{\LcTensionMinPlus}{\kilo\newton} and \SI{\LcTensionMaxPlus}{\kilo\newton} (\(\dot\tau > 0\)), and between \SI{\LcTensionMinMinus}{\kilo\newton} and \SI{\LcTensionMaxMinus}{\kilo\newton} (\(\dot\tau < 0\)).
 % TODO physical interpretation: which direction of travel (climbing or diving at the centre) gives the larger power, and why
 
 \begin{figure}[thpb]
