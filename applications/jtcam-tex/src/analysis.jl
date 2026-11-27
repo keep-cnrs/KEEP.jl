@@ -16,7 +16,8 @@ using KEEP: LimitCycle as LC
 using KEEP: DEFAULT_TOLERANCE, TAU0
 
 using Plots
-using LinearAlgebra: norm
+using LinearAlgebra: norm, eigvals
+import ForwardDiff
 using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
 using PyFormattedStrings: @f_str
@@ -246,6 +247,92 @@ function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol
     return (; plt, slope)
 end
 
+## Spectra of the equilibria and Floquet multipliers of the cycles (numbers of the text)
+
+"Jacobian of the 4D vector field f(x) = (dq, ddq) at the state `x`."
+state_jacobian(x, vbp) = ForwardDiff.jacobian(
+    y -> PM4.dynamics(PM4.build_u(y[1], y[2], y[3], y[4], zero(y[1])), vbp, 0)[1:4], collect(x))
+
+"Monodromy matrix of the cycle `lc`: derivative of the time-T flow at its initial state."
+function monodromy(lc, vbp; tol=DEFAULT_TOLERANCE)
+    T = lc.t[end]
+    flow = y -> PM4.integrate(PM4.build_u(y[1], y[2], y[3], y[4], zero(y[1])), T, vbp; tol).u[end][1:4]
+    return ForwardDiff.jacobian(flow, collect(lc.u[1][1:4]))
+end
+
+fmt_complex(z) = abs(imag(z)) < 1e-8 ? f"{real(z):.2f}" :
+    f"{real(z):.2f} \\pm {abs(imag(z)):.2f}\\,i"
+
+"""
+Spectra of the equilibria, grouped by σ-pairs (σ(α, τ) = (-α, τ + π) conjugates the
+vector field, so both members of a pair have the same spectrum). The Jacobian is
+differentiated through the 0/0 of the line tension on the fold, and can come out
+non-finite at one member of a pair: the pair's spectrum is then the other member's.
+Returns a vector of named tuples, one per pair, sorted by arm side then zone.
+"""
+function equilibrium_spectra(ss, vbp; is_down, is_center)
+    spec = [eigvals(state_jacobian((q[1], q[2], 0.0, 0.0), vbp)) for q in ss]
+    pairs = []
+    used = falses(length(ss))
+    for i in eachindex(ss)
+        used[i] && continue
+        qi = ss[i]
+        j = findfirst(k -> !used[k] && k != i &&
+            abs(rem2pi(ss[k][1] + qi[1], RoundNearest)) < 1e-6 &&
+            abs(rem2pi(ss[k][2] - qi[2] - π, RoundNearest)) < 1e-6, eachindex(ss))
+        j === nothing && error("equilibrium $(rad2deg.(qi)) deg has no σ-twin")
+        used[i] = used[j] = true
+        good = filter(k -> all(isfinite, spec[k]) && maximum(abs, spec[k]) < 1e6, [i, j])
+        isempty(good) && error("no finite spectrum for the σ-pair of $(rad2deg.(qi)) deg")
+        if length(good) == 2
+            d = maximum(abs, sort(spec[i]; by=reim) - sort(spec[j]; by=reim))
+            # the equilibria are close to the fold, where the Jacobian is sensitive: the
+            # twins agree to about 1e-4; require agreement to the printed precision
+            d < 5e-3 || @warn "σ-twins with different spectra" rad2deg.(qi) d
+        else
+            @warn "non-finite Jacobian at one equilibrium of a σ-pair: twin's spectrum used" rad2deg.(ss[setdiff([i, j], good)[1]])
+        end
+        k = good[1]
+        # representative with τ in [0, π), as in the figures' description
+        r = rem2pi(ss[i][2], RoundDown) < π ? i : j
+        λ = sort(spec[k]; by=z -> (real(z), imag(z)))
+        push!(pairs, (; q=ss[r], down=is_down(ss[r]), center=is_center(ss[r]), λ,
+            nunstable=count(z -> real(z) > 0, λ), remax=maximum(real, λ)))
+    end
+    sort!(pairs; by=p -> (!p.down, !p.center))
+    return pairs
+end
+
+function equilibria_table(pairs)
+    rows = map(pairs) do p
+        λs = String[]
+        λ = p.λ
+        k = 1
+        while k <= length(λ)  # a complex pair once, with ±
+            push!(λs, fmt_complex(λ[k]))
+            k += abs(imag(λ[k])) < 1e-8 ? 1 : 2
+        end
+        arm, zone = p.down ? "downwind" : "upwind", p.center ? "centre" : "tip"
+        α, τ = rad2deg(p.q[1]), rad2deg(rem2pi(p.q[2], RoundDown))
+        ev = join(λs, raw",\ ")
+        "    $arm & $zone & \$($(f"{α:.1f}"), $(f"{τ:.1f}"))\$ & \$$ev\$ & $(p.nunstable) \\\\"
+    end
+    return raw"""
+\begin{table}[thpb]
+\centering
+\caption{Equilibria of the system for the parameters of Table~\ref{tab:params}, by pairs exchanged by the symmetry~\eqref{eq:symmetry}: one representative \((\alpha, \tau)\) of each pair (in degrees, \(0 \leq \tau < 180\)), eigenvalues of the Jacobian of \(f\) (in \si{\per\second}) and number of eigenvalues with positive real part.}
+\label{tab:equilibria}
+\begin{tabular}{l l c l c}
+    \toprule
+    {Arm} & {Kite} & {\((\alpha, \tau)\)} & {Eigenvalues} & {Unstable} \\
+    \midrule
+""" * join(rows, "\n") * raw"""
+
+    \bottomrule
+\end{tabular}
+\end{table}"""
+end
+
 function run_analysis(; fast::Bool=false)
     ## Determine optimal parameters using kinetic model
     p0 = PMP.build_para()
@@ -360,14 +447,6 @@ function run_analysis(; fast::Bool=false)
 
     (p_conv_p, slope_p) = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
     (p_conv_m, slope_m) = plot_convergence_panel(vbp, -1, 2; ntrace=0)
-    # numbers quoted in the text of the analysis section, with the precision of the
-    # figure's annotations (`tables/numbers.tex` belongs to the optimization section)
-    push!(files, write_table("numbers_analysis", join([
-        "% Generated by main.jl (analysis section): numbers quoted in the text.",
-        "\\newcommand{\\ConvRatePlus}{$(f"{slope_p:.2f}")}",
-        "\\newcommand{\\ConvRateMinus}{$(f"{slope_m:.2f}")}",
-        "\\newcommand{\\ConvTol}{10^{$(round(Int, log10(LC_CONV_TOL)))}}",
-    ], "\n")))
     plot!(p_conv_p, leftmargin=11Plots.mm)
     plot!(p_conv_m, leftmargin=5Plots.mm)
     plot!(p_conv_p, ylabel="Distance to limit")
@@ -424,6 +503,61 @@ function run_analysis(; fast::Bool=false)
     plot!(l, tickfontsize=TICKFONTSIZE - 1)
     plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
     append!(files, save_figure(current(), "yz_limit_cycles"))
+
+    ## Numbers of the text: equilibria, cycles, inventory
+    pairs = equilibrium_spectra(ss, vbp; is_down, is_center)
+    push!(files, write_table("table5", equilibria_table(pairs)))
+    length(ss) == 8 || @warn "the text describes 8 equilibria" n = length(ss)
+    all(p -> p.nunstable > 0, pairs) || @warn "the text says that all equilibria are unstable"
+    pick(down, center) = only(filter(p -> p.down == down && p.center == center, pairs))
+    all(c -> pick(false, c).nunstable == pick(true, c).nunstable + 1, (true, false)) ||
+        @warn "the text says that an upwind equilibrium has one more unstable eigenvalue than its downwind counterpart"
+    cyc = map((lc_p, lc_m)) do lc
+        μ = eigvals(monodromy(lc, vbp))
+        itriv = argmin(abs.(μ .- 1))
+        μn = maximum(abs, μ[setdiff(eachindex(μ), itriv)])  # largest non-trivial multiplier
+        (; T=lc.t[end], P=lc.u[end][end] / lc.t[end], μn, μerr=abs(μ[itriv] - 1),
+            αmax=rad2deg(maximum(u -> abs(u[1]), lc.u)), dτ0=lc.u[1][4])
+    end
+    for (c, s) in zip(cyc, (slope_p, slope_m))
+        abs(-log10(c.μn) - s) < 0.2 || @warn "convergence rate not close to the Floquet multiplier" s -log10(c.μn)
+        c.αmax < 90 || @warn "the text says |α| stays below 90 deg" c.αmax
+    end
+    n_inv, vmax_inv = 100, 10
+    lcs = LC.all_limit_cycles(vbp; N=n_inv, vmax=vmax_inv)
+    length(lcs) == 2 || @warn "the text says the inventory finds the two cycles only" n = length(lcs)
+    sci(x) = (e = floor(Int, log10(x)); f"{x / exp10(e):.1f} \\times 10^{{{e}}}")
+    expo(x) = "10^{$(ceil(Int, log10(x)))}"
+    # numbers quoted in the text of the analysis section (`tables/numbers.tex` belongs
+    # to the optimization section); the rates with the precision of the figure's annotations
+    push!(files, write_table("numbers_analysis", join([
+        "% Generated by main.jl (analysis section): numbers quoted in the text.",
+        "\\newcommand{\\ConvRatePlus}{$(f"{slope_p:.2f}")}",
+        "\\newcommand{\\ConvRateMinus}{$(f"{slope_m:.2f}")}",
+        "\\newcommand{\\ConvTol}{10^{$(round(Int, log10(LC_CONV_TOL)))}}",
+        "\\newcommand{\\IntTol}{10^{$(round(Int, log10(DEFAULT_TOLERANCE)))}}",
+        "\\newcommand{\\EqCount}{$(length(ss))}",
+        "\\newcommand{\\EqReCenterMin}{$(f"{min(pick(true, true).remax, pick(false, true).remax):.1f}")}",
+        "\\newcommand{\\EqReCenterMax}{$(f"{max(pick(true, true).remax, pick(false, true).remax):.1f}")}",
+        "\\newcommand{\\EqReTipMin}{$(f"{min(pick(true, false).remax, pick(false, false).remax):.2f}")}",
+        "\\newcommand{\\EqReTipMax}{$(f"{max(pick(true, false).remax, pick(false, false).remax):.2f}")}",
+        "\\newcommand{\\LcPeriodPlus}{$(f"{cyc[1].T:.2f}")}",
+        "\\newcommand{\\LcPeriodMinus}{$(f"{cyc[2].T:.2f}")}",
+        "\\newcommand{\\LcPowerPlus}{$(f"{cyc[1].P / 1000:.2f}")}",
+        "\\newcommand{\\LcPowerMinus}{$(f"{cyc[2].P / 1000:.2f}")}",
+        "\\newcommand{\\LcAlphaMaxPlus}{$(f"{cyc[1].αmax:.0f}")}",
+        "\\newcommand{\\LcAlphaMaxMinus}{$(f"{cyc[2].αmax:.0f}")}",
+        "\\newcommand{\\LcDtauPlus}{$(f"{cyc[1].dτ0:.2f}")}",
+        "\\newcommand{\\LcDtauMinus}{$(f"{cyc[2].dτ0:.2f}")}",
+        "\\newcommand{\\FloquetPlus}{$(sci(cyc[1].μn))}",
+        "\\newcommand{\\FloquetMinus}{$(sci(cyc[2].μn))}",
+        "\\newcommand{\\FloquetRatePlus}{$(f"{-log10(cyc[1].μn):.2f}")}",
+        "\\newcommand{\\FloquetRateMinus}{$(f"{-log10(cyc[2].μn):.2f}")}",
+        "\\newcommand{\\FloquetTrivialErr}{$(expo(max(cyc[1].μerr, cyc[2].μerr)))}",
+        "\\newcommand{\\InvSeeds}{$n_inv}",
+        "\\newcommand{\\InvVmax}{$vmax_inv}",
+        "\\newcommand{\\InvCount}{$(length(lcs))}",
+    ], "\n")))
     return files
 end
 

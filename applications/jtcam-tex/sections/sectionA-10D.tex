@@ -81,7 +81,8 @@ The set of acceptable positions for $K$ is the intersection between a filled tor
 We assume that all forces apply to the kite at point $K$ of mass $m$ and all moments apply to the arm which rotates around $\vu z$ at point $O$.
 We want to determine $\ddq$ in terms of $\vq$ and $\dq$.
 
-\subsubsection*{Aerodynamic forces} \label{sec:model10D-dyn-aero}
+% \subsubsection*{Aerodynamic forces}
+\label{sec:model10D-dyn-aero}
 
 We choose the 1/7-power-law profile to model the wind, such that the wind speed $\vb w$ at altitude $z$ is given by $\vb w(z) = w_r \qty( z / z_r )^{1/7} \vu x$.
 The apparent wind, the wind which is felt by the kite, is then $\vb w_a = \vb w - \dot{\vb r}$.
@@ -158,7 +159,7 @@ and the total aerodynamic force of the system is
     \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a.
 \end{equation}
 \textcolor{red}{verify consistency, used to be $\vb F_a = L \vu k_t + (D + \tilde D_\ell) \vu k_b$}
-\subsubsection*{Gravity}
+% \subsubsection*{Gravity}
 
 The kite has mass $m$ and the lines have density $\rho_\ell$, therefore their mass is $m_\ell = n \pi \ell \rho_\ell d_\ell^2 / 4$.
 We assume that the kite lifts half of the lines, while the rest is supported by the arm.
@@ -167,7 +168,7 @@ The total flying mass is then $m + m_\ell/2$ and the total weight is
     \vb F_g = -\qty(m + \frac{m_\ell}{2}) g \vu z.
 \end{equation}
 
-\subsubsection*{Line tension and torque on the arm}
+% \subsubsection*{Line tension and torque on the arm}
 
 We denote $\vb F_\ell = -F_\ell \hat{\boldsymbol{\ell}}$ the tension of the lines on the kite, then, the torque applied by the lines on the arm is
 \begin{equation}
@@ -206,7 +207,7 @@ In the above, $\sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be
 With a typical choice of parameters the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
 However, $\sin(\phi_\ell)$ could very well be null, but the singularity is only in the equations as we observe no exceptional behavior when the lines and the arm are aligned ($xy$-plane)
 
-\subsubsection*{Fictitious force of the cone}
+% \subsubsection*{Fictitious force of the cone}
 To understand this section better, let's picture a train on a railway.
 The train doesn't control where by steering (a \emph{control} in the mathematical sense), instead, the railway exerts a force on the train, always perpendicular to railway/the direction of the train, that keeps the train on the track passively.
 We want the eight-shaped cone to play the role of the railway to passively steer the kite into eight-shaped trajectories.

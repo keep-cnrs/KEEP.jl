@@ -3,7 +3,7 @@
 This appendix gathers the computations and proofs behind Section~\ref{sec:opt-curvature}, whose notation is used throughout.
 Primes denote derivatives with respect to \(\tau\), and the subscript \(\sigma\) a derivative with respect to the arclength \(\sigma\) of the spherical eight.
 
-\paragraph{Radial distance.}
+% \paragraph{Radial distance.}
 From \(\norm{\vb r - \vb a}^2 = \ell^2\) with \(\vb r = r\,\vu r\), one gets \(r^2 - 2pr + a^2 - \ell^2 = 0\), where \(p = \vu r \vdot \vb a\).
 Since \(a<\ell\), the roots have opposite signs, and the positive one is \(r = p + R\), \(R = \sqrt{p^2+\ell^2-a^2}\).
 As \(r\) increases with \(p\in[-a,a]\), \(\ell-a\le r\le\ell+a\).
@@ -12,7 +12,7 @@ Moreover \(\dv*{r}{p} = 1 + p/R = r/R\), so that, with \(u = \ln r\),
     u_p = \frac1R, \qquad u_{pp} = -\frac{p}{R^3}, \qquad R \ge \sqrt{\ell^2-a^2}.
 \end{equation}
 
-\paragraph{Spherical eight.}
+% \paragraph{Spherical eight.}
 With \(\vu e_\theta, \vu e_\phi\) the coordinate unit vectors,
 \begin{equation}
 \begin{split}
@@ -33,7 +33,7 @@ Since \(\cos\tau\) and \(\cos2\tau\) do not vanish simultaneously, \(v>0\).
 At \(\tau=\pi/2\): \(\theta=\theta_0\), \(v = 2\Delta\theta\), and \(\kappa_g = \Delta\phi\sin\theta_0/(4\Delta\theta^2)\).
 At \(\tau = 3\pi/4\): \(\theta = \theta_0-\Delta\theta\), \(\cos2\tau=0\), \(v = \Delta\phi\sin(\theta_0-\Delta\theta)/\sqrt2\), which gives the stated value.
 
-\paragraph{Curvature formula.}
+% \paragraph{Curvature formula.}
 To obtain \eqref{eq:curv-formula}, work in the frame \((\vu r, \vu t, \vu n)\); using \(\vu r_\sigma = \vu t\) and \(\vu t_\sigma = -\vu r + \kappa_g\vu n\),
 \begin{equation}
     \vb r_\sigma = r_\sigma\,\vu r + r\,\vu t, \qquad
@@ -49,7 +49,7 @@ With \(r_\sigma = r\,u_\sigma\) and \(r_{\sigma\sigma} = r\,(u_{\sigma\sigma} + 
 \end{equation}
 and \(\kappa = \norm{\vb r_\sigma\times\vb r_{\sigma\sigma}}/\norm{\vb r_\sigma}^3\) is \eqref{eq:curv-formula}.
 
-\paragraph{Decomposition on the cone.}
+% \paragraph{Decomposition on the cone.}
 Parametrise \(\mathscr C\) by \(X(r,\sigma) = r\,\vu r(\sigma)\).
 Then \(X_r = \vu r\), \(X_\sigma = r\,\vu t\), the unit normal is \(\vu n\), and \(X_{rr} = 0\), \(X_{r\sigma} = \vu t\), \(X_{\sigma\sigma} = r\,(-\vu r + \kappa_g\vu n)\).
 The fundamental forms are
@@ -70,13 +70,13 @@ The geodesic curvature is intrinsic, hence equal to the curvature of the develop
 Their squares add up to \eqref{eq:curv-formula}.
 For \(a=0\), \(r\equiv\ell\), \(u_\sigma = u_{\sigma\sigma} = 0\), and the developed curve is the circle of radius \(\ell\).
 
-\paragraph{Arm-free lower bound.}
+% \paragraph{Arm-free lower bound.}
 For \(a=0\), \(\kappa = \sqrt{1+\kappa_g^2}/\ell \ge 1/\ell\).
 At \(\tau=0\) (\(\theta = \theta_0\), \(\sin\tau=0\), \(\cos\tau=1\)) the numerator of \(\kappa_g\) equals \(\Delta\phi\cos\theta_0\,(8\Delta\theta^2 + \Delta\phi^2\sin^2\theta_0)\), and at \(\tau=\pi\) its opposite.
 If \(\theta_0\ne\pi/2\), these have opposite signs, so by continuity \(\kappa_g\) vanishes on \((0,\pi)\), and likewise on \((\pi,2\pi)\); if \(\theta_0 = \pi/2\), it vanishes at \(\tau = 0,\pi\).
 Hence \(\min\kappa = 1/\ell\).
 
-\paragraph{Upper bound, step 1: lower bound on the speed.}
+% \paragraph{Upper bound, step 1: lower bound on the speed.}
 We prove \(v\ge v_*\) on the box.
 Put \(x = \cos^2\tau\in[0,1]\), \(\delta = \Delta\theta_-\), \(\varpi = m\Delta\phi_-\).
 Since \(\cos^22\tau = (2x-1)^2\) and both terms of \(v^2\) are nondecreasing in \(\Delta\theta\), \(\Delta\phi\) and \(\sin\theta\ge m\),
@@ -91,7 +91,7 @@ Otherwise \(x^*\in(0,1)\), \(2x^*-1 = -\varpi^2/(16\delta^2)\), and
 \end{equation}
 which is \(v_*^2\).
 
-\paragraph{Upper bound, step 2: bound on the geodesic curvature of the eight.}
+% \paragraph{Upper bound, step 2: bound on the geodesic curvature of the eight.}
 We prove \(\abs{\kappa_g}\le\bar\kappa_g\) on the box.
 With \(y = \sin\tau\), \(\abs{\sin\tau}\,(2+\cos2\tau) = \abs{y}\,(3-2y^2)\le\sqrt2\) on \([-1,1]\) (maximum at \(y^2 = 1/2\)).
 Also \(8\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau\le2v^2\).
@@ -101,14 +101,14 @@ Hence
 \end{equation}
 and \(v\ge\Delta\phi\sin\theta\,\abs{\cos\tau}\ge m\Delta\phi\,\abs{\cos\tau}\) bounds the last term by \(2C/m\); the first is at most \(2\sqrt2\,M\Delta\theta_+\Delta\phi_+/v_*^3\) by the lower bound \(v\ge v_*\).
 
-\paragraph{Upper bound, step 3: reduction to the second derivative of \(u\).}
+% \paragraph{Upper bound, step 3: reduction to the second derivative of \(u\).}
 With \(s = u_\sigma^2\ge0\) and \(w = u_{\sigma\sigma}\), \(\kappa_g^2(1+s)/(1+s)^3\le\kappa_g^2\) and
 \begin{equation}
     \frac{(1+s-w)^2}{(1+s)^3} \le \frac{(1+s+\abs{w})^2}{(1+s)^3} = \frac{\bigl(1+\abs{w}/(1+s)\bigr)^2}{1+s} \le (1+\abs{w})^2,
 \end{equation}
 so that \(r\kappa\le\sqrt{\kappa_g^2 + (1+\abs{u_{\sigma\sigma}})^2}\), and \(r\ge\ell-a\ge\ell_--a\).
 
-\paragraph{Upper bound, step 4: bound on \(u_{\sigma\sigma}\).}
+% \paragraph{Upper bound, step 4: bound on \(u_{\sigma\sigma}\).}
 We show \(\abs{u_{\sigma\sigma}}\le U\).
 Write \(p = a\,g\) with \(g = \sin\theta\cos\psi\), \(\psi = \phi-\alpha\).
 Then
@@ -129,12 +129,12 @@ Next, \(v' = (\vu r'\vdot\vu r'')/v = \vu t\vdot\vu r''\) is bounded by the tang
 \end{equation}
 Finally \(\abs{u_{\sigma\sigma}}\le\abs{u''}/v^2 + \abs{u'}\abs{v'}/v^3\), and \(v\ge v_*\) gives \(U\).
 
-\paragraph{Conclusion of the upper bound.}
+% \paragraph{Conclusion of the upper bound.}
 Combining the bounds on \(\kappa_g\), on \(r\kappa\) and on \(u_{\sigma\sigma}\), \(\kappa\le\sqrt{\bar\kappa_g^2 + (1+U)^2}/r\le\sqrt{\bar\kappa_g^2 + (1+U)^2}/(\ell_--a)\).
 For \(a=0\), \(U=0\) and \(r=\ell\ge\ell_-\), and the lower bound was proved above.
 As \(\varepsilon' = \varepsilon/\sqrt{1-\varepsilon^2}\), \(U = O(\varepsilon)\).
 
-\paragraph{Expansion for small arm length.}
+% \paragraph{Expansion for small arm length.}
 From the expression of \(r\), \(r = \ell\bigl(\varepsilon g + \sqrt{1-\varepsilon^2+\varepsilon^2g^2}\bigr)\), so that \(u = \ln\ell + \varepsilon g + O(\varepsilon^2)\) and \(1/r = (1-\varepsilon g)/\ell + O(\varepsilon^2)\), with \(O(\varepsilon^2)\) remainders whose first two \(\tau\)-derivatives are \(O(\varepsilon^2)\) when \(\alpha'\), \(\alpha''\) are bounded.
 Since \(v\ge v_*>0\), \(u_\sigma = O(\varepsilon)\) and \(u_{\sigma\sigma} = \varepsilon\,g_{\sigma\sigma} + O(\varepsilon^2)\) uniformly.
 Then \eqref{eq:curv-formula} gives

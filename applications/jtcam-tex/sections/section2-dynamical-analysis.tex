@@ -1,123 +1,126 @@
-\section{Analysis of the dynamics -- equilibria and periodic orbits} \label{sec:analysis}
+\section{Analysis of the dynamics: equilibria and periodic orbits} \label{sec:analysis}
 
-\begin{enumerate}
-\item \textbf{Choosing parameters} Set parameters to physically sensible values. Choose $b$ according to optimality criterion \ref{pto_optimality_constraint}.
+This section describes the dynamics of the four-dimensional system \(\dot{\vb x} = f(\vb x)\) of Section~\ref{sec:model-eom} for one set of parameters, the one of Table~\ref{tab:params}.
+The braking coefficient \(b\) satisfies the optimality condition~\eqref{pto_optimality_constraint} of the one-dimensional model, \(b = I\omega\), where \(\omega = 2\pi/T\) is now the angular frequency of the limit cycle of the full system with \(\dot\tau > 0\) (see Section~\ref{sec:analysis-cycles}) rather than the estimate~\eqref{eq:Omega_PTO}.
+As the period \(T\) depends on \(b\), this condition is a fixed-point equation, solved by iterating \(b \leftarrow 2\pi I/T(b)\).
+\alter{The inertia \(I = \SI{1300}{\kilogram\meter\squared}\) of Table~\ref{tab:params} is not the value \(\SI{\PtoI}{\kilogram\meter\squared}\) given by~\eqref{eq:opti_b_I_PTO}: justify this choice (it is the initial guess of Section~\ref{sec:optimization}), or switch to the PTO values.}
+% Units: the state and the parameters are in physical units (s, rad, rad/s); the code
+% (PointMassPara.build_vbpara) only rescales the parameters internally, with a, m and w0 kept physical.
+All the trajectories are integrated with the order-9 Verner method~\cite{Verner2010}, as implemented in DifferentialEquations.jl~\cite{rackauckas2017differentialequations}, with absolute and relative tolerances \(\IntTol\) unless specified otherwise.
 
-[Table of parameter values]
+\subsection{Equilibria} \label{sec:analysis-equilibria}
 
-\item \textbf{Equilibria}
-
-but first, let's study the equilibria
-
-Define the \ac{bvp} that we are solving, explain why tauf = tau0 + 2pi
-
-First return map converges, look at floquet exponents ?
-
-\item \textbf{General behavior}
-
-    hints at existence of two stable limit cycles
-
-\item \textbf{Limit cycles}
-
-\item \textbf{Algorithm for obtaining a limit cycle}
-
-start form equilibrium, speed in correct direction, integrate until first return map converged.
-
-\end{enumerate}
-
-% TODO relevant? any implications?
-All state and parameter values are normalized with unit length \(L\) the physical arm length, unit mass \(M\) the mass of the kite, and unit time \(T\) the wind speed at reference altitude over arm length ratio; therefore, \(a = m = v_{\mathrm{ref}} = 1\).
-
-Let the state be \(vb x = (\vb q, \dq) = (\alpha, \tau, \dot \alpha, \dot \tau\). We are first interested in the steady states of the dynamical system, \emph{i.e.} static solutions with both zero velocity and acceleration. Therefore we are looking for solutions \(\vb q_0\) to
-
-\begin{equation}
-    \ddq(\vb q_0, \dq = 0) = 0 \in \R^2.
+The equilibria, or steady states, of the system are the states \(\vb x_0 = (\vq_0, 0)\) with zero velocity and zero acceleration, that is the solutions of
+\begin{equation} \label{eq:equilibria}
+    \ddq(\vq_0, \dq = 0) = 0 \in \mathbf{R}^2.
 \end{equation}
+At such a state, the arm is at rest and the generator exerts no torque, so that the equation~\eqref{eq:newton_arm} of the arm reduces to \(a F_\ell\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) = 0\): either the lines are slack, or the lever arm of the tension vanishes.
+In the latter case, the kite lies on one of the edges \(\Gamma_\pm\) of the band of reachable positions, the fold curves \(\alpha = \phi(\tau)\) (arm pointing towards the kite, downwind arm) and \(\alpha = \phi(\tau) + \pi\) (arm pointing away from the kite, upwind arm) of Section~\ref{sec:model-geometry}.
+The arm and the lines are then in the same vertical plane.
+The equilibria are therefore searched for on the fold curves: along each of them, the norm of the acceleration is minimized in \(\tau\) from 100 initial values, and the minimizers are refined by a nonlinear solver on the full system~\eqref{eq:equilibria}, then completed by symmetry.
+% TODO math: the line tension (eq:f_lines) is 0/0 on the fold curves; show that ddq has a finite limit there (sectionB-explicit-ddq), and check F_l >= 0 at the equilibria (not computed by main.jl)
+\alter{Check that the lines are taut (\(F_\ell > 0\)) at the equilibria found below: the tension is not computed by \texttt{main.jl}.}
 
-In Figure~\ref{fig:equilibria-phase-space} we identify those solutions at the intersections of accelerations in \(\alpha\) and in \(\tau\): 4 null-clines for \(\ddot \tau\) that traverse the plot area horizontally and 2 for \(\ddot \alpha\) that traverse it vertically, therefore this system has \(4 \times 2 = 8\) steady states. We represent the configuration of the system at the steady states in Figure~\ref{fig:equilibria-eight-circle}.
+The solutions of~\eqref{eq:equilibria} lie at the intersections of the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), shown in Fig.~\ref{fig:equilibria-phase-space}: the nullclines of \(\ddot\tau\) cross the torus \(\mathbf{T}^2\) of configurations horizontally, those of \(\ddot\alpha\) vertically, and they meet at \(\EqCount\) points.
+The symmetry~\eqref{eq:symmetry} maps an equilibrium \((\alpha, \tau)\) onto the equilibrium \((-\alpha, \tau + \pi)\), with the kite on the other side of the plane of the wind, so that the equilibria come in \(\EqCount/2\) pairs.
+They realize the eight combinations of three binary features: the arm points downwind or upwind; the kite is near the centre of the eight or near one of its tips; it is on the left or on the right of the plane of the wind.
+Their configurations are drawn in Fig.~\ref{fig:equilibria-eight-circle}, and Table~\ref{tab:equilibria} gives their positions and the eigenvalues of the Jacobian of \(f\).
+The two members of a pair have the same spectrum, since \(\sigma\) is linear and conjugates the vector field to itself.
 
+All the equilibria are unstable.
+The two pairs with the kite near the centre of the eight have a real eigenvalue between \(\EqReCenterMin\) and \SI{\EqReCenterMax}{\per\second}, which repels the trajectories on a time scale of a tenth of a second; the two pairs with the kite near a tip have a pair of complex eigenvalues with real part between \(\EqReTipMin\) and \SI{\EqReTipMax}{\per\second}, an unstable oscillation.
+With an upwind arm, each equilibrium has one more unstable eigenvalue, real and small, than its downwind counterpart.
+None of the equilibria is a possible operating point of the device, which motivates the study of the periodic motions below.
+% TODO physical interpretation of the instability: at the centre, the kite is pulled along the eight by the lift (largest acceleration); at the tips, ...
+% DATA: at one equilibrium of the downwind-tip pair, (alpha, tau) = (50, 89.7) deg, the AD Jacobian is not finite
+% (0/0 of the line tension on the fold): the spectrum of its sigma-twin is used (src/analysis.jl, equilibrium_spectra).
+
+\input{tables/table5}
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/equilibria_phase_space}
-    \caption{Zero velocity curves and equilibria of the dynamics.
-    The black arrows represent the direction of the vector field $\ddq(\vq, \dq = 0)$, the green lines are the nullclines of $\ddot \alpha(\alpha, \tau)$, \emph{i.e.} the points $(\alpha, \tau)$ such that $\ddot \alpha(\alpha, \tau) = 0$, and the purple lines are the ones of $\ddot \tau(\alpha, \tau)$.
-    At their intersections lie the equilibria of the system (all unstable), with color codes ranging from yellow to blue according to the highest real part of their eigenvalues.
-    % TODO change graphical references in captions, also, says that max(Re(lambda i)) is approx 3 for circle and 12 for diamonds, for both colors
-    The background is green when the arm points downwind and red when it points upwind.}
+    \caption{Zero-velocity accelerations and equilibria.
+    The black arrows show the direction of the field \(\ddq(\vq, \dq = 0)\); the green and purple curves are the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), respectively.
+    The equilibria lie at their intersections: white markers for a downwind arm, black ones for an upwind arm, circles when the kite is near the centre of the eight and diamonds when it is near a tip.
+    The background is grey when the arm points downwind and red when it points upwind.}
+    % TODO check the colour names in the caption against the figure (nullclines: palette colours 1 and 2)
     \label{fig:equilibria-phase-space}
 \end{figure}
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/equilibria_eight_circle}
-    % TODO For sale
-    \caption{Configuration of the same equilibria in \emph{almost physical} top view of the system (the position of the kite is not adjusted according to the arm angle). We verified numerically that for all equilibria, the arm and the lines belong to the same vertical plane, \emph{i.e.} their projections in the $XY$ plane are aligned.}
-    We find eight equilibria in total. They are unstable and we verify that for all of them, the lines and the arms are aligned when projected in the $x-y$ plane.
-    % TODO move steady states descriptions here: one ss on the side (diamond), one near the center (circle), plus their symmetry through sigma (eq:symmetry), for both downwind and upwind arm.
+    \caption{Configurations of the equilibria, top view, for a downwind (left) and an upwind (right) arm, with the markers of Fig.~\ref{fig:equilibria-phase-space}.
+    The eight is projected on the horizontal plane without the correction of the radial distance \(r\) by the angle of the arm.
+    At every equilibrium, the projections of the arm and of the lines on the horizontal plane are aligned.}
     \label{fig:equilibria-eight-circle}
 \end{figure}
 
-Let us now look at dynamical solutions to this dynamical system. One such trajectory is a solution to
+\subsection{Periodic orbits} \label{sec:analysis-cycles}
 
-\begin{equation}
-    \dot x = f(x)
-\end{equation}
-% TODO cite OrdinaryDiffEqVerner.jl
-For integrating, we use the order-9 Verner method provided by OrdinaryDiffEqVerner.jl with absolute and relative integration tolerance of \(10^{-9}\) unless specified otherwise.
-
-% TODO or adimensionalized?
-Let \( x_0^{\pm} = (0, 0, 0, \pm 1)\) in normalized units. Time series for \(x_0^+\) exhibit a periodic orbit behavior.  
+Starting from the configuration \(\vq = (0, 0)\) at rest except for the kite, \(\vb x_0^\pm = (0, 0, 0, \pm\SI{1}{\radian\per\second})\), the trajectory settles after a few seconds into a periodic motion, along which the kite runs indefinitely along the eight in the direction given by the sign of \(\dot\tau(0)\) and the arm swings back and forth (Fig.~\ref{fig:timeseries}).
+The angle \(\tau\) is then monotone, and a period is a lap of the eight, along which \(\tau\) increases or decreases by \(2\pi\) while \(\alpha\), \(\dot\alpha\) and \(\dot\tau\) return to their initial values.
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/time_series_4D}
-    % TODO give the initial state
-    \caption{Time series of the state for a ten second integration. After a few seconds, the same pattern is repeated: this hints that our dynamical system exhibits a limit cycle.}
+    \caption{Time series of the state over \SI{10}{\second} from \(\vb x_0^+\). After a few seconds the same pattern repeats: the trajectory approaches a limit cycle.}
     \label{fig:timeseries}
 \end{figure}
 
-
-
-\begin{figure}[thpb]
-    \centering
-    \includegraphics{figs/yz_limit_cycles}
-    \caption{Projection of the kite trajectories onto the $YZ$ plane for the two limit cycles with opposite directions of motion (arrows indicate the direction of the kite motion). Zooming in on the trajectories shows that the two paths are distinct}
-    \label{fig:yz_limit_cycle}
-\end{figure}
-
-Deflation algorithm for that set of parameters did not yield new limit cycles, on top of the two that are obtained with \(x_0^\pm\).
-
-
-We define a sequence of states $(\vb x_i)_{i \geq 1}$ lying on a surface of section $\Sigma$, such that $\vb x_{i+1}$ is the first intersection between $\{\varphi^t(\vb x_i),\, t > 0\}$ and $\Sigma$, where $\varphi^t$ is the flow of ~\eqref{eq:eom}. Let
+We study these motions on the Poincaré section
 \begin{equation}
-    \Sigma = \{\vb x \in T\mathbf{T}^2 \mid \tau(\vb x) = 0\}
+    \Sigma = \{\vb x \in \mathbf{T}^2 \times \mathbf{R}^2 \mid \tau = 0 \bmod 2\pi\},
 \end{equation}
-and $\Delta t(\vb x)$ be the time needed to achieve the first crossing of $\Sigma$ from state $\vb x$, namely:
+which every trajectory along which \(\tau\) is monotone crosses once per lap.
+Let \(\varphi^t\) be the flow of \(f\), and \(\Delta t(\vb x) = \min\{t > 0 \mid \varphi^t(\vb x) \in \Sigma\}\) the time to the next crossing; the first return map is
 \begin{equation}
-    \Delta t(\vb x) = \min\{t > 0 \mid \varphi^t(\vb x) \in \Sigma\}.
+    P : \vb x \in \Sigma \mapsto \varphi^{\Delta t(\vb x)}(\vb x) \in \Sigma,
 \end{equation}
-We then define the first recurrence map, or Poincaré map, as
-\begin{equation}
-    P : \vb x \in T\mathbf{T}^2 \mapsto \varphi^{\Delta t(\vb x)}(\vb x) \in \Sigma,
+and \(\Sigma\) is parametrized by \((\alpha, \dot\alpha, \dot\tau)\).
+A periodic orbit with one lap per period is a fixed point of \(P\); equivalently, its initial state \(\vb x(0) = (\alpha_0, 0, \dot\alpha_0, \dot\tau_0)\) and its period \(T\) solve the boundary value problem
+\begin{equation} \label{eq:cycle-bvp}
+    \vb x(T) = \vb x(0) + (0, \pm 2\pi, 0, 0), \qquad \dot{\vb x} = f(\vb x),
 \end{equation}
-and finally the desired sequence
-\begin{equation}\begin{cases}
-    \vb x_0 = P(\vb x^0) \\
-    \vb x_{i+1} = P(\vb x_i).
-\end{cases}\end{equation}
+four equations for the four unknowns \((\alpha_0, \dot\alpha_0, \dot\tau_0, T)\), the sign being that of \(\dot\tau_0\).
+The crossings of \(\Sigma\) are located during the integration by an event function (the continuous callbacks of DifferentialEquations.jl) and evaluated on the dense output of the integrator.
+A limit cycle is computed in two steps: the trajectory from \(\vb x_0^\pm\) is integrated until two successive crossings agree within \(10\times\IntTol\), and this approximation of the fixed point is refined by Newton's method on~\eqref{eq:cycle-bvp}, the Jacobian being obtained by forward-mode \ac{ad} through the integrator.
 
-Since the trajectory starting at $\vb x^0$ approaches an attracting limit cycle, the limit of this sequence is defined and we plot the distance from $\vb x_i$ to $\vb x_\infty = \lim_{i \to \infty} \vb x_i$ in Figure~\ref{fig:convergence}.
-The sequence converges exponentially, and in only $8$ iterations (seven revolutions over the lemniscate), we reach the precision limit of our ODE solver, with a distance of less than $10^{-12}$; in fact, we approximately gain $2$ digits of $\vb x_\infty$ after each revolution.
-The points $\vb x_i$ are obtained using DifferentialEquations.jl's continuous callback feature, which saves the current state when a user defined function changes its sign, using the high-precision dense output from the ODE solver.
-
-We confirm that there exist only two attracting limit cycles by sampling the state space with $(\alpha, \tau) \in \mathbf{T}^2$ and velocities $-M \leq \dot\alpha, \dot\tau \leq M$, and simulating the trajectory of each sampled point until convergence to a limit cycle with a \SI{1e-9} tolerance.
-We choose $M = 10 \si{\radian\per\second}$ as upper bound; it corresponds to high arm and kite speeds which would be quickly damped by the generator and aerodynamic drag anyway.
+The iterates \(\vb x_{i+1} = P(\vb x_i)\) converge to the fixed point \(\vb x_\infty\) exponentially (Fig.~\ref{fig:limit_cycle_convergence}): the distance to the limit is divided by about \(10^{\ConvRatePlus}\) (\(\dot\tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot\tau < 0\)) at each lap, until it stalls at the integration tolerance.
+This rate is the one predicted by the Floquet multipliers of the cycles, the eigenvalues of the monodromy matrix \(\partial\varphi^T/\partial\vb x\) at \(\vb x_\infty\), computed by \ac{ad} through the integrator.
+One multiplier is trivially \(1\), the derivative along the flow, which the computation recovers to within \(\FloquetTrivialErr\); the other three, the eigenvalues of the derivative of \(P\), have moduli at most \(\FloquetPlus\) (\(\dot\tau > 0\)) and \(\FloquetMinus\) (\(\dot\tau < 0\)), that is \(10^{-\FloquetRatePlus}\) and \(10^{-\FloquetRateMinus}\), close to the observed rates.
+Both cycles are therefore strongly attracting: a perturbation is damped by more than two orders of magnitude at each lap.
+% TODO the measured rates (ConvRate*) and the Floquet rates (FloquetRate*) differ by about 0.06: the fit range of the slope (1e-2 to 10*ConvTol) includes the transient of the complex pair of multipliers; fit on a later range, or quote only the Floquet rate?
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/limit_cycle_convergence}
-    \caption{Convergence toward the fixed point on the Poincaré map. The trajectory gets closer to the limit cycle as the number of lemniscate revolutions (a revolution is defined as a sweep over the interval $[0,2\pi]$ for the angle $\tau$) increases.
-    The linear trend in log-linear plot indicates exponential convergence; after each revolution, the distance to the limit decreases by a factor of \(10^{\ConvRatePlus}\) (\(\dot \tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot \tau < 0\)), until it stalls near the tolerance of the integration scheme, set at \(\ConvTol\). The colored line is for \(\vb q_0 = (0, 0)\), perturbed trajectories are integrated from \(\vb q_0\) sampled in \([0, 2\pi]^2\).}
+    \caption{Convergence to the fixed point of the first return map, for \(\dot\tau > 0\) (left) and \(\dot\tau < 0\) (right): distance from the \(i\)-th crossing of \(\Sigma\) to the limit, as a function of the number of laps of the eight (a lap is a sweep of \(\tau\) over \(2\pi\)).
+    The linear trend in log scale shows an exponential convergence: at each lap, the distance to the limit is divided by about \(10^{\ConvRatePlus}\) (\(\dot\tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot\tau < 0\)), until it stalls near the integration tolerance, set at \(\ConvTol\).}
     \label{fig:limit_cycle_convergence}
 \end{figure}
+
+The two limit cycles, one for each direction of travel of the kite along the eight, are close but distinct (Fig.~\ref{fig:yz_limit_cycle}).
+Their periods are \SI{\LcPeriodPlus}{\second} (\(\dot\tau > 0\)) and \SI{\LcPeriodMinus}{\second} (\(\dot\tau < 0\)), and their average powers \SI{\LcPowerPlus}{\kilo\watt} and \SI{\LcPowerMinus}{\kilo\watt}.
+Along them, the arm swings by at most \ang{\LcAlphaMaxPlus} and \ang{\LcAlphaMaxMinus} from the downwind direction, within the operating limit \(\abs{\alpha} \leq \pi/2\) of Section~\ref{sec:1D-PTO}.
+The cycle with \(\dot\tau > 0\) is the starting point of the optimization of Section~\ref{sec:optimization}.
+The symmetry~\eqref{eq:symmetry} preserves the sign of \(\dot\tau\), so that it maps each cycle onto a cycle with the same direction of travel, and does not exchange the two cycles; no symmetry of the system reverses the direction of travel, as it would have to exchange a kite climbing through the centre of the eight with a kite diving through it, which gravity, the wind shear and the shape of the eight on the sphere distinguish.
+% TODO math: confirm that the system has no symmetry reversing the direction of travel (only sigma is known)
+% TODO check numerically that each cycle is invariant under sigma (shifted by half a period), as uniqueness implies; not computed by main.jl
+% TODO physical interpretation: which direction of travel (climbing or diving at the centre) gives the larger power, and why
+
+\begin{figure}[thpb]
+    \centering
+    \includegraphics{figs/yz_limit_cycles}
+    \caption{Projection of the trajectory of the kite on the \(YZ\) plane for the two limit cycles, with opposite directions of travel (the arrows give the direction of motion of the kite). The inset, a zoom, shows that the two paths are distinct.}
+    \label{fig:yz_limit_cycle}
+\end{figure}
+
+No other limit cycle was found.
+\InvSeeds{} initial states sampled on \(\Sigma\) by a Halton sequence, with \(\alpha \in [0, \pi]\) and \(\abs{\dot\alpha}, \abs{\dot\tau} \leq \SI{\InvVmax}{\radian\per\second}\), are integrated with the coarser tolerance \(\sqrt{\IntTol}\) until their crossings of \(\Sigma\) settle; the settled states are clustered, and the centroid of each cluster is refined as above.
+This yields \(\InvCount\) limit cycles, the two above.
+The bound on the velocities corresponds to speeds of the arm and of the kite that the generator and the aerodynamic drag quickly damp.
+% TODO the sample covers alpha in [0, pi] only (LimitCycle.all_limit_cycles): justify by the symmetry, or extend to [-pi, pi]
+% TODO the sampling does not exclude cycles with several laps per period, or with a non-monotone tau (not detected by the section); say so, or test it
+\alter{This inventory is a numerical exploration, not a proof of uniqueness.}

@@ -45,12 +45,12 @@ subject to constraints
 where the components of \(\tilde{\vb x}(t_f, \Theta)\) are obtained by integrating the \ac{ivp} from \(\tilde{\vb x}_0 = (\alpha_0, 0, \dot \alpha_0, \dot \tau_0, 0)\) with parameters \(\Theta\), and \(W_f\) is a slack variable for the final work.
 In the search for parameters that provide more power, the solver thus also determines the corresponding initial condition lying on the periodic orbit.
 
-\paragraph{Initial guess.}
+% \paragraph{Initial guess.}
 We reuse our work on equilibria and limit cycles to provide the solver with an initial guess that satisfies the constraints.
 %\alter{can we get them from Alain's kinematic model in the appendix? ``We start with values obtained from annex X where we use a kinematic model to determine the optimal parameters...''}
 Starting from a physically reasonable set of parameters \(\Theta_0\), we compute the corresponding limit cycle (with the correct direction of travel), from which we extract \(\alpha_0, \dot \alpha_0, \dot \tau_0, t_f\) and \(W_f\); this results into a feasible point.
 
-\paragraph{Implementation.}
+% \paragraph{Implementation.}
 The problem is modelled with ADNLPModels.jl \cite{migot2021adnlpmodels}, which computes all required derivatives algorithmically with ForwardDiff.jl \cite{RevelsLubinPapamarkou2016}.
 It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(\IpoptTol\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
 The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(\IvpTol\) with Vern9, Verner's Runge--Kutta 9(8) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
@@ -121,7 +121,7 @@ Furthermore, the minimum line tension remains above \SI{\SweepMinTension}{\kilo\
 Besides power, a design has to be compatible with the flight of the kite: the turns of the curve \(t\mapsto\vb r(t)\) it describes must not be too strong.
 We therefore derive upper bounds on the curvature \(\kappa\) of this curve; the computations and proofs are given in Appendix~\ref{app:curv}.
 
-\paragraph{Setting.}
+% \paragraph{Setting.}
 Recall that the kite position is \(\vb r = r\,\vu r(\tau)\), where \(\vu r\) is the spherical eight \eqref{eq:sphere_Model_Deriv}--\eqref{eq:traject_Model_Deriv}, a closed curve on the unit sphere with \(0<\theta_0-\Delta\theta\) and \(\theta_0+\Delta\theta<\pi\), and where \(r\) solves the line-length constraint:
 \begin{equation}
     r = p + \sqrt{p^2+\ell^2-a^2}, \qquad p = a\,g, \qquad g = \sin\theta\cos(\phi-\alpha),
@@ -132,7 +132,7 @@ The kite trajectory is drawn on the \emph{cone} \(\mathscr C = \{r\,\vu r(\tau) 
 Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\vb r'\times\vb r''}/\norm{\vb r'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
 It depends on \(\ell\), \(\Delta\theta\), \(\Delta\phi\), \(\theta_0\), \(a\), and on the arm law through \(\alpha,\alpha',\alpha''\); for \(a=0\), only on \(\ell,\Delta\theta,\Delta\phi,\theta_0\).
 
-\paragraph{Curvature formula.}
+% \paragraph{Curvature formula.}
 Let \(v = \norm{\vu r'}\) be the speed on the sphere,
 \begin{equation}
     v^2 = 4\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau > 0,
@@ -155,7 +155,7 @@ where \(\beta\) is the angle between the trajectory and the generator.
 The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\vb r}\) along the cycle.
 The surface therefore bounds \(\kappa\) from below only, by \(\abs{\kappa_n}\); this lower bound vanishes at the inflection points of the eight, where \(\kappa_g=0\), and it gives no upper bound.
 
-\paragraph{Without arm.}
+% \paragraph{Without arm.}
 For \(a=0\), the trajectory lies on the sphere of radius \(\ell\), the unrolled curve is a circle of radius \(\ell\), and
 \begin{equation}
     \kappa = \frac{\sqrt{1+\kappa_g^2}}{\ell} \ \ge\ \frac1\ell,
@@ -170,7 +170,7 @@ Indeed, exactly,
 \end{equation}
 so that, for \(a=0\), \(\max\kappa\to\infty\) as \(\Delta\theta\to0\) or as \(\Delta\phi\to0\), the other parameters being fixed.
 
-\paragraph{Upper bound.}
+% \paragraph{Upper bound.}
 Consider a box of parameters: let \(\ell\ge\ell_->a\), \(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\), \(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\) with \(\Delta\theta_->0\), \(\Delta\phi_->0\), and \(\theta_0\in[\theta_{0-},\theta_{0+}]\) with \(\mathscr J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\).
 Set
 \begin{equation}
@@ -201,14 +201,14 @@ Since \(U = O(\varepsilon)\), the bound is \(\sqrt{1+\bar\kappa_g^2}/\ell_- + O(
 The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathscr J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
 In the optimization above, the lower bound on \(\ell\) in Table~\ref{tab:opt_descr} plays the role of \(\ell_-\), while \(A_1\) and \(A_2\) can be evaluated on the computed periodic orbits.
 
-\paragraph{First order in the arm length.}
+% \paragraph{First order in the arm length.}
 With \(K = \sqrt{1+\kappa_g^2}\), for a fixed eight and a fixed arm law with bounded \(\alpha',\alpha''\),
 \begin{equation} \label{eq:curv-first-order}
     \ell\,\kappa = K\,(1-\varepsilon g) - \varepsilon\,\frac{g_{\sigma\sigma}}{K} + O(\varepsilon^2)
 \end{equation}
 uniformly in \(\tau\): the arm rescales the arm-free curvature by \(\ell/r\) and adds the contribution of the second derivative of \(g\) (hence of \(\alpha''\)) along the eight.
 
-\paragraph{Example (without arm).}
+% \paragraph{Example (without arm).}
 For the optimized eight of Table~\ref{tab:opt_results} (\(\Delta\theta=\DthetaFixed^\circ\), \(\Delta\phi=\DphiOpt^\circ\), \(\theta_0=\ThetaZero^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq\CurvTipKg\), hence \(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq \CurvTipK\) at the lobe tips for \(a=0\).
 This value at the tip is exact: it follows from the formulas above, with no approximation.
 The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\) and, by symmetry, at \(\tau+\pi\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
