@@ -58,8 +58,11 @@ The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(\Iv
 %\alter{Ipopt requires a bounding box; we give it as large as possible to avoid saturating a bound.}
 The parameters and their bounds are described in Table~\ref{tab:opt_descr}, while the result of the optimization is presented in Table~\ref{tab:opt_results}.
 %\alter{ECC run: 11 iterations, \SI{0.5}{\second} on an M2 MacBook Air, but at tolerance \(10^{-6}\); update iteration count and timing for \(10^{-8}\)}
-Ipopt solves the problem in \IpoptIter{} iterations.
+Ipopt solves the problem in \IpoptIter{} iterations; as for any interior point method, the solution is a local optimum.
+The pipeline stops if Ipopt does not reach its tolerance, or if the power of its periodic orbit differs from that of the cycle recomputed at the optimum by settling and Newton's method (Section~\ref{sec:analysis-cycles}).
+The optimized cycle remains attracting, but less strongly: the largest modulus of its non-trivial Floquet multipliers is \(\FloquetOpt\), against \(\FloquetInit\) for the initial guess.
 We show the limit cycles before and after optimization in Figure~\ref{fig:time_series}: the period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power from \SI{\PowerInit}{\kilo\watt} to \SI{\PowerOpt}{\kilo\watt} (\(+\PowerGain\%\)).
+These powers depend strongly on the glide ratio of the kite, \(G = C_L/C_D = \GlideRef\) here: with \(G = \GlideLow\), a value more typical of soft kites, the optimized design produces \SI{\PowerOptGlideLow}{\kilo\watt}.
 
 \input{tables/table2}
 
@@ -199,7 +202,12 @@ Then, for all parameters in the box, every such arm law, and every \(\tau\),
 and, without arm (\(a=0\), \(U=0\)), \(1/\ell\le\kappa\le\sqrt{1+\bar\kappa_g^2}/\ell_-\).
 Since \(U = O(\varepsilon)\), the bound is \(\sqrt{1+\bar\kappa_g^2}/\ell_- + O(\varepsilon)\), uniformly on the box.
 The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathscr J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
-In the optimization above, the lower bound on \(\ell\) in Table~\ref{tab:opt_descr} plays the role of \(\ell_-\), while \(A_1\) and \(A_2\) can be evaluated on the computed periodic orbits.
+The purpose of this bound is to control the curvature of the trajectory by the bounds of the design parameters alone: in the optimization above, the lower bound on \(\ell\) and the bounds on \(\Delta\varphi\) of Table~\ref{tab:opt_descr} play the role of \(\ell_-\) and \(\Delta\phi_\pm\), with \(\Delta\theta_\pm = \Delta\theta\) and \(\theta_{0\pm} = \theta_0\) fixed.
+Without arm, this gives a bound valid for every design of the box.
+With the arm, the bound also involves the bounds \(A_1\) and \(A_2\) on the arm law, which are not design parameters but properties of the periodic orbit: they are evaluated on the computed orbit, which makes the bound an a posteriori check rather than an a priori estimate.
+On the optimized cycle, \(A_1 = \CurvAOne\) and \(A_2 = \CurvATwo\), and the smallest radius of curvature computed along the cycle, arm included, is \SI{\CurvArmRadius}{\meter}.
+Evaluated on the whole box of Table~\ref{tab:opt_descr}, the bound~\eqref{eq:curv-bound} only guarantees a radius of \SI{\CurvBoxRadius}{\milli\meter}: it holds, but it is far from sharp, as the box contains narrow eights (\(\Delta\phi_- = 10^\circ\)) for which \(v_*\) is small and the bound, of order \(1/v_*^3\), is large.
+Evaluated at the optimized design itself (\(\ell_- = \ell\), \(\Delta\phi_\pm = \Delta\phi\)), it guarantees \SI{\CurvPointRadius}{\meter}.
 
 % \paragraph{First order in the arm length.}
 With \(K = \sqrt{1+\kappa_g^2}\), for a fixed eight and a fixed arm law with bounded \(\alpha',\alpha''\),
@@ -212,7 +220,7 @@ uniformly in \(\tau\): the arm rescales the arm-free curvature by \(\ell/r\) and
 For the optimized eight of Table~\ref{tab:opt_results} (\(\Delta\theta=\DthetaFixed^\circ\), \(\Delta\phi=\DphiOpt^\circ\), \(\theta_0=\ThetaZero^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq\CurvTipKg\), hence \(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq \CurvTipK\) at the lobe tips for \(a=0\).
 This value at the tip is exact: it follows from the formulas above, with no approximation.
 The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\) and, by symmetry, at \(\tau+\pi\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
-The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:curv-bound} is proven.
+For \(a>0\), see the a posteriori check above.
 
 
 \input{tables/table4}
@@ -232,6 +240,6 @@ The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:cu
     \includegraphics{figs/optimization_landscape.pdf}
     \caption{Average power as the optimization parameters vary.
     % TODO which variables are on their bounds? which variables have the most impact? could reoptimize other 3 parameters
-    The objective landscape is smooth, explaining the easy numerical solving.}
+    Along these one-dimensional slices, the objective is smooth around the optimum; this does not exclude other local optima.}
     \label{fig:opt-landscape}
 \end{figure}

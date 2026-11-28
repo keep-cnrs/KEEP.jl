@@ -27,7 +27,7 @@ Let us define three unit vectors: $\vu a$ follows the arm, $\hat{\boldsymbol{\el
 Here, $\alpha$ is the angle between the arm and the $x$-axis (aligned with the wind), $\theta_\ell$, $\phi_\ell$ are the spherical coordinates of $K$ in $(A, \vu a, \vu z \times \vu a, \vu z)$, and $R$, $\theta$ and $\phi$ are the spherical coordinates of $K$ in $(O, \vu x, \vu y, \vu z)$.
 Spherical coordinates use the physics convention also found in ISO 80000-2:2019:
 \begin{itemize}
-    \item $r$ is the radius,
+    \item $R$ is the radius,
     \item $\theta$ is the polar angle from the $z$-axis,
     \item $\phi$ is the azimuthal angle from the $x$-axis.
 \end{itemize}
@@ -35,7 +35,7 @@ Spherical coordinates use the physics convention also found in ISO 80000-2:2019:
 % TODO Spherical coordinates in annex with more details and a figure?
 The state of the system at time $t$ is given by the configuration vector
 \begin{equation} \label{eq:state_vector}
-    \vq(t) = (\alpha(t), \theta_\ell(t), \phi_\ell(t), R(t), \tau_\ell(t))
+    \vq(t) = (\alpha(t), \theta_\ell(t), \phi_\ell(t), R(t), \tau(t))
 \end{equation}
 %
 and its corresponding velocities $\dq(t)$, while $\theta_0$, $\Delta \theta$ and $\Delta \phi$ are the parameters that control the shape of the lemniscate.
@@ -57,8 +57,8 @@ We define
     \vb g : \vq \in \R^5 \mapsto
     \vb g(\vq) &= \vb r(\vq) - \vb a(\vq) - \boldsymbol{\ell}(\vq) \\
     &= \begin{pmatrix}
-        R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\phi_\ell) \\
-        R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\phi_\ell) \\
+        R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\alpha + \phi_\ell) \\
+        R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\alpha + \phi_\ell) \\
         R \cos(\theta(\tau)) - \ell \cos(\theta_\ell)
     \end{pmatrix} \in \R^3
 \end{split}
@@ -71,9 +71,7 @@ We have a five dimensional state (\emph{cf.} \ref{eq:state_vector}) subject to t
 
 \begin{remark} 
 The set of acceptable positions for $K$ is the intersection between a filled torus (filled \emph{spindle} torus if the lines are longer than the arm, \emph{i.e.} $\ell > a$) and an eight-shaped cone.
-\begin{center}
-[Spindle torus] [lemniscate cone]
-\end{center}
+See Fig.~\ref{fig:spindle_torus} and Section~\ref{sec:model-geometry}.
 \end{remark}
 
 \subsection{Dynamics}  \label{sec:model10D-dynamics}
@@ -118,47 +116,26 @@ Let us first define the apparent wind of the lines at distance $\lambda$ from th
 \end{equation}
 %
 and $\vu w_a = \frac{\vb w_a}{\norm{\vb w_a}}$ is its unit vector.
-Then we compute the apparent surface of an element of one line of length $\dd{\lambda}$ and diameter $d_\ell$:
+Let \(\theta_a\) be the angle between the lines and the apparent wind: \(\hat{\boldsymbol{\ell}} \cdot \vu w_{a,\ell} = \cos(\theta_a)\), so that \(\sin(\theta_a) = \sqrt{1 - (\hat{\boldsymbol{\ell}} \cdot \vu w_{a,\ell})^2}\).
+% QUESTION (PR #78, abavoil): projected area (drag in sin theta_a) or cross-flow principle (sin^2 theta_a)? The code (PointMass4._forces) uses the cross-flow form below.
+Following the cross-flow principle, the drag of an element of line of length \(\dd{\lambda}\) and diameter \(d_\ell\) depends only on the component of the apparent wind orthogonal to the lines, \(\vb w_{a,\ell}^\perp = \vb w_{a,\ell} - (\hat{\boldsymbol{\ell}} \cdot \vb w_{a,\ell})\,\hat{\boldsymbol{\ell}}\), of norm \(\norm{\vb w_{a,\ell}}\sin(\theta_a)\), and is directed along it.
+The drag of the \(n = 4\) lines with drag coefficient \(C_{D,\ell}\) is
 \begin{equation}
-    S_a = d_\ell \dd{\lambda} \sin(\theta_a(\lambda))
-\end{equation}
-%
-where $\theta_a$ is the angle between the lines and the apparent wind.
-Using $\hat{\boldsymbol{\ell}} \cdot \vu w_a = \cos(\theta_a)$, we get $\sin(\theta_a) = 1 - (\hat{\boldsymbol{\ell}} \cdot \vu w_a)^2$, thus
-\begin{equation}
-    S_a = d_\ell \dd{\lambda} \qty(1 - (\hat{\boldsymbol{\ell}} \cdot \vu w_a(\lambda))^2).
-\end{equation}
-%
-The drag of the $n = 4$ lines with drag coefficient $C_{D,\ell}$ is
-\begin{equation}\begin{split}
     \vb D_\ell
-    &= \bigintssss \limits_{\lambda = 0}^{\lambda = \ell} \frac{1}{2} n d_\ell \qty(1 - (\ell \cdot \vu w_{a,\ell}(\lambda))^2) \rho_a C_{D,\ell} \norm{\vb w_{a,\ell}(\lambda)}^2 \vu w_{a,\ell}(\lambda) \dd{\lambda} \\
-    &= \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \int \limits_{\xi=0}^{\xi=1} \qty(1 - (\hat{\boldsymbol{\ell}} \cdot \vu w_{a,\ell}(\ell \xi))^2) \norm{\vb w_{a,\ell}(\ell \xi)}^2 \vu w_{a,\ell}(\lambda) \dd{\xi}.
-\end{split}\end{equation}
+    = \bigintssss \limits_{\lambda = 0}^{\lambda = \ell} \frac{1}{2} n d_\ell \rho_a C_{D,\ell} \norm{\vb w_{a,\ell}^\perp(\lambda)}\, \vb w_{a,\ell}^\perp(\lambda) \dd{\lambda}
+    = \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \int \limits_{\xi=0}^{\xi=1} \norm{\vb w_{a,\ell}^\perp(\ell \xi)}\, \vb w_{a,\ell}^\perp(\ell \xi) \dd{\xi}.
+\end{equation}
 %
-We make a few big approximations to simplify this integral:
-\begin{itemize}
-    \item the speed of $A$ is negligible: $\dot A \approx 0$ and the wind profile is linear along the lines: $\vb w_{a,\ell}(\lambda) \approx \frac{\lambda}{\ell} \vb w_a$,
-    \item the apparent wind is always perpendicular to the lines: $\qty(1 - (\ell \cdot \vu w_a(\ell \xi))^2) \approx 1$,
-    \item the direction of the force is the same as for the kite drag: $\vb{\tilde D}_\ell = \tilde D_\ell \vu k_b$.
-\end{itemize}
-%
-We in turn get this approximation for the drag of the lines:
-\begin{equation}\begin{split}
-    \tilde D_\ell
-    &\textcolor{red}{\text{equal or approx?}}\approx \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \int \limits_{\xi=0}^{\xi=1} \norm{\xi \vb w_a}^2 \dd{\xi} \\
-    &= \frac{1}{2} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a}^2 \int \limits_{\xi=0}^{\xi=1} \xi^2 \dd{\xi}.
-\end{split}\end{equation}
-%
-Finally, we get the following expression for the approximated drag of the lines:
+We approximate this integral by assuming that the speed of \(A\) is negligible, \(\dot{\vb a} \approx 0\), and that the apparent wind varies linearly along the lines, \(\vb w_{a,\ell}(\ell\xi) \approx \xi\, \vb w_a\).
+Then \(\vb w_{a,\ell}^\perp(\ell\xi) \approx \xi\, \vb w_a^\perp\), and the integral of \(\xi^2\) over \([0,1]\) gives the approximated drag of the lines
 \begin{equation} \label{eq:line-drag-10D}
-    \tilde D_\ell = \frac{1}{6} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a}^2,
+    \tilde{\vb D}_\ell = \tilde D_\ell\, \vu w_a^\perp, \qquad \tilde D_\ell = \frac{1}{6} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a^\perp}^2, \qquad \vu w_a^\perp = \frac{\vb w_a^\perp}{\norm{\vb w_a^\perp}},
 \end{equation}
 and the total aerodynamic force of the system is
 \begin{equation} \label{eq:f_aero_10D}
-    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a.
+    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a^\perp.
 \end{equation}
-\textcolor{red}{verify consistency, used to be $\vb F_a = L \vu k_t + (D + \tilde D_\ell) \vu k_b$}
+In all the computations of this paper, \(C_{D,\ell} = 0\): the drag of the lines is lumped into the drag coefficient \(C_D\) of the kite.
 % \subsubsection*{Gravity}
 
 The kite has mass $m$ and the lines have density $\rho_\ell$, therefore their mass is $m_\ell = n \pi \ell \rho_\ell d_\ell^2 / 4$.
@@ -201,11 +178,11 @@ from which we compute $\vb F_\ell$, directed by $-\hat{\boldsymbol{\ell}}$:
 \begin{equation} \label{eq:f_lines-10D}
     \vb F_\ell = \frac{-I \ddot \alpha - b \dot \alpha}{a \sin(\theta_\ell) \sin(\phi_\ell)} \hat{\boldsymbol{\ell}}.
 \end{equation}
-In the above, $\sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \ref{eq:lhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
+In the above, the lever arm of the tension is $a \sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \ref{eq:lhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
 % TODO better explanation?
 % TODO define when it breaks: when does proj_xy(K) equal A?
 With a typical choice of parameters the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
-However, $\sin(\phi_\ell)$ could very well be null, but the singularity is only in the equations as we observe no exceptional behavior when the lines and the arm are aligned ($xy$-plane)
+However, $\sin(\phi_\ell)$ could very well be null, but the singularity is only in the equations, as we observe no exceptional behavior when the lines and the arm are aligned ($xy$-plane); for the reduced model, it is removed by solving the equation of the arm for $\ddot\alpha$ instead of the tension (Section~\ref{sec:model-eom} and Appendix~\ref{sec:explicit-ddq}).
 
 % \subsubsection*{Fictitious force of the cone}
 To understand this section better, let's picture a train on a railway.
@@ -273,8 +250,8 @@ By combining \ref{eq:f_cone_constraint_10D} and \ref{eq:loop_closure_function}, 
 \begin{equation}\begin{cases}
     \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\vb r}{R}}(\vq) = 0 \\
     \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\vb r}{\tau}}(\vq) = 0 \\
-    R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\phi_\ell) = 0 \\
-    R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\phi_\ell) = 0 \\
+    R \sin(\theta(\tau)) \cos(\phi(\tau)) - a \cos(\alpha) - \ell \sin(\theta_\ell) \cos(\alpha + \phi_\ell) = 0 \\
+    R \sin(\theta(\tau)) \sin(\phi(\tau)) - a \sin(\alpha) - \ell \sin(\theta_\ell) \sin(\alpha + \phi_\ell) = 0 \\
     R \cos(\theta(\tau)) - \ell \cos(\theta_\ell) = 0,
 \end{cases}\end{equation}
 %
@@ -302,7 +279,7 @@ The algebraic equation $\vb g(\vq) = 0$ is reduced to
 \begin{equation}\begin{cases} \dg(\vq, \dq) = 0 \\ \vb g(\vq(t_0)) = 0,\end{cases}\end{equation}
 and differentiating a second time yields
 \begin{equation}\begin{cases} \ddg(\vq, \dq, \ddq) = 0 \\ \dg(\vq(t_0), \dq(t_0)) = 0 \\ \vb g(\vq(t_0)) = 0,\end{cases}\end{equation}
-which also exhibits three new algebraic equations that were previously hidden : $\dot g(u) = 0$, \emph{i.e.} not only must the configuration be consistent, but the velocities as well.
+which also exhibits three new algebraic equations that were previously hidden: $\dg(\vq, \dq) = 0$, \emph{i.e.} not only must the configuration be consistent, but the velocities as well.
 % TODO Show the differentiation of g?
 In our particular case, \emph{two} differentiation steps are required, thus we are working with an \emph{index $2$} \ac{dae}.
 By doing so, our system is reduced to $5$ second order \ac{ode}s and $6$ initial conditions:
@@ -320,7 +297,7 @@ We introduce $v = \dq$ and rewrite this previous system with only first order \a
     \dg(\vq(t_0), \vb v(t_0)) = 0_{\R^3} \\
     \vb g(\vq(t_0)) = 0_{\R^3}.
 \end{cases}\end{equation}
-The first two vector equations are implicit and nonlinear in $\du$: we use a symbolic solver to solve them and have the explicit expression of $\dot{\vb v}$ directly written into our code.
+The first two vector equations are implicit and affine in $\dot{\vb v}$: we use a symbolic solver to solve them and have the explicit expression of $\dot{\vb v}$ directly written into our code.
 As for the initialization, we have to choose $(\vq, \vb v) \in \R^{5+5}$ verifying the six implicit nonlinear constraints.
 To make the solving easier, we set
 \begin{equation}\begin{cases}

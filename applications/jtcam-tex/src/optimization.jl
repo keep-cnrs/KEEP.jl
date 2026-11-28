@@ -24,7 +24,8 @@ using Plots
 using PyFormattedStrings: @f_str
 using SplitApplyCombine: invert
 using Logging: with_logger, NullLogger
-using LinearAlgebra: norm
+using LinearAlgebra: norm, eigvals
+import ForwardDiff
 
 include(joinpath(@__DIR__, "helpers.jl"))
 
@@ -53,6 +54,7 @@ const B_BOUNDS = (1.0, 1.0e6)                # braking slope b
 const I_BOUNDS = (62.0, 1.0e6)               # arm inertia I (kg m²)
 const DPHI_BOUNDS = deg2rad.((10.0, 90.0))   # fixed shape box, in radians
 const DTHETA_RANGE = (2.0, 20.0)              # Δθ sweep, in degrees
+const GLIDE_LOW = 5                           # glide ratio of the sensitivity remark (soft kites: 4-6)
 const PTO_TS = 1000.0                         # max wing loading T_s (N/m²) of the PTO estimate
 
 # Marks shared by the wind sweep, the landscape and the Δθ plots: the floor of
@@ -221,12 +223,15 @@ clamp_guess(s) = (; α0=clamp(s.α0, -π + 1e-6, π - 1e-6),
 """
 One optimization step, limited to `iters` Ipopt iterations.
 """
-function opt_step(p, syms, lower, upper; iters=MAX_ITER)
+function opt_step(p, syms, lower, upper; iters=MAX_ITER, strict=false)
     solution, stats, _ = with_logger(NullLogger()) do
         OPT.optimize(p, syms, lower, upper; sense=SENSE, tol=TOL, max_iter=iters,
             max_wall_time=WALL_SAFETY)
     end
-    stats.status == :first_order || @warn "opt_step($(join(syms, ", "))) did not converge" stats.status stats.iter
+    if stats.status != :first_order
+        msg = "opt_step($(join(syms, ", "))) did not converge: $(stats.status) after $(stats.iter) iterations"
+        strict ? error(msg) : @warn msg
+    end
     p_next = copy(p)
     p_next[syms] .= solution.params[syms]  # physical units
     return (; p=p_next, P=solution.P, iter=stats.iter)
@@ -464,6 +469,70 @@ function curvature_stats(p; n=200_000)
 end
 
 """
+Floquet multipliers of the dτ > 0 cycle of `p`: the largest modulus among the three
+non-trivial ones (`μ`) and the error on the trivial multiplier 1 (`err`), from the
+monodromy matrix computed by forward-mode AD through the integrator.
+"""
+function floquet(p)
+    vbp = PMP.build_vbpara(p)
+    lc = LC.compute_limit_cycle(vbp; sense=SENSE, save_everystep=true)
+    T = lc.t[end]
+    flow = y -> PM4.integrate(PM4.build_u(y[1], y[2], y[3], y[4], zero(y[1])), T, vbp).u[end][1:4]
+    μ = eigvals(ForwardDiff.jacobian(flow, collect(lc.u[1][1:4])))
+    itriv = argmin(abs.(μ .- 1))
+    return (; μ=maximum(abs, μ[setdiff(eachindex(μ), itriv)]), err=abs(μ[itriv] - 1))
+end
+
+"""
+A posteriori curvature check on the optimized cycle of `p` (dτ > 0), with the arm: the
+curvature κ = ‖ṙ × r̈‖/‖ṙ‖³ of the kite trajectory, maximized over the cycle; the bounds
+A₁ = max|α'|, A₂ = max|α''| (prime = d/dτ) of the arm law along the cycle; and the upper
+bound (eq:curv-bound) evaluated with the box of the optimization (ℓ ≥ ℓ₋ = L_BOUNDS[1],
+Δφ in DPHI_BOUNDS, Δθ and θ0 fixed), and at the design point itself (ℓ₋ = ℓ, Δφ₋ = Δφ₊ =
+Δφ), with these A₁, A₂. Returns radii (m): `rmin` the smallest radius of curvature of
+the cycle, `rbox` and `rpt` the radii guaranteed by the bound (both ≤ `rmin`, checked).
+"""
+function curvature_check(p; n=4000)
+    vbp = PMP.build_vbpara(p)
+    lc = LC.compute_limit_cycle(vbp; sense=SENSE, tol=TOL, save_everystep=true)
+    vel(u) = (k = PM4._kinematics(u[1], u[2], vbp);
+              (k.R_α * u[3] + k.R_τ * u[4]) * k.rhat + k.R * u[4] * k.rhatp)
+    cross3(x, y) = (x[2]y[3] - x[3]y[2], x[3]y[1] - x[1]y[3], x[1]y[2] - x[2]y[1])
+    rows = map(range(0, lc.t[end], n + 1)[1:end-1]) do t
+        u = collect(lc(t)[1:4])
+        du = PM4.dynamics(u, vbp)[1:4]
+        v = vel(u)
+        acc = ForwardDiff.derivative(s -> vel(u .+ s .* du), 0.0)
+        κ = norm(collect(cross3(v, acc))) / norm(v)^3
+        α1 = u[3] / u[4]                                   # α' = α̇/τ̇
+        α2 = (du[3] * u[4] - u[3] * du[4]) / u[4]^3          # α'' = (α̈τ̇ - α̇τ̈)/τ̇³
+        (; κ, α1, α2)
+    end
+    κmax = maximum(r -> r.κ, rows)
+    A1, A2 = maximum(r -> abs(r.α1), rows), maximum(r -> abs(r.α2), rows)
+    # bound (eq:curv-bound) on a box: ℓ ≥ ℓm, Δφ in [Δφm, Δφp], Δθ and θ0 fixed
+    function κbound(ℓm, Δφm, Δφp)
+        a, Δθm, Δθp = p.a, p.Δθ, p.Δθ
+        J = (p.θ0 - Δθp, p.θ0 + Δθp)
+        0 < J[1] && J[2] < π || error("curvature bound: J not in (0, π)")
+        js = range(J..., 10_001)
+        m, M, C = minimum(sin, js), maximum(sin, js), maximum(x -> abs(cos(x)), js)
+        vstar = m * Δφm >= 4Δθm ? 2Δθm : m * Δφm * sqrt(1 / 2 - m^2 * Δφm^2 / (64 * Δθm^2))
+        κg = 2sqrt(2) * M * Δθp * Δφp / vstar^3 + 2C / m
+        Γ1 = 2Δθp + Δφp + A1
+        Γ2 = Γ1^2 + 4Δθp + Δφp + A2
+        V1 = 4Δθp + Δφp + Δφp^2 / 2 + 4Δθp * Δφp
+        εp = a / sqrt(ℓm^2 - a^2)
+        U = εp * (Γ2 + εp^2 * Γ1^2) / vstar^2 + εp * Γ1 * V1 / vstar^3
+        return sqrt(κg^2 + (1 + U)^2) / (ℓm - a)
+    end
+    κbox = κbound(first(L_BOUNDS), DPHI_BOUNDS...)   # the box of the optimization
+    κpt = κbound(p.l, p.Δφ, p.Δφ)                     # the design point itself
+    κmax <= min(κbox, κpt) || @warn "curvature: the a posteriori bound is violated" κmax κbox κpt
+    return (; rmin=1 / κmax, rbox=1 / κbox, rpt=1 / κpt, A1, A2)
+end
+
+"""
 Power take-off estimate of section "Estimation of power take-off" (Alain Nême's 1D
 model) for the parameters `p` of Table 1, with the maximum wing loading `Ts` (N/m²),
 which is not a model parameter: kite speed at the centre of the eight, length of the
@@ -523,7 +592,18 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep, dtheta, dtheta_op
         @warn "Δθ caption: the re-optimized power no longer decreases steadily above the nominal angle"
     isfinite(dtheta_lost) || @warn "Δθ caption: the continuation now reaches the smallest angle; reword the caption"
     pto = pto_estimate(p_start)
+    cc = curvature_check(p_ref)
+    fq0, fq1 = floquet(p_start), floquet(p_ref)
+    # sensitivity to the glide ratio G = C_L/C_D: the optimized design and the PTO
+    # estimate with the lower G of soft kites (the value the parameters' comments cite)
+    pG = copy(p_ref); pG.C_D = pG.C_L / GLIDE_LOW
+    sG = cycle_report(pG)
+    ptoG = pto_estimate(let q = copy(p_start); q.C_D = q.C_L / GLIDE_LOW; q end)
+    isfinite(sG.P) || @warn "glide-ratio sensitivity: no cycle at G = $GLIDE_LOW" 
+    fq1.μ < 1 && fq1.err < 1e-6 || @warn "the text says the optimized cycle is attracting" fq1
+    fq1.μ > fq0.μ || @warn "the text says the optimized cycle is less strongly attracting than the initial one" fq0 fq1
     r1(x) = f"{x:.1f}"
+    sciq(x) = (e = floor(Int, log10(x)); f"{x / exp10(e):.1f} \\times 10^{{{e}}}")  # math mode
     r2(x) = f"{x:.2f}"
     macros = [
         "WindRef" => string(round(Int, WIND_REF)),
@@ -543,6 +623,12 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep, dtheta, dtheta_op
         "CurvTipKg" => r2(c.kg_tip), "CurvTipK" => r2(c.K_tip),
         "CurvMaxK" => r2(c.K_max), "CurvMaxTau" => f"{c.τ_max:.3f}",
         "CurvMaxRadius" => r1(p_ref.l / c.K_max),
+        "GlideRef" => string(round(Int, p_ref.C_L / p_ref.C_D)), "GlideLow" => string(GLIDE_LOW),
+        "PowerOptGlideLow" => r2(sG.P / 1000), "PtoPowerGlideLow" => r1(ptoG.pto / 1000),
+        "FloquetInit" => sciq(fq0.μ), "FloquetOpt" => sciq(fq1.μ),
+        "CurvArmRadius" => r2(cc.rmin), "CurvBoxRadius" => f"{1000 * cc.rbox:.1f}",
+        "CurvPointRadius" => r2(cc.rpt),
+        "CurvAOne" => r2(cc.A1), "CurvATwo" => r2(cc.A2),
         "PtoTs" => string(round(Int, PTO_TS)),
         "PtoI" => string(round(Int, pto.I)), "PtoB" => r1(deg2rad(pto.b)),  # b per degree, as in the tables
         "PtoPower" => r1(pto.pto / 1000), "PtoPowerZero" => r1(pto.pto0 / 1000),
@@ -801,8 +887,14 @@ function run_optimization(; fast::Bool=false)
     upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
 
     @info "opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, ", ")))"
-    opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref)
+    opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref, strict=!fast)
     p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
+    # the power of the solver's orbit must be that of the cycle recomputed from p_ref
+    # (settling + Newton), which every table and figure uses
+    let Pc = cycle_report(p_ref).P, gap = abs(opt_ref.P - Pc) / abs(Pc)
+        msg = "optimum: solver power $(opt_ref.P) vs recomputed cycle $Pc (rel. gap $gap)"
+        gap < 1e-3 || (fast ? @warn(msg) : error(msg))
+    end
 
     winds = range(5, 15, length=fast ? 3 : 11)
     i_ref = findfirst(x -> x >= WIND_REF, winds)
@@ -846,9 +938,9 @@ function run_optimization(; fast::Bool=false)
     sols = map((p_start, p_ref)) do p
         LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
     end
-    # "PTO optimum" is the initial guess (the power-take-off sizing point);
-    # "Dynamic optimum" is the same system optimized for average power.
-    fig_ts = plot_time_series_grid(sols; titles=("PTO optimum", "Dynamic optimum"))
+    # initial guess (I = 1300, b = Iω; not the PTO optimum of section C) and the same
+    # system optimized for average power
+    fig_ts = plot_time_series_grid(sols; titles=("Initial guess", "Dynamic optimum"))
     append!(files, save_figure(fig_ts, "optimization_timeseries_all"))
     return files
 end
