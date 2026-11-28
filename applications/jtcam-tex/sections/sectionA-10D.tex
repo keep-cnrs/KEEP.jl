@@ -151,7 +151,7 @@ We in turn get this approximation for the drag of the lines:
 \end{split}\end{equation}
 %
 Finally, we get the following expression for the approximated drag of the lines:
-\begin{equation}
+\begin{equation} \label{eq:line-drag-10D}
     \tilde D_\ell = \frac{1}{6} n \ell d_\ell \rho_a C_{D,\ell} \norm{\vb w_a}^2,
 \end{equation}
 and the total aerodynamic force of the system is
@@ -330,10 +330,10 @@ To make the solving easier, we set
 and let the user choose $(\tau(t_0), \dot \tau) \in \R^2$.
 We again use a symbolic solver to determine the rest of the initial conditions as a function of $(\tau(t_0), \dot \tau(t_0))$.
 
-We can finally solve the system numerically using an \ac{ode} solver like Runge-Kutta 5(4) to get the trajectory shown on the left pane of \ref{fig:callback-comparison}. 
+We can finally solve the system numerically using an \ac{ode} solver like Runge-Kutta 5(4) to get the trajectory shown on the left pane of Fig.~\ref{fig:traj-10D}.
 
-On the left, we show the trajectory for $t_f = 20$ and $\vb a + \boldsymbol{\ell}$ seems to coincide with $\vb r$, yet on the left, by integrating for longer, the two trajectories diverge.
-Even though we initialize such that $\dg(\vq(t_0)) = 0$ and the \ac{ode} part enforces $\ddg(\vq, \vb v, \dot{\vb v}) = 0$, the slight integration error made at each time step accumulate and make $\dg$, and eventually $\vb g$, drift away from zero \ref{fig:residuals}.
+On the left pane, over a short horizon, $\vb a + \boldsymbol{\ell}$ seems to coincide with $\vb r$; yet on the middle pane, by integrating for longer, the two trajectories diverge.
+Even though we initialize such that $\dg(\vq(t_0)) = 0$ and the \ac{ode} part enforces $\ddg(\vq, \vb v, \dot{\vb v}) = 0$, the slight integration error made at each time step accumulate and make $\dg$, and eventually $\vb g$, drift away from zero (Fig.~\ref{fig:residuals-10D}).
 % TODO runtime
 
 \subsection{Limitations of this approach}
@@ -347,19 +347,24 @@ This can be avoided by using a callback to project $(\vq, \vb v)$ on the accepta
     \left\{ (\vq, \vb v) \in \R^{5+5} \mid \vb g(\vq) = 0 \land \dg(\vq, \vb v) = 0 \right\}
 \end{equation}
 using one or multiple steps of Newton's method.
-The state is becomes coherent at all times \ref{fig:residuals} but the running time is multiplied by two.
+The state then stays coherent at all times (right pane of Fig.~\ref{fig:traj-10D}, and Fig.~\ref{fig:residuals-10D}) but the running time is multiplied by two.
 % TODO table of run times? at least give some values
 Another limitation of this approach include the reliance on an external symbolic solver, whose output is copy pasted into the code, therefore the code is unreadable and hard to maintain, and a small change in the model requires re-running the symbolic solver.
 
-\begin{center} \label{fig:residuals}
-    \includegraphics[width=\textwidth]{figs/residuals_10D_interp}
-\end{center}
+\begin{figure}[thpb]
+    \centering
+    \includegraphics[width=\textwidth]{figs/trajectory_10D_short_long_cb}
+    \caption{Kite trajectory of the 10D model integrated with a loose tolerance: short horizon (left), long horizon (middle), long horizon with the manifold projection callback (right).
+    Without the callback, the positions given by $\vb r$ and by $\vb a + \boldsymbol{\ell}$ drift apart.}
+    \label{fig:traj-10D}
+\end{figure}
 
-
-\begin{center} \label{fig:traj-callback}
-    \includegraphics[width=\textwidth]{figs/trajectory_10D_short_long_cb.pdf}
-    I should probably drop the left subplot as it is identical to \ref{fig:traj20-80}'s right subplot.
-\end{center}
+\begin{figure}[thpb]
+    \centering
+    \includegraphics{figs/residuals_10D_interp}
+    \caption{Residuals of the configuration constraints of the 10D model on position (top) and on velocity (bottom) along the trajectory, without and with the manifold projection callback.}
+    \label{fig:residuals-10D}
+\end{figure}
 
 As previously mentioned, this model has five states but only two degrees of freedom; this observation motivates the main result of the paper, which is a whole rewrite of the model by having only two states and no configuration constraint.
 The pure \ac{ode} form makes the analytical work much easier, the numerical solution has no drift and is computed much faster because of the reduced number of dimensions, no symbolic solver is required, nor is a callback.

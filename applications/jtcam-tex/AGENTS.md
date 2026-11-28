@@ -55,8 +55,8 @@ Already loaded (`main.tex:7`). Prefer these over raw `\frac`:
 
 ## Custom packages
 
-- `mymacros.sty` — math shorthands: `\vq`, `\dq`, `\ddq`, `\R`, `\vbl`, `\vul`
-- `myacronyms.sty` — ODE, DAE, AD, DoF
+- `mymacros.sty` — math shorthands: `\vq`, `\dq`, `\ddq`, `\du`, `\dg`, `\ddg`, `\R` (unused ones moved to `old/deprecated-macros-and-notes.tex`)
+- `myacronyms.sty` — ODE, DAE, AD, DoF, IVP, BVP, PTO
 
 ## Conventions
 
