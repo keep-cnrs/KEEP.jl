@@ -27,7 +27,7 @@ Without loss of generality, we fix the phase by imposing \(\tau(0) = 0\), so tha
 The sign determines the direction of travel of the kite: it rises either on the sides of the eight (\(\tau(t_f) = +2\pi\)) or in its center (\(\tau(t_f) = -2\pi\)).
 To avoid the lines sliding against each other, we choose the former.
 
-We optimize the line length \(\ell\), the arm inertia \(I\) and the braking coefficient \(b\) of the generator, and denote by \(\Theta = (\ell, I, b)\) the vector of design parameters.
+We optimize the line length \(\ell\), the arm inertia \(I\), the braking coefficient \(b\) of the generator and the half-width \(\Delta\varphi\) of the eight, and denote by \(\Theta = (\ell, I, b, \Delta\varphi)\) the vector of design parameters; the half-height \(\Delta\theta = \DthetaFixed^\circ\) of the eight is held fixed.
 The optimization problem reads
 \begin{equation} \label{eq:opt-problem}
 W_f / t_f \underset{\substack{\alpha_0, \dot{\alpha}_0, \dot{\tau}_0 \\ W_f, t_f \\ \Theta}}{\longrightarrow} \max
@@ -45,89 +45,64 @@ subject to constraints
 where the components of \(\tilde{\vb x}(t_f, \Theta)\) are obtained by integrating the \ac{ivp} from \(\tilde{\vb x}_0 = (\alpha_0, 0, \dot \alpha_0, \dot \tau_0, 0)\) with parameters \(\Theta\), and \(W_f\) is a slack variable for the final work.
 In the search for parameters that provide more power, the solver thus also determines the corresponding initial condition lying on the periodic orbit.
 
-\paragraph{Initial guess.}
+% \paragraph{Initial guess.}
 We reuse our work on equilibria and limit cycles to provide the solver with an initial guess that satisfies the constraints.
 %\alter{can we get them from Alain's kinematic model in the appendix? ``We start with values obtained from annex X where we use a kinematic model to determine the optimal parameters...''}
 Starting from a physically reasonable set of parameters \(\Theta_0\), we compute the corresponding limit cycle (with the correct direction of travel), from which we extract \(\alpha_0, \dot \alpha_0, \dot \tau_0, t_f\) and \(W_f\); this results into a feasible point.
 
-\paragraph{Implementation.}
+% \paragraph{Implementation.}
 The problem is modelled with ADNLPModels.jl \cite{migot2021adnlpmodels}, which computes all required derivatives algorithmically with ForwardDiff.jl \cite{RevelsLubinPapamarkou2016}.
-It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(10^{-8}\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
-The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(10^{-9}\) with Tsit5 \cite{tsitouras2011rk54}, a Runge--Kutta 5(4) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(\IpoptTol\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
+The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(\IvpTol\) with Vern9, Verner's Runge--Kutta 9(8) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+The limit cycles from which the tables, figures and numbers of this section are computed are recomputed from the parameters, by settling and Newton's method (Section~\ref{sec:analysis-cycles}), with integration tolerance \(\PostTol\).
+% TODO cite Verner's paper (reference to be checked before adding)
 %\alter{Ipopt requires a bounding box; we give it as large as possible to avoid saturating a bound.}
 The parameters and their bounds are described in Table~\ref{tab:opt_descr}, while the result of the optimization is presented in Table~\ref{tab:opt_results}.
 %\alter{ECC run: 11 iterations, \SI{0.5}{\second} on an M2 MacBook Air, but at tolerance \(10^{-6}\); update iteration count and timing for \(10^{-8}\)}
-Ipopt solves the problem in about a dozen iterations, without a single restoration iteration, meaning it never leaves the feasible region.
-We show the power curve over the limit cycle in Figure~\ref{fig:time_series}: after optimization, the period is significantly increased and about \(13\%\) more power is harvested on average.
+Ipopt solves the problem in \IpoptIter{} iterations; as for any interior point method, the solution is a local optimum.
+The pipeline stops if Ipopt does not reach its tolerance, or if the power of its periodic orbit differs from that of the cycle recomputed at the optimum by settling and Newton's method (Section~\ref{sec:analysis-cycles}).
+Figure~\ref{fig:opt-landscape} shows the average power along one-dimensional slices through the optimum, each parameter varying while the others are held.
+The optimized cycle remains attracting, but less strongly: the largest modulus of its non-trivial Floquet multipliers is \(\FloquetOpt\), against \(\FloquetInit\) for the initial guess.
+We show the limit cycles before and after optimization in Figure~\ref{fig:time_series}: the period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power from \SI{\PowerInit}{\kilo\watt} to \SI{\PowerOpt}{\kilo\watt} (\(+\PowerGain\%\)).
+These powers depend strongly on the glide ratio of the kite, \(G = C_L/C_D = \GlideRef\) here: with \(G = \GlideLow\), a value more typical of soft kites, the optimized design produces \SI{\PowerOptGlideLow}{\kilo\watt}.
 
-\begin{table}[thpb]
-\centering
-\caption{Description of the optimized parameters}
-\begin{tabular}{l S S}
-    \toprule
-    {Symbol (Unit)} & {Lower} & {Upper} \\
-    \midrule
-    $\ell$ (\si{\meter}) & 10.3 & 93.0 \\
-    $I$ (\si{\kilogram\meter\squared}) & 433.3 & 3900.0 \\
-    $b$ (\si{\newton\meter\second\per\radian}) & 1333.3 & 12000.0 \\
-    \bottomrule
-\end{tabular}
-\label{tab:opt_descr}
-\end{table}
+\input{tables/table2}
 
-\begin{table}[thpb]
-\centering
-\caption{Optimization results}
-\begin{tabular}{l S S}
-    \toprule
-    {Symbol (Unit)} & {Initial Guess} & {Solution} \\
-    \midrule
-    $\ell$ (\si{\meter}) & 31.0 & 47.4 \\
-    $I$ (\si{\kilogram\meter\squared}) & 1300.0 & 3541.3 \\
-    $b$ (\si{\newton\meter\second\per\radian}) & 4000.0 & 3862.6 \\
-    \midrule
-    Average power (\si{\kilo\watt}) & 9.05 & 10.21 \\
-    Norm of residual & {$3.7\times10^{-9}$} & {$5.3\times10^{-10}$} \\
-    \bottomrule
-\end{tabular}
-\label{tab:opt_results}
-\end{table}
+\input{tables/table3}
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/optimization_timeseries_all.pdf}
-    \caption{\alter{ce plots n'exist plus, il y a toutes les séries temporelles dans un seul plot maintenant} Power generation curves over the normalized time comparing the initial guess (black) to the optimized limit cycle (red).
-    Solid lines represent instantaneous power, while the horizontal dotted lines indicate the average power generated over the cycle.
-    After optimization, the period is significantly increased, resulting in approximately 13\% more power harvested on average.}
+    \caption{Limit cycles for the initial guess (left) and the optimized parameters (dynamic optimum, right): angles and angular velocities (top), instantaneous and average power (middle), line tension (bottom).
+    The period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power increases by \(\PowerGain\%\).}
     \label{fig:time_series}
 \end{figure}
 
 \subsection{Optimal design as a function of wind speed} \label{sec:opt-wind}
 
 Since the optimization converges quickly, we repeat the procedure for a range of reference wind speeds \(w_0\).
-For each integer wind speed from \SIrange{5}{15}{\meter\per\second}, we find the set of parameters (Figure~\ref{fig:parameterized_optimization_params}) that maximizes power (Figure~\ref{fig:parameterized_optimization_power}) and show the corresponding minimum and maximum line tension over the limit cycle (Figure~\ref{fig:parameterized_optimization_tension}).
-For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{10}{\meter\per\second}.
-This set of parameters proves strongly resilient across a wide range of wind speeds (\(\pm 50\%\)), as it yields nearly as much power as the actual optimum (with a difference of less than \(5\%\)), with only a slight increase in tension.
+For each integer wind speed from \SIrange{\SweepWindMin}{\SweepWindMax}{\meter\per\second}, we find the set of parameters (Figure~\ref{fig:parameterized_optimization_params}) that maximizes power (Figure~\ref{fig:parameterized_optimization_power}) and show the corresponding minimum and maximum line tension over the limit cycle (Figure~\ref{fig:parameterized_optimization_tension}).
+For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section~\ref{sec:opt-power}, optimized for a wind speed of \SI{\WindRef}{\meter\per\second}.
+Over this whole range, this fixed set of parameters yields at most \(\SweepMaxLoss\%\) less power than the actual optimum, with a maximum line tension at most \(\SweepMaxTensionIncrease\%\) higher.
 %\alter{landscape of the objective around the optimum: no asymmetry, just aim for the middle?}
-There is thus no need to adapt the geometry to the wind speed.
 The system exhibits quasilinear scaling along this parameterized optimization, even though the length of the arm (and other parameters) is kept constant, which makes it impossible to scale the model perfectly to wind speed.
-We observe the following approximate trends:
+Least-squares power laws along the optimized sweep give the following trends:
 \begin{itemize}
-    \item power is proportional to the cube of wind speed, consistent with the scaling of wind power;
-    \item tension is proportional to the square of wind speed;
-    \item line length \(\ell\) and arm inertia \(I\) are both ratios of first-order polynomials in wind speed;
-    \item the arm braking coefficient \(b\) is proportional to wind speed;
-    \item (not shown) the period is inversely proportional to wind speed.
+    \item the average power grows like \(w_0^{\ExpPower}\), to be compared with the \(w_0^3\) scaling of wind power;
+    \item the maximum line tension grows like \(w_0^{\ExpTension}\);
+    \item the line length \(\ell\) and the arm inertia \(I\) vary as shown in Figure~\ref{fig:parameterized_optimization_params};
+    \item the arm braking coefficient \(b\) grows like \(w_0^{\ExpBrake}\);
+    \item (not shown) the period varies like \(w_0^{\ExpPeriod}\).
 \end{itemize}
 
 The maximum line tension defines the strength requirements for the kite fabric and lines.
-Furthermore, the minimum line tension remains positive, confirming \emph{a posteriori} the modeling assumption that the lines are always in tension and never exert compression on the arm.
+Furthermore, the minimum line tension remains above \SI{\SweepMinTension}{\kilo\newton} over the whole sweep, confirming \emph{a posteriori} the modeling assumption that the lines are always in tension and never exert compression on the arm.
 
 \begin{figure}[thpb]
   \centering
   \includegraphics{figs/optimization_wind_sweep_power.pdf}
   \caption{Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed \(w_0\) is varied.
-  The reference curve is generated by fixing the design parameters to the optimal values for \(w_0 = \SI{10}{\meter\per\second}\).}
+  The reference curve is generated by fixing the design parameters to the optimal values for \(w_0 = \SI{\WindRef}{\meter\per\second}\).}
   \label{fig:parameterized_optimization_power}
 \end{figure}
 
@@ -141,27 +116,30 @@ Furthermore, the minimum line tension remains positive, confirming \emph{a poste
 \begin{figure}[thpb]
   \centering
   \includegraphics{figs/optimization_wind_sweep_params.pdf}
-  \caption{Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for \(w_0 = \SI{10}{\meter\per\second}\) (black dashed lines).}
+  \caption{Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for \(w_0 = \SI{\WindRef}{\meter\per\second}\) (black dashed lines).}
+  % At this level of operation and despite relatively strong changes in the environmental parameter, the braking coefficient of the arm behaves linearly with respect to wind speed.
   \label{fig:parameterized_optimization_params}
 \end{figure}
 
+The half-height \(\Delta\theta\) of the eight, held fixed in the optimization, is varied in Figure~\ref{fig:opt-dtheta}, with \(\Theta\) either held at the optimum or re-optimized at each angle.
+
 \subsection{Curvature of the kite trajectory} \label{sec:opt-curvature}
 
-Besides power, a design has to be compatible with the flight of the kite: the turns of the curve \(t\mapsto\OK(t)\) it describes must not be too strong.
+Besides power, a design has to be compatible with the flight of the kite: the turns of the curve \(t\mapsto\vb r(t)\) it describes must not be too strong.
 We therefore derive upper bounds on the curvature \(\kappa\) of this curve; the computations and proofs are given in Appendix~\ref{app:curv}.
 
-\paragraph{Setting.}
-Recall that the kite position is \(\OK = r\,\vu r(\tau)\), where \(\vu r\) is the spherical eight \eqref{eq:sphere_Model_Deriv}--\eqref{eq:traject_Model_Deriv}, a closed curve on the unit sphere with \(0<\theta_0-\Delta\theta\) and \(\theta_0+\Delta\theta<\pi\), and where \(r\) solves the line-length constraint:
+% \paragraph{Setting.}
+Recall that the kite position is \(\vb r = r\,\vu r(\tau)\), where \(\vu r\) is the spherical eight \eqref{eq:sphere_Model_Deriv}--\eqref{eq:traject_Model_Deriv}, a closed curve on the unit sphere with \(0<\theta_0-\Delta\theta\) and \(\theta_0+\Delta\theta<\pi\), and where \(r\) solves the line-length constraint:
 \begin{equation}
     r = p + \sqrt{p^2+\ell^2-a^2}, \qquad p = a\,g, \qquad g = \sin\theta\cos(\phi-\alpha),
 \end{equation}
 so that \(\ell-a\le r\le\ell+a\), and \(r\equiv\ell\) when \(a=0\).
 We write \(\varepsilon = a/\ell\) and \(\varepsilon' = a/\sqrt{\ell^2-a^2}\).
-The kite trajectory is drawn on the \emph{cone} \(\mathcal C = \{r\,\vu r(\tau) : r>0,\ \tau\in\mathbb S^1\}\), the conical hull of the spherical eight.
-Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\OK'\times\OK''}/\norm{\OK'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
+The kite trajectory is drawn on the \emph{cone} \(\mathscr C = \{r\,\vu r(\tau) : r>0,\ \tau\in\mathbf{S}^1\}\), the conical hull of the spherical eight.
+Along a periodic orbit with \(\dot\tau\ne0\), the arm angle is a function \(\alpha(\tau)\), and since curvature does not depend on the parametrisation, the curvature \(\kappa = \norm{\vb r'\times\vb r''}/\norm{\vb r'}^3\) of the space curve (prime \(=\dv*{}{\tau}\)) does not depend on the time law \(\tau(t)\): \(\kappa(t) = \kappa(\tau(t))\).
 It depends on \(\ell\), \(\Delta\theta\), \(\Delta\phi\), \(\theta_0\), \(a\), and on the arm law through \(\alpha,\alpha',\alpha''\); for \(a=0\), only on \(\ell,\Delta\theta,\Delta\phi,\theta_0\).
 
-\paragraph{Curvature formula.}
+% \paragraph{Curvature formula.}
 Let \(v = \norm{\vu r'}\) be the speed on the sphere,
 \begin{equation}
     v^2 = 4\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau > 0,
@@ -175,16 +153,16 @@ For every \(\tau\),
 \begin{equation} \label{eq:curv-formula}
     r\,\kappa = \frac{\sqrt{\kappa_g^2\,(1+u_\sigma^2) + (1+u_\sigma^2-u_{\sigma\sigma})^2}}{(1+u_\sigma^2)^{3/2}}.
 \end{equation}
-The cone \(\mathcal C\) is a developable surface, with principal curvatures \(0\) along the generators and \(\kappa_g/r\) across them.
-Formula \eqref{eq:curv-formula} is the decomposition \(\kappa^2 = \kappa_n^2 + (\kappa_g^{\mathcal C})^2\) of the curvature of a curve drawn on \(\mathcal C\) into its normal and geodesic parts:
+The cone \(\mathscr C\) is a developable surface, with principal curvatures \(0\) along the generators and \(\kappa_g/r\) across them.
+Formula \eqref{eq:curv-formula} is the decomposition \(\kappa^2 = \kappa_n^2 + (\kappa_g^{\mathscr C})^2\) of the curvature of a curve drawn on \(\mathscr C\) into its normal and geodesic parts:
 \begin{equation}
-    \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathcal C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
+    \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathscr C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
 \end{equation}
 where \(\beta\) is the angle between the trajectory and the generator.
-The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\OK}\) along the cycle.
+The normal part is controlled by the curvature of the surface, \(\abs{\kappa_n}\le\abs{\kappa_g}/r\), and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve \(\sigma\mapsto r(\sigma)\) obtained by unrolling the cone, and is due to the variation of \(r=\norm{\vb r}\) along the cycle.
 The surface therefore bounds \(\kappa\) from below only, by \(\abs{\kappa_n}\); this lower bound vanishes at the inflection points of the eight, where \(\kappa_g=0\), and it gives no upper bound.
 
-\paragraph{Without arm.}
+% \paragraph{Without arm.}
 For \(a=0\), the trajectory lies on the sphere of radius \(\ell\), the unrolled curve is a circle of radius \(\ell\), and
 \begin{equation}
     \kappa = \frac{\sqrt{1+\kappa_g^2}}{\ell} \ \ge\ \frac1\ell,
@@ -199,11 +177,11 @@ Indeed, exactly,
 \end{equation}
 so that, for \(a=0\), \(\max\kappa\to\infty\) as \(\Delta\theta\to0\) or as \(\Delta\phi\to0\), the other parameters being fixed.
 
-\paragraph{Upper bound.}
-Consider a box of parameters: let \(\ell\ge\ell_->a\), \(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\), \(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\) with \(\Delta\theta_->0\), \(\Delta\phi_->0\), and \(\theta_0\in[\theta_{0-},\theta_{0+}]\) with \(\mathcal J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\).
+% \paragraph{Upper bound.}
+Consider a box of parameters: let \(\ell\ge\ell_->a\), \(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\), \(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\) with \(\Delta\theta_->0\), \(\Delta\phi_->0\), and \(\theta_0\in[\theta_{0-},\theta_{0+}]\) with \(\mathscr J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\).
 Set
 \begin{equation}
-    m = \min_{\mathcal J}\sin, \qquad M = \max_{\mathcal J}\sin, \qquad C = \max_{\mathcal J}\abs{\cos},
+    m = \min_{\mathscr J}\sin, \qquad M = \max_{\mathscr J}\sin, \qquad C = \max_{\mathscr J}\abs{\cos},
 \end{equation}
 \begin{equation}
     v_* = \begin{cases}
@@ -227,89 +205,45 @@ Then, for all parameters in the box, every such arm law, and every \(\tau\),
 \end{equation}
 and, without arm (\(a=0\), \(U=0\)), \(1/\ell\le\kappa\le\sqrt{1+\bar\kappa_g^2}/\ell_-\).
 Since \(U = O(\varepsilon)\), the bound is \(\sqrt{1+\bar\kappa_g^2}/\ell_- + O(\varepsilon)\), uniformly on the box.
-The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathcal J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
-In the optimization above, the lower bound on \(\ell\) in Table~\ref{tab:opt_descr} plays the role of \(\ell_-\), while \(A_1\) and \(A_2\) can be evaluated on the computed periodic orbits.
+The bound degenerates only when \(\Delta\theta_-\to0\), \(\Delta\phi_-\to0\), or \(\mathscr J\) reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when \(a>0\), the bound on \(\alpha''\) cannot be dispensed with, since \(u_{\sigma\sigma}\), which contains \(\alpha''\) linearly, enters \eqref{eq:curv-formula} through \(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\).
+The purpose of this bound is to control the curvature of the trajectory by the bounds of the design parameters alone: in the optimization above, the lower bound on \(\ell\) and the bounds on \(\Delta\varphi\) of Table~\ref{tab:opt_descr} play the role of \(\ell_-\) and \(\Delta\phi_\pm\), with \(\Delta\theta_\pm = \Delta\theta\) and \(\theta_{0\pm} = \theta_0\) fixed.
+Without arm, this gives a bound valid for every design of the box.
+With the arm, the bound also involves the bounds \(A_1\) and \(A_2\) on the arm law, which are not design parameters but properties of the periodic orbit: they are evaluated on the computed orbit, which makes the bound an a posteriori check rather than an a priori estimate.
+On the optimized cycle, \(A_1 = \CurvAOne\) and \(A_2 = \CurvATwo\), and the smallest radius of curvature computed along the cycle, arm included, is \SI{\CurvArmRadius}{\meter}.
+Evaluated on the whole box of Table~\ref{tab:opt_descr}, the bound~\eqref{eq:curv-bound} only guarantees a radius of \SI{\CurvBoxRadius}{\milli\meter}: it holds, but it is far from sharp, as the box contains narrow eights (\(\Delta\phi_- = 10^\circ\)) for which \(v_*\) is small and the bound, of order \(1/v_*^3\), is large.
+Evaluated at the optimized design itself (\(\ell_- = \ell\), \(\Delta\phi_\pm = \Delta\phi\)), it guarantees \SI{\CurvPointRadius}{\meter}.
 
-\paragraph{First order in the arm length.}
+% \paragraph{First order in the arm length.}
 With \(K = \sqrt{1+\kappa_g^2}\), for a fixed eight and a fixed arm law with bounded \(\alpha',\alpha''\),
 \begin{equation} \label{eq:curv-first-order}
     \ell\,\kappa = K\,(1-\varepsilon g) - \varepsilon\,\frac{g_{\sigma\sigma}}{K} + O(\varepsilon^2)
 \end{equation}
 uniformly in \(\tau\): the arm rescales the arm-free curvature by \(\ell/r\) and adds the contribution of the second derivative of \(g\) (hence of \(\alpha''\)) along the eight.
 
-\paragraph{Example (without arm).}
-For the eight of Table~\ref{tab:params} (\(\Delta\theta=6^\circ\), \(\Delta\phi=50^\circ\), \(\theta_0=65^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq18.03\), hence \(\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2}/\ell \simeq 18.06/\ell\) for \(a=0\): at the lobe tips, the radius of curvature of the trajectory is about \(\ell/18\), \emph{i.e.} about \SI{2.6}{\meter} for \(\ell=\SI{47.4}{\meter}\), the optimized length of Table~\ref{tab:opt_results}.
+% \paragraph{Example (without arm).}
+For the optimized eight of Table~\ref{tab:opt_results} (\(\Delta\theta=\DthetaFixed^\circ\), \(\Delta\phi=\DphiOpt^\circ\), \(\theta_0=\ThetaZero^\circ\)), the exact value above gives \(\kappa_g(\pi/2)\simeq\CurvTipKg\), hence \(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq \CurvTipK\) at the lobe tips for \(a=0\).
 This value at the tip is exact: it follows from the formulas above, with no approximation.
-That the tips are where the turn is sharpest is, however, only a \emph{numerical observation}, not a proven fact: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq18.09\), reached slightly before the tip (at \(\tau\simeq1.560\) instead of \(\pi/2\)), about \(0.15\%\) above the tip value.
-The case \(a>0\) was not examined here; there, only the upper bound \eqref{eq:curv-bound} is proven.
+The tips are not necessarily where the turn is sharpest: sampling \(\tau\) on a fine grid gives \(\max_\tau\ell\kappa\simeq\CurvMaxK\), reached at \(\tau\simeq\CurvMaxTau\) and, by symmetry, at \(\tau+\pi\); the smallest radius of curvature of the trajectory is thus about \(\ell/\CurvMaxK\), \emph{i.e.} about \SI{\CurvMaxRadius}{\meter} for the optimized length \(\ell=\SI{\EllOpt}{\meter}\).
+For \(a>0\), see the a posteriori check above.
 
 
-
-\begin{table}[htbp]
-  \centering
-  \caption{Comparison of initial and optimized parameters}
-  \label{tab:parameter_comparison}
-  \begin{tabular}{lrr}
-    \toprule
-    Parameter & \multicolumn{1}{c}{PTO initialization} & \multicolumn{1}{c}{Dynamic ptimization} \\
-    \midrule
-    $\ell$ ($\mathrm{m}$)                             & 31.0     & 26.9679  \\
-    $I$ ($\mathrm{kg\cdot m^2}$)                     & 1300.0   & 351.628  \\
-    $b$ ($\mathrm{kg\cdot m^2\cdot s^{-1}\cdot rad^{-1}}$) & 2888.29  & 737.073  \\
-    $\Delta\phi$ ($\mathrm{rad}$)                    & 0.872665 & 0.29     \\
-    \midrule
-    Period ($\mathrm{s}$)                            & 2.82807  & 0.949268 \\
-    Objective $P$ ($\mathrm{kW}$)                    & 9.63887  & 12.2534  \\
-    Min tension ($\mathrm{kN}$)                      & 3.35552  & 5.74767  \\
-    Max tension ($\mathrm{kN}$)                      & 8.85567  & 10.8269  \\
-    Max acceleration ($\mathrm{m/s^2}$)              & 517.078  & 938.602  \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{figure}[thpb]
-    \centering
-    \includegraphics{figs/optimization_timeseries_all.pdf}
-    \caption{Time series of the BVP with optimal parameters according to PTO (left) and after dynamic optimization (right).
-}
-    \label{fig:opt-time-series}
-\end{figure}
+\input{tables/table4}
 
 
 \begin{figure}[thpb]
     \centering
         \includegraphics{figs/optimization_dtheta.pdf}
-    \caption{Average power and line tension and acceleration as $\Delta \theta$ varies. 6° gives a good combination of average power (higher is better) and line tension (lower is better).}
-    \label{fig:opt-time-series}
+    \caption{Average power (left, normalized by its value \(P^*\) at the nominal \(\Delta\theta=\DthetaFixed^\circ\)) and min--max line tension (right) as \(\Delta\theta\) varies, with \(\Theta\) held at the optimum (points) and re-optimized at each angle (line with triangles, shaded envelope).
+    \(\Theta\) is re-optimized by continuation from the nominal angle, in warm-started steps of at most \SI{\DthetaStep}{\degree}; \DthetaBelow.
+    With \(\Theta\) held, the power peaks at the nominal angle and loses \SI{\DthetaFixedLoss}{\percent} at \(\DthetaMax^\circ\); re-optimized, it decreases steadily above the nominal angle and loses \SI{\DthetaOptLoss}{\percent} at \(\DthetaMax^\circ\).}
+    \label{fig:opt-dtheta}
 \end{figure}
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/optimization_landscape.pdf}
     \caption{Average power as the optimization parameters vary.
-    The objective landscape is smooth, explaining the easy numerical solving. \alter{which variables are on their bounds ?} \alter{which variables have the most impact?} \alter{could reoptimize other 3 parameters}}
-    \label{fig:opt-time-series}
-\end{figure}
-
-\begin{figure}[thpb]
-  \centering
-  \includegraphics{figs/optimization_wind_sweep_power.pdf}
-  \caption{Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed $w_0$ is varied.
-  The reference curve is generated by fixing the design parameters to the optimal values for a $w_0 = \SI{10}{\meter\per\second}$.}
-  \label{fig:parameterized_optimization_power}
-\end{figure}
-
-\begin{figure}[thpb]
-  \centering
-  \includegraphics{figs/optimization_wind_sweep_tension.pdf}
-  \caption{Minimum and maximum line tension $\vb F_\ell$ for optimized (blue) and reference (black) parameters.}
-  \label{fig:parameterized_optimization_tension}
-\end{figure}
-
-\begin{figure}[thpb]
-  \centering
-  \includegraphics{figs/optimization_wind_sweep_params.pdf}
-  \caption{Optimal parameters for each wind speed (color) and and reference parameters fixed at the optimum for $w_0 = \SI{10}{\meter\per\second}$ (black dashed lines).}
-  % At this level of operation and despite relatively strong changes in the environmental parameter, the braking coefficient of the arm behaves linearly with respect to wind speed.
-  \label{fig:parameterized_optimization_params}
+    % TODO which variables are on their bounds? which variables have the most impact? could reoptimize other 3 parameters
+    Along these one-dimensional slices, the objective is smooth around the optimum; this does not exclude other local optima.}
+    \label{fig:opt-landscape}
 \end{figure}

@@ -1,0 +1,92 @@
+name: jtcam-tex
+
+# Paper build for applications/jtcam-tex.
+#   compile  : on every push / PR that touches the paper, compile main.tex from the committed
+#              figs/ and tables/ and upload main.pdf.
+#   figures  : on manual dispatch or a tag, regenerate figs/ and tables/ with main.jl (fast=true
+#              for a quick smoke test of the workflow) and compile the paper from them.
+# Committing regenerated files stays a manual step (download the artifact).
+
+on:
+  push:
+    branches:
+      - main
+    tags: '*'
+    paths:
+      - 'applications/jtcam-tex/**'
+      - '.github/workflows/jtcam-tex.yml'
+  pull_request:
+    paths:
+      - 'applications/jtcam-tex/**'
+      - 'src/Optimization.jl'
+      - '.github/workflows/jtcam-tex.yml'
+  workflow_dispatch:
+    inputs:
+      fast:
+        description: 'Fast mode: reduced iteration limits and grids (smoke test, not the paper results)'
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: applications/jtcam-tex
+
+jobs:
+  figures:
+    # heavy: only on manual dispatch or on a tag
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.13.4'  # same as applications/jtcam-tex/Manifest.toml
+      - uses: julia-actions/cache@v2
+      - name: System packages (latex + dvipng for the math labels of the Plots figures, Libertine font)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-fonts-extra fonts-linuxlibertine dvipng
+      - name: Instantiate
+        run: julia --project=. -e 'import Pkg; Pkg.instantiate()'
+      - name: Regenerate figures and tables
+        env:
+          GKSwstype: '100'
+        run: julia --project=. main.jl ${{ (github.event_name == 'workflow_dispatch' && inputs.fast) && '--fast' || '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jtcam-tex-figs-tables
+          path: |
+            applications/jtcam-tex/figs
+            applications/jtcam-tex/tables
+
+  compile:
+    needs: figures
+    # run after `figures` when it ran, and alone otherwise
+    if: ${{ !cancelled() && (needs.figures.result == 'success' || needs.figures.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use the regenerated figures and tables
+        if: needs.figures.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: jtcam-tex-figs-tables
+          path: applications/jtcam-tex
+      - name: TeX Live
+        # the package list is a first guess: adjust it from the first run's missing-file errors
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+            texlive-fonts-extra texlive-science texlive-publishers texlive-bibtex-extra \
+            texlive-pictures texlive-plain-generic biber latexmk
+      - name: Compile
+        run: latexmk -pdf -interaction=nonstopmode -outdir="$RUNNER_TEMP/build" main.tex
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jtcam-tex-pdf
+          path: |
+            ${{ runner.temp }}/build/main.pdf
+            ${{ runner.temp }}/build/main.log

@@ -1,18 +1,18 @@
 \section{Estimation of power take-off} \label{sec:1D-PTO}
-A simple 1D dynamic model is derived in order to estimate the power take-off (PTO) by the KEEP device. \Comment{}{def PTO?} Significant assumptions are made. An \(\omega\)-pulsation harmonic couple around \(\vu z\), caused by the tether attached to the end of the arm, is modelled by \(C_M\,\cos(\omega\,t)\), where \(C_M=F_s\,a \sin \theta_0\) and \(F_s\) is a constant tension in the line. Thus, the variation of the aerodynamics forces along the kite’s figure-of-eight trajectory is averaged and projected onto the horizontal plane (\(z=0\)). The Newton's second law for the arm \ref{eq:newton_arm} yields
+A simple 1D dynamic model is derived in order to estimate the \ac{pto} by the KEEP device, that is the mechanical power extracted from the rotation of the arm by the generator, modelled as a viscous torque \(-b\dot\alpha\) (average of \(b\dot\alpha^2\)). Significant assumptions are made. An \(\omega\)-pulsation harmonic couple around \(\vu z\), caused by the tether attached to the end of the arm, is modelled by \(C_M\,\cos(\omega\,t)\), where \(C_M=F_s\,a \sin \theta_0\) and \(F_s\) is a constant tension in the line. Thus, the variation of the aerodynamics forces along the kite’s figure-of-eight trajectory is averaged and projected onto the horizontal plane (\(z=0\)). The Newton's second law for the arm \eqref{eq:newton_arm} yields
 \begin{equation} \label{eq:newton_arm_PTO}
     I \ddot\alpha = C_M\,\cos(\omega\,t) -b \dot\alpha.
 \end{equation}
-The following non dimensional parameters \(\overline{b}=b/(I\,\omega)\), \(\overline{C_M}=C_M/(I\,\omega^2)\) and \(\tau=\omega\,t\) are defined. The derivative of \(\alpha\) with respect to \(\tau\) is denoted by \(\alpha'\), such that \(\alpha'=\dot{\alpha}/\omega\). The Newton's second law for the arm \ref{eq:newton_arm_PTO} simplifies as follows
+The following non dimensional parameters \(\overline{b}=b/(I\,\omega)\), \(\overline{C_M}=C_M/(I\,\omega^2)\) and \(\tau=\omega\,t\) are defined. The derivative of \(\alpha\) with respect to \(\tau\) is denoted by \(\alpha'\), such that \(\alpha'=\dot{\alpha}/\omega\). The Newton's second law for the arm \eqref{eq:newton_arm_PTO} simplifies as follows
 \begin{equation} \label{eq:newton_arm_PTO_adim}
     \alpha''+\overline{b}\, \alpha' = \overline{C_M}\,\cos(\tau).
 \end{equation}
-The steady-state harmonic solution of \ref{eq:newton_arm_PTO_adim} is
+The steady-state harmonic solution of \eqref{eq:newton_arm_PTO_adim} is
 \begin{equation} \label{eq:sol_alpha_PTO}
     \alpha = -\frac{\overline{C_M}}{B}\,\cos(\tau+\delta),
 \end{equation}
 where \(B=(1+\overline{b}^2)^{1/2}\) and \(\delta=\arctan \overline{b}\). This last relationship shows that the phase difference between the angular position of the arm and that of the kite is closely linked to the rotor resistance $b$. The mechanical power produced by the device is expressed as
-\begin{equation} \label{eq:power_PTO}
+\begin{equation} \label{eq:inst_power_PTO}
     \dot{W} = b \, \dot \alpha^2=I\,\omega^3\,\overline{b}\,\alpha'^2.
 \end{equation}
 Consequently, the average power produced over a steady-state operating cycle of the KEEP system is given by
@@ -23,11 +23,11 @@ A maximum tension condition is imposed on the cable whilst seeking to preserve t
 \begin{equation} \label{eq:C_M_PTO}
     C_M=T_s\, S\,a \sin(\theta_0).
 \end{equation}
-Furthermore, the pulsation \(\omega\) introduced in the simple formulation \ref{eq:newton_arm_PTO} can be determined using a zero-mass model of the  kite \cite{Leloup2014OE}. We consider line length \(\ell\) that are much greater than the arm length \(a\), so that \(r=\ell\) is a reasonable assumption. Futhermore, assuming a constant kite speed \(V_k=\lVert \dot{\boldsymbol{r}} \rVert\) along its figure-of-eight trajectory, equal to the value at the center \((x,y,z)=(\ell\,\sin(\theta_0),0,\ell\,\cos(\theta_0))\), it can be shown that 
+Furthermore, the pulsation \(\omega\) introduced in the simple formulation \eqref{eq:newton_arm_PTO} can be determined using a zero-mass model of the  kite \cite{Leloup2014OE}. We consider line length \(\ell\) that are much greater than the arm length \(a\), so that \(r=\ell\) is a reasonable assumption. Futhermore, assuming a constant kite speed \(V_k=\lVert \dot{\boldsymbol{r}} \rVert\) along its figure-of-eight trajectory, equal to the value at the center \((x,y,z)=(\ell\,\sin(\theta_0),0,\ell\,\cos(\theta_0))\), it can be shown that 
 \begin{equation} \label{eq:Vk_PTO}
     V_k=w_\ell\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1},
 \end{equation}
-where \(G=C_L/C_D\) is the glide ratio of the kite. According to \ref{eq:sphere_Model_Deriv} and \ref{eq:traject_Model_Deriv}, the total length of the figure-of-eight trajectory \(L_{81}\) on the unit sphere (\(\ell=1\)) is given by
+where \(G=C_L/C_D\) is the glide ratio of the kite. According to \eqref{eq:sphere_Model_Deriv} and \eqref{eq:traject_Model_Deriv}, the total length of the figure-of-eight trajectory \(L_{81}\) on the unit sphere (\(\ell=1\)) is given by
 \begin{equation} \label{eq:L81_PTO}
     L_{81}=\int \limits_{\tau=0}^{\tau=2\pi} \sqrt{\left[2 \, \Delta\theta\, \cos(2\,\tau)\right]^2+{\sin(\theta_0 + \Delta\theta \sin(2\tau))}^2\,\left[\Delta\phi\, \cos(\tau)\right]^2} \dd{\tau},
 \end{equation}
@@ -37,63 +37,38 @@ hence the following expression of the pulsation
 \end{equation}
 As detailed in appendix \ref{app8}, one has the following estimate:
 \begin{equation} \label{eq:L81_PTO_approx}
-L_{81}=4\Delta\varphi\sin\theta_0+\frac{8\,\Delta\theta^2}{\Delta\varphi\sin\theta_0}\Bigl[\ln\frac{2\Delta\varphi\sin\theta_0}{\Delta\theta}-\frac56-\frac2{15}\Delta\varphi^2\sin^2\theta_0\Bigr]+o(\Delta\theta^2).
+L_{81}=4\Delta\phi\sin\theta_0+\frac{8\,\Delta\theta^2}{\Delta\phi\sin\theta_0}\Bigl[\ln\frac{2\Delta\phi\sin\theta_0}{\Delta\theta}-\frac56-\frac2{15}\Delta\phi^2\sin^2\theta_0\Bigr]+o(\Delta\theta^2).
 \end{equation}
-Assuming that the values of the aerodynamics parameters \(G\), \(w_r\) and \(z_r\), of the geometry parameters \(a\), \(\ell\), \(\theta_0\), \(\Delta \theta\) and \(\Delta \phi\), as well as those of the kite properties \(S\) and \(T_s\), have been selected, the independent parameters \(b\) and \(I\) can be optimized. The last term of the relationship (\ref{eq:power_PTO}) reaches its maximum value for \(\overline{b}=1\), which leads to the design constraint
+Assuming that the values of the aerodynamics parameters \(G\), \(w_r\) and \(z_r\), of the geometry parameters \(a\), \(\ell\), \(\theta_0\), \(\Delta \theta\) and \(\Delta \phi\), as well as those of the kite properties \(S\) and \(T_s\), have been selected, the independent parameters \(b\) and \(I\) can be optimized.
+At fixed inertia \(I\), the last term of the relationship \eqref{eq:power_PTO} reaches its maximum value for \(\overline{b}=1\), that is
 \begin{equation} \label{pto_optimality_constraint}
-    b=I\,\omega.
+    b=I\,\omega,
 \end{equation}
-The optimum average power is therefore,
-\begin{equation} \label{eq:opti_power_PTO}
-    W_a =\frac{{C_M}^2}{4\,I\,\omega}.
-\end{equation}
-For operating reasons, the magnitude of the angle \(\alpha\) is limited to \(\pi/2\), hence the following condition
+which gives the average power \(W_a = C_M^2/(4I\omega)\).
+For operating reasons, the magnitude of the angle \(\alpha\) is limited to \(\pi/2\). By~\eqref{eq:sol_alpha_PTO}, the amplitude is \(\overline{C_M}/B = C_M/(\omega\sqrt{I^2\omega^2+b^2})\), hence the condition
 \begin{equation} \label{eq:opti_I_PTO}
-   \frac{\sqrt{2}\,C_M}{\pi\,\omega^2} \leqslant I .
+    \omega^2\qty(I^2\omega^2 + b^2) \geqslant \qty(\frac{2\,C_M}{\pi})^2,
 \end{equation}
-According to \ref{eq:opti_power_PTO}, the maximum average power is achieved when \(I\) is at its minimum. Finally, the parameters \(b\) and \(I\) are optimal when
+which depends on both parameters.
+With \(Z = I^2\omega^2+b^2\), the power~\eqref{eq:power_PTO} reads \(W_a = b\,C_M^2/(2Z)\).
+At fixed \(Z\), it increases with \(b\), that is as \(I\) decreases, and at fixed \(b\) it decreases with \(Z\): in this model, the inertia of the arm only costs power, and the supremum \(\pi C_M\omega/4\) is approached as \(I\to0\), with~\eqref{eq:opti_I_PTO} active.
+The inertia is bounded below by the structure of the arm, \(I\geq I_{\min}\), with \(I_{\min} = \SI{62}{\kilogram\meter\squared}\) the lower bound of Table~\ref{tab:opt_descr} (a tube that withstands the maximum tension of the lines).
+% I_min: src/optimization.jl, I_BOUNDS (the same bound as the optimization of Section 4)
+As long as \(I_{\min} < \sqrt2\,C_M/(\pi\omega^2)\), which holds here, the condition~\eqref{eq:opti_I_PTO} is active at the optimum, and the parameters \(b\) and \(I\) are optimal when
 \begin{equation} \label{eq:opti_b_I_PTO}
-    \begin{cases} I=\frac{\sqrt{2}\,C_M}{\pi\,\omega^2}  \\  b=I\,\omega=\frac{\sqrt{2}\,C_M}{\pi\,\omega}  \end{cases},
+    I = I_{\min}, \qquad b = \frac{2\,C_M}{\pi\,\omega}\sqrt{1-\varepsilon^2}, \qquad \varepsilon = \frac{\pi\,\omega^2 I_{\min}}{2\,C_M},
 \end{equation}
-where \(C_M\) and \(\omega\) are given by \ref{eq:C_M_PTO} and \ref{eq:Omega_PTO} respectively, which leads to the following average power:
-\begin{equation} \label{eq:opti_power_PTO}
-    W_a =\frac{\pi\,C_M\,\omega}{4\,\sqrt{2}}.
+where \(C_M\) and \(\omega\) are given by \eqref{eq:C_M_PTO} and \eqref{eq:Omega_PTO} respectively, which leads to the following average power:
+\begin{equation} \label{eq:opti_power_PTO_final}
+    W_a =\frac{\pi\,C_M\,\omega}{4}\sqrt{1-\varepsilon^2}.
 \end{equation}
+The design \(b = I\omega\) with the smallest admissible \(I\), \(I = \sqrt2\,C_M/(\pi\omega^2) = \SI{\PtoISeq}{\kilogram\meter\squared}\), satisfies the constraint but gives only \(\pi C_M\omega/(4\sqrt2)\): the condition~\eqref{pto_optimality_constraint} is optimal at fixed \(I\), not jointly, and the optimum~\eqref{eq:opti_b_I_PTO} gives \(\PtoGainSeq\,\%\) more power.
 Thus, the power take-off per unit area of kite \(pto\) by the KEEP device can be estimated as follows:
-\begin{equation} \label{eq:Vk_PTO}
-    pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,\sqrt{2}\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}.
+\begin{equation} \label{eq:pto_PTO}
+    pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\sqrt{1-\varepsilon^2}.
 \end{equation}
-The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters \alter{reference to a passage in the article} with \(T_s = 1000\text{ N/m\textsuperscript{2}}\), the KEEP device achieves a maximum power take-off of nearly \(3.6\text{ kW/m\textsuperscript{2}}\), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are approximately \(646\text{ kg m\textsuperscript{2}}\) and \(2300\text{ N m s}\) respectively.
+The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), \(\varepsilon = \PtoEps\), and the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\) (\SI{\PtoPowerZero}{\kilo\watt\per\square\meter} as \(I_{\min}\to0\)), regardless of whether expression \eqref{eq:L81_PTO} or \eqref{eq:L81_PTO_approx} is used for $L_{81}$. This estimate assumes a glide ratio \(G = \GlideRef\) (Table~\ref{tab:params}); with \(G = \GlideLow\), a value more typical of soft kites, it drops to \(\SI{\PtoPowerGlideLow}{\kilo\watt\per\square\meter}\).
+% QUESTION (PR #78, abavoil): justification and reference for G = 7 (code comment: L/D between 4 and 6) The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are \(\SI{\PtoI}{\kilogram\meter\squared}\) and approximately \(\SI{\PtoB}{\newton\meter\second\per\degree}\) respectively.
 
 
-%% BEGIN TABLE 1
-
-\begin{table}[thpb]
-\centering
-\caption{Parameter Description and Values}
-\label{tab:params}
-\begin{tabular}{l p{3.2cm} r l}
-    \toprule
-    {Symbol} & {Description} & {Value} & {Unit} \\
-    \midrule
-    $a$ & Arm length & $2$ & \si{\meter} \\ 
-    $b$ & Arm braking coefficient & $4000$ & \si{\newton\meter\second\per\radian} \\ 
-    $C_D$ & Kite drag coefficient & $C_L / 7$ &  \\ 
-    $C_{D,\ell}$ & Line drag coefficient & $0$ &  \\ 
-    $C_L$ & Kite lift coefficient & $0.6$ &  \\ 
-    $d_\ell$ & Line diameter & $0.003$ & \si{\meter} \\ 
-    $g$ & Gravity & $9.81$ & \si{\meter\per\square\second} \\ 
-    $I$ & Arm inertia & $1300$ & \si{\kg\square\meter} \\ 
-    $\ell$ & Line length & $31$ & \si{\meter} \\ 
-    $m$ & Kite mass & $6$ & \si{\kg} \\ 
-    $S$ & Kite surface & $10$ & \si{\square\meter} \\ 
-    $w_0$ & Wind reference speed & $9$ & \si{\meter\per\second} \\ 
-    $z_0$ & Wind reference altitude & $10$ & \si{\meter} \\ 
-    $\Delta\theta$ & Lemniscate polar half-height & $6\pi / 180$ & \si{\radian} \\ 
-    $\Delta\phi$ & Lemniscate azimuthal half-width & $50\pi / 180$ & \si{\radian} \\ 
-    $\theta_0$ & Lemniscate mean polar angle & $65\pi / 180$ & \si{\radian} \\ 
-    $\rho_a$ & Air density & $1.225$ & \si{\kg\per\cubic\meter} \\ 
-    $\rho_\ell$ & Line density & $707$ & \si{\kg\per\cubic\meter} \\  
-    \bottomrule
-\end{tabular}
-\end{table}
+\input{tables/table1}

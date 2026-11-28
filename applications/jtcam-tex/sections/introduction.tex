@@ -1,0 +1,55 @@
+\section*{Introduction} \label{sec:intro}
+\addcontentsline{toc}{section}{Introduction}
+
+% \paragraph{Airborne wind energy.}
+Wind speed increases with altitude, and above the first hundred metres it is both stronger and steadier than at the height of the hub of a conventional turbine.
+Airborne wind energy aims at harvesting this resource with tethered wings instead of towers and blades: a kite flown in crosswind motion sweeps a large area of the sky with little structural mass, and most of the material of a turbine, the tower and the outer part of the blades, is replaced by a few lines.
+The power is either produced on board and sent to the ground through a conducting tether, or produced on the ground from the traction of the lines.
+In the most studied ground-based concept, the pumping cycle, the kite pulls the lines off a drum coupled to a generator during a traction phase, and the lines are reeled in during a recovery phase that consumes part of the energy; quasi-steady models of such systems are now well established \cite{vanderVlugt2019RE}.
+Pumping systems are thus intermittent by design: power is only produced during the traction phase, and the recovery phase has to be made as short and as cheap as possible.
+
+% \paragraph{The KEEP concept.}
+This project is part of improving the performance of technologies that meet the challenges of the law concerning the energy transition.
+The innovative KEEP (Kite Electrical Energy Production) technology developed at ENSTA enables the production of electrical energy from a kite capturing wind energy.
+The project originated at ENSTA Bretagne, now part of ENSTA Paris, from the work of its kite team on the structure of leading edge inflatable kites \cite{Desenclos2023MCM}.
+In KEEP, the kite is attached by four lines, about thirty metres long, to the tip of an arm, about two metres long, which turns a platform about a vertical axis, in one direction and then in the other; the platform drives a generator through a dedicated gear train \cite{Bavoil2024KEEP}.
+The kite flies a figure of eight in the sky, downwind of the arm; the tension of the lines exerts a torque on the arm, which drives the generator, and the generator brakes the arm in return.
+There is no reeling phase: the motion is periodic, and power is produced continuously over the cycle, at the price of a strong coupling between the motion of the kite and that of the arm.
+The design of the device matters: for the model of this paper, optimizing the geometry, the inertia of the arm and the braking of the generator increases the average power by \(\PowerGain\%\) (Section~\ref{sec:optimization}).
+In the short and medium term, onshore and ship applications with a power production ranging from a few tens to hundreds of kilowatts are targeted, and the extension to offshore production at the megawatt scale, with kites of \SI{1000}{\square\meter}, is an objective.
+The development of the technology also builds on the know-how of the kite community in the modelling of kites as auxiliary propulsion for ships \cite{Leloup2014OE}.
+To reach these targets, the mechanical model of the complete system has to be improved, and its dynamics has to be analysed theoretically, which is the purpose of this paper.
+It builds on the technical report of the project \cite{Bavoil2024KEEP}, which sets the modelling assumptions used here (rigid lines of constant length, and a point-mass kite, whose attitude is not modelled, moving on a cone over a figure of eight), starts from a model with ten state variables, and reduces it to six and then to four variables, the angle of the arm and the position of the kite along the eight, together with their velocities.
+
+% \paragraph{Contributions.}
+We model the kite as a point mass whose trajectory is constrained to a spherical figure of eight, prescribed by its centre and its two half-amplitudes, and whose distance to the tip of the arm is the length of the lines.
+The motion then has two degrees of freedom, the angle \(\alpha\) of the arm and the parameter \(\tau\) of the kite along the eight, and the dynamics is a smooth system of ordinary differential equations on the tangent bundle of the torus \(\mathbf{T}^2\).
+This reduction is exact for the constraints, has a clear geometric content, and is cheap enough to be integrated many times, which is what the analysis and the optimization below require.
+We study the equilibria and the periodic orbits of this system, show that it has two attracting limit cycles, one for each direction of travel of the kite along the eight, and take the cycle along which \(\tau\) increases as the operating regime of the device.
+We then optimize the design of the device (line length, inertia of the arm, braking coefficient of the generator and width of the eight) for the average power of the limit cycle, by a direct shooting formulation solved with Ipopt \cite{WachterBiegler2006}, and study how the optimal design depends on the wind speed and on the shape of the eight.
+At the reference wind speed of \SI{\WindRef}{\meter\per\second}, the optimization increases the average power by \(\PowerGain\%\) with respect to the initial design.
+All figures and tables of the paper are generated by the open-source Julia package KEEP.jl, built on DifferentialEquations.jl \cite{rackauckas2017differentialequations}, so that every number quoted in the text can be reproduced.
+
+% \paragraph{Outline.}
+Section~\ref{sec:model} derives the mathematical model.
+It first describes the geometry of the configuration: the spherical eight and the cone it spans from the centre of rotation, the spindle torus swept by the sphere of radius \(\ell\) centred at the tip of the arm, which confines the kite, and the kinematic map from the configuration \((\alpha,\tau)\) to the position of the kite.
+It then gives the velocities, the force model (aerodynamic lift and drag of the kite, drag of the lines, gravity, torque of the generator, and the reaction of the cone, which enforces the constraint), and the equations of motion of the arm and of the kite, together with the instantaneous and average power.
+
+Section~\ref{sec:1D-PTO} estimates the power take-off with a simple one-dimensional model of the arm, forced by a harmonic torque that averages the traction of the kite along the eight.
+This model gives closed-form optimal values of the inertia of the arm and of the braking coefficient, and an estimate of the maximum power per unit area of the kite under a structural constraint on the wing loading.
+
+Section~\ref{sec:analysis} analyses the dynamics.
+It locates the equilibria of the system at the intersections of the nullclines of the two accelerations, eight in total, all unstable, and describes the corresponding configurations of the arm and the kite.
+Numerical integration exhibits periodic motions; a Poincaré section at \(\tau=0\) turns them into fixed points of the first return map, which converges exponentially, and two attracting limit cycles, one for each direction of travel of the kite, are computed by shooting and Newton's method; their Floquet multipliers explain the convergence rate, and a sampling of the section finds no other limit cycle.
+
+Section~\ref{sec:optimization} formulates the design optimization as a boundary value problem: the average power over one period is maximized with respect to the design parameters, under the constraint that the trajectory closes on itself after one lap of the eight, the period being an unknown.
+It reports the optimal design at the reference wind speed and the corresponding limit cycle, the optimal design as a function of the wind speed compared with a design fixed at the reference optimum, and the sensitivity to the half-height of the eight, which is held fixed in the optimization.
+It also bounds the curvature of the trajectory of the kite, which limits how sharply the kite has to turn: exact values at the tips of the eight without arm, an upper bound uniform over a box of parameters, and the first-order effect of the arm.
+
+The appendices collect the material that is not needed to follow the main text.
+Appendix~\ref{sec:model10D} presents a ten-dimensional model in which the kite and the arm are described by redundant coordinates, the constraints being algebraic equations that are differentiated to obtain an ordinary differential equation; it explains why the drift of the algebraic constraints makes it unsuitable for long integrations, which motivates the reduced model of Section~\ref{sec:model}.
+Appendix~\ref{sec:explicit-ddq} gives the explicit expression of the accelerations of the reduced model.
+Appendix~\ref{app8} computes the length of the spherical eight, in closed form with elliptic functions and as an expansion for a small half-height, which enters the power take-off estimate of Section~\ref{sec:1D-PTO}.
+Appendix~\ref{app:curv} contains the computations and proofs of the curvature results of Section~\ref{sec:optimization}.
+
+The control of the kite, which removes the constraint that it moves along a prescribed eight and steers it through its aerodynamic force, and eventually through the lengths of its left and right lines, is the final objective of the project \cite{Bavoil2024KEEP} and is left for future work.

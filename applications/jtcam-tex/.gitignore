@@ -2,3 +2,5 @@
 tmp/
 **/_*
 latex_out/
+# generated figures keep their png (ignored by the repo-wide *.png rule)
+!figs/*.png

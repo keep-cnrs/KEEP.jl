@@ -96,17 +96,18 @@ the ODE). `:lbfgs` uses a limited-memory quasi-Newton Hessian, which costs one
 constraint and one Jacobian evaluation per iteration instead of a full Hessian;
 `:exact` forces the exact Hessian.
 """
-function solve_nlp(model, solver::Symbol; tol, max_wall_time, linear_solver="mumps",
+function solve_nlp(model, solver::Symbol; tol, max_wall_time, max_iter=nothing, linear_solver="mumps",
     hessian=:auto, print_level=0)
-    solver === :ipopt && return _solve_ipopt(model; tol, max_wall_time, linear_solver,
+    solver === :ipopt && return _solve_ipopt(model; tol, max_wall_time, max_iter, linear_solver,
         hessian, print_level)
     solver === :madnlp && return _solve_madnlp(model; tol, max_wall_time, hessian, print_level)
     throw(ArgumentError("unknown solver `$solver`: use :ipopt or :madnlp"))
 end
 
-function _solve_ipopt(model; tol, max_wall_time, linear_solver="mumps", hessian=:auto, print_level=0)
+function _solve_ipopt(model; tol, max_wall_time, max_iter=nothing, linear_solver="mumps", hessian=:auto, print_level=0)
     kw = Dict{Symbol,Any}(:tol => tol, :max_wall_time => max_wall_time,
         :linear_solver => linear_solver, :print_level => print_level)
+    max_iter === nothing || (kw[:max_iter] = max_iter)
     if hessian === :lbfgs
         kw[:hessian_approximation] = "limited-memory"
         # Ipopt's default (6) is too short for this problem: the secant pairs are
@@ -149,6 +150,7 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
   non-linear constraints is integrated at `tol / 10`, and Ipopt is called with
   tolerance `tol`.
 - `max_wall_time`: Maximum wall-clock time in seconds for the Ipopt solver.
+- `max_iter`: Maximum number of Ipopt iterations (`nothing`, the default, keeps Ipopt's own limit). Unlike `max_wall_time` it does not depend on the machine, so results are reproducible. Ignored by `solver=:madnlp`.
 - `linear_solver`: The linear solver to use for the Ipopt solver, cf. https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_Linear_Solver. Defaults to "mumps".
 - `solver`: `:ipopt` (default) or `:madnlp`; the latter needs `using MadNLP` (KEEP ships
   it as a package extension, so Ipopt-only users pay nothing).
@@ -175,7 +177,7 @@ Performs optimization to find optimal limit cycle parameters using Ipopt.
 The optimization is performed in a normalized (dimensionless) space to improve solver conditioning.
 The `optim_para_lower`, `optim_para_upper`, and `initial_guess` inputs are expected in physical units and are converted to normalized units internally. While the raw `stats.solution` remains in normalized units, the returned `solution` ComponentArray is automatically scaled back to physical units.
 """
-function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., linear_solver="mumps", solver=:ipopt, hessian=:exact,
+function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=(+), tol=10DEFAULT_TOLERANCE, max_wall_time=120., max_iter=nothing, linear_solver="mumps", solver=:ipopt, hessian=:exact,
     rhs=:auto, symmetry=false, initial_guess=(;))
     @info "To remove logging, use a Logging level below Info"
 
@@ -281,7 +283,7 @@ function optimize(p, optim_para_syms, optim_para_lower, optim_para_upper; sense=
     model = ADNLPModel!(
         x -> obj(x, vbp), collect(optim_vars), collect(lb), collect(ub), (c, x) -> cons!(c, x, vbp), collect(lc), collect(uc); minimize=false, backend=:generic)
     @info "Starting solve"
-    solve = h -> solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time,
+    solve = h -> solve_nlp(model, solver; tol=tol, max_wall_time=max_wall_time, max_iter=max_iter,
         linear_solver=linear_solver, hessian=h, print_level=ifelse(should_verbose(), 5, 0))
 
     # A limited-memory Hessian is ~20x cheaper per iteration but can wander on badly
