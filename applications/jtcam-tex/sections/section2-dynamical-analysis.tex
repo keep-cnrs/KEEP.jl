@@ -42,10 +42,9 @@ None of the equilibria is a possible operating point of the device, which motiva
     \centering
     \includegraphics{figs/equilibria_phase_space}
     \caption{Zero-velocity accelerations and equilibria.
-    The black arrows show the direction of the field \(\ddq(\vq, \dq = 0)\); the green and purple curves are the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), respectively.
+    The grey arrows show the direction of the field \(\ddq(\vq, \dq = 0)\); the orange and blue curves are the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), respectively.
     The equilibria lie at their intersections: white markers for a downwind arm, black ones for an upwind arm, circles when the kite is near the centre of the eight and diamonds when it is near a tip.
-    The background is grey when the arm points downwind and red when it points upwind.}
-    % TODO check the colour names in the caption against the figure (nullclines: palette colours 1 and 2)
+    The background is light grey when the arm points downwind and light red when it points upwind.}
     \label{fig:equilibria-phase-space}
 \end{figure}
 
@@ -89,10 +88,11 @@ The crossings of \(\Sigma\) are located during the integration by an event funct
 A limit cycle is computed in two steps: the trajectory from \(\vb x_0^\pm\) is integrated until two successive crossings agree within \(10\times\IntTol\), and this approximation of the fixed point is refined by Newton's method on~\eqref{eq:cycle-bvp}, the Jacobian being obtained by forward-mode \ac{ad} through the integrator.
 
 The iterates \(\vb x_{i+1} = P(\vb x_i)\) converge to the fixed point \(\vb x_\infty\) exponentially (Fig.~\ref{fig:limit_cycle_convergence}): the distance to the limit is divided by about \(10^{\ConvRatePlus}\) (\(\dot\tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot\tau < 0\)) at each lap, until it stalls at the integration tolerance.
-This rate is the one predicted by the Floquet multipliers of the cycles, the eigenvalues of the monodromy matrix \(\partial\varphi^T/\partial\vb x\) at \(\vb x_\infty\), computed by \ac{ad} through the integrator.
-One multiplier is trivially \(1\), the derivative along the flow, which the computation recovers to within \(\FloquetTrivialErr\); the other three, the eigenvalues of the derivative of \(P\), have moduli at most \(\FloquetPlus\) (\(\dot\tau > 0\)) and \(\FloquetMinus\) (\(\dot\tau < 0\)), that is \(10^{-\FloquetRatePlus}\) and \(10^{-\FloquetRateMinus}\), close to the observed rates.
+This rate is explained by the Floquet multipliers of the cycles, the eigenvalues of the monodromy matrix \(\partial\varphi^T/\partial\vb x\) at \(\vb x_\infty\), computed by \ac{ad} through the integrator.
+One multiplier is trivially \(1\), the derivative along the flow, which the computation recovers to within \(\FloquetTrivialErr\); the other three are the eigenvalues of the derivative of \(P\).
+The largest of them is real, of modulus \(\FloquetPlus\) (\(\dot\tau > 0\)) and \(\FloquetMinus\) (\(\dot\tau < 0\)), that is \(10^{-\FloquetRatePlus}\) and \(10^{-\FloquetRateMinus}\): it sets the asymptotic rate of convergence.
+The other two form a complex pair of smaller modulus, \(10^{-\FloquetPairRatePlus}\) and \(10^{-\FloquetPairRateMinus}\); over the few laps before the distance reaches the tolerance, this faster, oscillating component still contributes, so that the observed rates are slightly above the asymptotic ones and vary from one lap to the next.
 Both cycles are therefore strongly attracting: a perturbation is damped by more than two orders of magnitude at each lap.
-% TODO the measured rates (ConvRate*) and the Floquet rates (FloquetRate*) differ by about 0.06: the fit range of the slope (1e-2 to 10*ConvTol) includes the transient of the complex pair of multipliers; fit on a later range, or quote only the Floquet rate?
 
 \begin{figure}[thpb]
     \centering
@@ -120,9 +120,8 @@ The lines remain taut along both cycles, as required in Section~\ref{sec:model-f
 \end{figure}
 
 No other limit cycle was found.
-\InvSeeds{} initial states sampled on \(\Sigma\) by a Halton sequence, with \(\alpha \in [0, \pi]\) and \(\abs{\dot\alpha}, \abs{\dot\tau} \leq \SI{\InvVmax}{\radian\per\second}\), are integrated with the coarser tolerance \(\sqrt{\IntTol}\) until their crossings of \(\Sigma\) settle; the settled states are clustered, and the centroid of each cluster is refined as above.
+\InvSeeds{} initial states sampled on \(\Sigma\) by a Halton sequence, with \(\alpha \in [-\pi, \pi]\) and \(\abs{\dot\alpha}, \abs{\dot\tau} \leq \SI{\InvVmax}{\radian\per\second}\), are integrated with the coarser tolerance \(\sqrt{\IntTol}\) until their crossings of \(\Sigma\) settle; the settled states are clustered, and the centroid of each cluster is refined as above.
 This yields \(\InvCount\) limit cycles, the two above.
 The bound on the velocities corresponds to speeds of the arm and of the kite that the generator and the aerodynamic drag quickly damp.
-% TODO the sample covers alpha in [0, pi] only (LimitCycle.all_limit_cycles): justify by the symmetry, or extend to [-pi, pi]
 % TODO the sampling does not exclude cycles with several laps per period, or with a non-monotone tau (not detected by the section); say so, or test it
 \alter{This inventory is a numerical exploration, not a proof of uniqueness.}

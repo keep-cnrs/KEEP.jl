@@ -548,13 +548,18 @@ function run_analysis(; fast::Bool=false)
     cyc = map((lc_p, lc_m)) do lc
         μ = eigvals(monodromy(lc, vbp))
         itriv = argmin(abs.(μ .- 1))
-        μn = maximum(abs, μ[setdiff(eachindex(μ), itriv)])  # largest non-trivial multiplier
+        μnt = sort(μ[setdiff(eachindex(μ), itriv)]; by=abs, rev=true)  # non-trivial multipliers
+        μn = abs(μnt[1])                                     # largest non-trivial modulus
         (; T=lc.t[end], P=lc.u[end][end] / lc.t[end], μn, μerr=abs(μ[itriv] - 1),
+            μ1real=abs(imag(μnt[1])) < 1e-12, μpair=abs(μnt[2]),  # dominant real; then a complex pair
             αmax=rad2deg(maximum(u -> abs(u[1]), lc.u)), dτ0=lc.u[1][4])
     end
     for (c, s) in zip(cyc, (slope_p, slope_m))
         abs(-log10(c.μn) - s) < 0.2 || @warn "convergence rate not close to the Floquet multiplier" s -log10(c.μn)
         c.αmax < 90 || @warn "the text says |α| stays below 90 deg" c.αmax
+        c.μ1real && c.μpair < c.μn ||
+            @warn "the text says the dominant multiplier is real, followed by a complex pair" c
+        s > -log10(c.μn) || @warn "the text says the measured rate is above the Floquet rate" s -log10(c.μn)
     end
     ten = [equilibrium_tension(q, vbp) for q in ss]
     all(t -> t.rel < 1e-6 && abs(t.fold) < 1e-12, ten) ||
@@ -565,8 +570,8 @@ function run_analysis(; fast::Bool=false)
         @warn "the text says each cycle is invariant under σ with a half-period shift" sig
     Fl_cyc = [[PM4.compute_line_tension(lc(t), vbp) for t in range(lc.t[1], lc.t[end], 400)] for lc in (lc_p, lc_m)]
     all(F -> minimum(F) > 0, Fl_cyc) || @warn "the text says the lines stay taut along the cycles"
-    n_inv, vmax_inv = 100, 10
-    lcs = LC.all_limit_cycles(vbp; N=n_inv, vmax=vmax_inv)
+    n_inv, vmax_inv = 200, 10  # α sampled in [-π, π]: σ maps Σ onto {τ = π}, not onto Σ
+    lcs = LC.all_limit_cycles(vbp; αmin=-π, αmax=π, N=n_inv, vmax=vmax_inv)
     length(lcs) == 2 || @warn "the text says the inventory finds the two cycles only" n = length(lcs)
     sci(x) = (e = floor(Int, log10(x)); f"{x / exp10(e):.1f} \\times 10^{{{e}}}")
     expo(x) = "10^{$(ceil(Int, log10(x)))}"
@@ -595,6 +600,8 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\FloquetMinus}{$(sci(cyc[2].μn))}",
         "\\newcommand{\\FloquetRatePlus}{$(f"{-log10(cyc[1].μn):.2f}")}",
         "\\newcommand{\\FloquetRateMinus}{$(f"{-log10(cyc[2].μn):.2f}")}",
+        "\\newcommand{\\FloquetPairRatePlus}{$(f"{-log10(cyc[1].μpair):.2f}")}",
+        "\\newcommand{\\FloquetPairRateMinus}{$(f"{-log10(cyc[2].μpair):.2f}")}",
         "\\newcommand{\\FloquetTrivialErr}{$(expo(max(cyc[1].μerr, cyc[2].μerr)))}",
         "\\newcommand{\\EqTensionMin}{$(f"{minimum(t -> t.Fl, ten):.0f}")}",
         "\\newcommand{\\EqTensionMax}{$(f"{maximum(t -> t.Fl, ten):.0f}")}",
