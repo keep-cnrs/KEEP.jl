@@ -39,31 +39,35 @@ As detailed in appendix \ref{app8}, one has the following estimate:
 \begin{equation} \label{eq:L81_PTO_approx}
 L_{81}=4\Delta\phi\sin\theta_0+\frac{8\,\Delta\theta^2}{\Delta\phi\sin\theta_0}\Bigl[\ln\frac{2\Delta\phi\sin\theta_0}{\Delta\theta}-\frac56-\frac2{15}\Delta\phi^2\sin^2\theta_0\Bigr]+o(\Delta\theta^2).
 \end{equation}
-Assuming that the values of the aerodynamics parameters \(G\), \(w_r\) and \(z_r\), of the geometry parameters \(a\), \(\ell\), \(\theta_0\), \(\Delta \theta\) and \(\Delta \phi\), as well as those of the kite properties \(S\) and \(T_s\), have been selected, the independent parameters \(b\) and \(I\) can be optimized. The last term of the relationship (\ref{eq:power_PTO}) reaches its maximum value for \(\overline{b}=1\), which leads to the design constraint
+Assuming that the values of the aerodynamics parameters \(G\), \(w_r\) and \(z_r\), of the geometry parameters \(a\), \(\ell\), \(\theta_0\), \(\Delta \theta\) and \(\Delta \phi\), as well as those of the kite properties \(S\) and \(T_s\), have been selected, the independent parameters \(b\) and \(I\) can be optimized.
+At fixed inertia \(I\), the last term of the relationship (\ref{eq:power_PTO}) reaches its maximum value for \(\overline{b}=1\), that is
 \begin{equation} \label{pto_optimality_constraint}
-    b=I\,\omega.
+    b=I\,\omega,
 \end{equation}
-The optimum average power is therefore,
-\begin{equation} \label{eq:opti_power_PTO}
-    W_a =\frac{{C_M}^2}{4\,I\,\omega}.
-\end{equation}
-For operating reasons, the magnitude of the angle \(\alpha\) is limited to \(\pi/2\), hence the following condition
+which gives the average power \(W_a = C_M^2/(4I\omega)\).
+For operating reasons, the magnitude of the angle \(\alpha\) is limited to \(\pi/2\). By~\eqref{eq:sol_alpha_PTO}, the amplitude is \(\overline{C_M}/B = C_M/(\omega\sqrt{I^2\omega^2+b^2})\), hence the condition
 \begin{equation} \label{eq:opti_I_PTO}
-   \frac{\sqrt{2}\,C_M}{\pi\,\omega^2} \leqslant I .
+    \omega^2\qty(I^2\omega^2 + b^2) \geqslant \qty(\frac{2\,C_M}{\pi})^2,
 \end{equation}
-According to \ref{eq:opti_power_PTO}, the maximum average power is achieved when \(I\) is at its minimum. Finally, the parameters \(b\) and \(I\) are optimal when
+which depends on both parameters.
+With \(Z = I^2\omega^2+b^2\), the power~\eqref{eq:power_PTO} reads \(W_a = b\,C_M^2/(2Z)\).
+At fixed \(Z\), it increases with \(b\), that is as \(I\) decreases, and at fixed \(b\) it decreases with \(Z\): in this model, the inertia of the arm only costs power, and the supremum \(\pi C_M\omega/4\) is approached as \(I\to0\), with~\eqref{eq:opti_I_PTO} active.
+The inertia is bounded below by the structure of the arm, \(I\geq I_{\min}\), with \(I_{\min} = \SI{62}{\kilogram\meter\squared}\) the lower bound of Table~\ref{tab:opt_descr} (a tube that withstands the maximum tension of the lines).
+% I_min: src/optimization.jl, I_BOUNDS (the same bound as the optimization of Section 4)
+As long as \(I_{\min} < \sqrt2\,C_M/(\pi\omega^2)\), which holds here, the condition~\eqref{eq:opti_I_PTO} is active at the optimum, and the parameters \(b\) and \(I\) are optimal when
 \begin{equation} \label{eq:opti_b_I_PTO}
-    \begin{cases} I=\frac{\sqrt{2}\,C_M}{\pi\,\omega^2}  \\  b=I\,\omega=\frac{\sqrt{2}\,C_M}{\pi\,\omega}  \end{cases},
+    I = I_{\min}, \qquad b = \frac{2\,C_M}{\pi\,\omega}\sqrt{1-\varepsilon^2}, \qquad \varepsilon = \frac{\pi\,\omega^2 I_{\min}}{2\,C_M},
 \end{equation}
 where \(C_M\) and \(\omega\) are given by \ref{eq:C_M_PTO} and \ref{eq:Omega_PTO} respectively, which leads to the following average power:
 \begin{equation} \label{eq:opti_power_PTO_final}
-    W_a =\frac{\pi\,C_M\,\omega}{4\,\sqrt{2}}.
+    W_a =\frac{\pi\,C_M\,\omega}{4}\sqrt{1-\varepsilon^2}.
 \end{equation}
+The design \(b = I\omega\) with the smallest admissible \(I\), \(I = \sqrt2\,C_M/(\pi\omega^2) = \SI{\PtoISeq}{\kilogram\meter\squared}\), satisfies the constraint but gives only \(\pi C_M\omega/(4\sqrt2)\): the condition~\eqref{pto_optimality_constraint} is optimal at fixed \(I\), not jointly, and the optimum~\eqref{eq:opti_b_I_PTO} gives \(\PtoGainSeq\,\%\) more power.
 Thus, the power take-off per unit area of kite \(pto\) by the KEEP device can be estimated as follows:
 \begin{equation} \label{eq:pto_PTO}
-    pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,\sqrt{2}\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}.
+    pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\sqrt{1-\varepsilon^2}.
 \end{equation}
-The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are approximately \(\SI{\PtoI}{\kilogram\meter\squared}\) and \(\SI{\PtoB}{\newton\meter\second\per\degree}\) respectively.
+The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), \(\varepsilon = \PtoEps\), and the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\) (\SI{\PtoPowerZero}{\kilo\watt\per\square\meter} as \(I_{\min}\to0\)), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are \(\SI{\PtoI}{\kilogram\meter\squared}\) and approximately \(\SI{\PtoB}{\newton\meter\second\per\degree}\) respectively.
 
 
 \input{tables/table1}

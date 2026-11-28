@@ -1,9 +1,9 @@
 \section{Analysis of the dynamics: equilibria and periodic orbits} \label{sec:analysis}
 
 This section describes the dynamics of the four-dimensional system \(\dot{\vb x} = f(\vb x)\) of Section~\ref{sec:model-eom} for one set of parameters, the one of Table~\ref{tab:params}.
-The braking coefficient \(b\) satisfies the optimality condition~\eqref{pto_optimality_constraint} of the one-dimensional model, \(b = I\omega\), where \(\omega = 2\pi/T\) is now the angular frequency of the limit cycle of the full system with \(\dot\tau > 0\) (see Section~\ref{sec:analysis-cycles}) rather than the estimate~\eqref{eq:Omega_PTO}.
+The inertia of the arm is \(I = \SI{1300}{\kilogram\meter\squared}\), the initial guess of the optimization of Section~\ref{sec:optimization}: the results of this section describe the device before optimization, which the optimized design of Section~\ref{sec:optimization} is compared with.
+At this inertia, the braking coefficient \(b\) satisfies the condition~\eqref{pto_optimality_constraint}, \(b = I\omega\), that maximizes the average power~\eqref{eq:power_PTO} of the one-dimensional model at fixed \(I\), where \(\omega = 2\pi/T\) is now the angular frequency of the limit cycle of the full system with \(\dot\tau > 0\) (see Section~\ref{sec:analysis-cycles}) rather than the estimate~\eqref{eq:Omega_PTO}.
 As the period \(T\) depends on \(b\), this condition is a fixed-point equation, solved by iterating \(b \leftarrow 2\pi I/T(b)\).
-\alter{The inertia \(I = \SI{1300}{\kilogram\meter\squared}\) of Table~\ref{tab:params} is not the value \(\SI{\PtoI}{\kilogram\meter\squared}\) given by~\eqref{eq:opti_b_I_PTO}: justify this choice (it is the initial guess of Section~\ref{sec:optimization}), or switch to the PTO values.}
 % Units: the state and the parameters are in physical units (s, rad, rad/s); the code
 % (PointMassPara.build_vbpara) only rescales the parameters internally, with a, m and w0 kept physical.
 All the trajectories are integrated with the order-9 Verner method~\cite{Verner2010}, as implemented in DifferentialEquations.jl~\cite{rackauckas2017differentialequations}, with absolute and relative tolerances \(\IntTol\) unless specified otherwise.
@@ -14,27 +14,30 @@ The equilibria, or steady states, of the system are the states \(\vb x_0 = (\vq_
 \begin{equation} \label{eq:equilibria}
     \ddq(\vq_0, \dq = 0) = 0 \in \mathbf{R}^2.
 \end{equation}
-At such a state, the arm is at rest and the generator exerts no torque, so that the equation~\eqref{eq:newton_arm} of the arm reduces to \(a F_\ell\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) = 0\): either the lines are slack, or the lever arm of the tension vanishes.
+At such a state, the arm is at rest and the generator exerts no torque, so that~\eqref{eq:ddalpha} reduces to \(a\lambda F_\ell = 0\): either the lines are slack, or the lever arm~\eqref{eq:lever-arm} of the tension vanishes.
 In the latter case, the kite lies on one of the edges \(\Gamma_\pm\) of the band of reachable positions, the fold curves \(\alpha = \phi(\tau)\) (arm pointing towards the kite, downwind arm) and \(\alpha = \phi(\tau) + \pi\) (arm pointing away from the kite, upwind arm) of Section~\ref{sec:model-geometry}.
 The arm and the lines are then in the same vertical plane.
-The equilibria are therefore searched for on the fold curves: along each of them, the norm of the acceleration is minimized in \(\tau\) from 100 initial values, and the minimizers are refined by a nonlinear solver on the full system~\eqref{eq:equilibria}, then completed by symmetry.
-% TODO math: the line tension (eq:f_lines) is 0/0 on the fold curves; show that ddq has a finite limit there (sectionB-explicit-ddq)
-All the equilibria found lie on the fold curves, to rounding error, and none has slack lines.
-As the formula~\eqref{eq:f_lines} is singular there, the tension at an equilibrium is obtained from the balance of the kite at rest, \(\vb F_a + \vb F_g + \vb F_\ell\) normal to the cone by~\eqref{eq:newton_kite} and~\eqref{eq:cone_constraint}: its components along \(\vu r\) and \(\vu r'\) give two values of \(F_\ell\), which agree, between \SI{\EqTensionMin}{\newton} and \SI{\EqTensionMax}{\newton}.
+Slack lines are excluded: off the fold curves, \(F_\ell = 0\) at rest requires, by~\eqref{eq:K1}--\eqref{eq:K2}, that the force \(\vb F_a + \vb F_g\) on the kite be normal to the cone, whereas on a grid of \(\SlackGrid\times\SlackGrid\) configurations its tangential part is at least \(\SlackRatio\) times its norm.
+% (a Lipschitz bound of this ratio on the grid cells would turn this into a proof)
+The equilibria therefore lie on the fold curves, which are nullclines of \(\ddot\alpha\) at zero velocity, since \(\lambda = 0\) there.
+Along each fold curve, the equilibria are the zeros of the single function \(g_\pm(\tau) = \ddot\tau(\vq(\tau), 0)\), with \(\vq(\tau) = (\phi(\tau), \tau)\) or \((\phi(\tau)+\pi, \tau)\); by~\eqref{eq:K1}--\eqref{eq:K2} with \(\lambda = 0\), they are the configurations where the weight and the aerodynamic force are balanced by the tension of the lines and the reaction of the cone.
+They are bracketed by the sign changes of \(g_\pm\) on a grid of \(\FoldGrid\) values of \(\tau\), and refined by a scalar root finder; the same \(\EqCount\) equilibria are found by a nonlinear solver on the full system~\eqref{eq:equilibria} started from 100 values of \(\tau\) on each fold curve and completed by symmetry.
+Their tensions, given by~\eqref{eq:eom_regular}, lie between \SI{\EqTensionMin}{\newton} and \SI{\EqTensionMax}{\newton}.
 
 The solutions of~\eqref{eq:equilibria} lie at the intersections of the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), shown in Fig.~\ref{fig:equilibria-phase-space}: the nullclines of \(\ddot\tau\) cross the torus \(\mathbf{T}^2\) of configurations horizontally, those of \(\ddot\alpha\) vertically, and they meet at \(\EqCount\) points.
 The symmetry~\eqref{eq:symmetry} maps an equilibrium \((\alpha, \tau)\) onto the equilibrium \((-\alpha, \tau + \pi)\), with the kite on the other side of the plane of the wind, so that the equilibria come in \(\EqCount/2\) pairs.
 They realize the eight combinations of three binary features: the arm points downwind or upwind; the kite is near the centre of the eight or near one of its tips; it is on the left or on the right of the plane of the wind.
 Their configurations are drawn in Fig.~\ref{fig:equilibria-eight-circle}, and Table~\ref{tab:equilibria} gives their positions and the eigenvalues of the Jacobian of \(f\).
-The two members of a pair have the same spectrum, since \(\sigma\) is linear and conjugates the vector field to itself.
+The two members of a pair have the same spectrum, since \(\sigma\) is linear and conjugates the vector field to itself; as the vector field is analytic, the Jacobians are computed by \ac{ad} at the equilibria themselves, and the spectra of the two members agree to rounding error.
 
 All the equilibria are unstable.
 The two pairs with the kite near the centre of the eight have a real eigenvalue between \(\EqReCenterMin\) and \SI{\EqReCenterMax}{\per\second}, which repels the trajectories on a time scale of a tenth of a second; the two pairs with the kite near a tip have a pair of complex eigenvalues with real part between \(\EqReTipMin\) and \SI{\EqReTipMax}{\per\second}, an unstable oscillation.
 With an upwind arm, each equilibrium has one more unstable eigenvalue, real and small, than its downwind counterpart.
 None of the equilibria is a possible operating point of the device, which motivates the study of the periodic motions below.
-% TODO physical interpretation of the instability: at the centre, the kite is pulled along the eight by the lift (largest acceleration); at the tips, ...
-% DATA: at one equilibrium of the downwind-tip pair, (alpha, tau) = (50, 89.7) deg, the AD Jacobian is not finite
-% (0/0 of the line tension on the fold): the spectrum of its sigma-twin is used (src/analysis.jl, equilibrium_spectra).
+% DRAFT (Claude, 2026-11-28), for jb to check: physical interpretation of the instability.
+At every equilibrium, the unstable eigenvectors move the kite along the eight, in \(\tau\) and \(\dot\tau\), while the arm stays at rest to first order: the instability is that of the kite on its prescribed path, not that of the arm.
+Near the centre of the eight, it is static: the tangential component of the aerodynamic force and of the weight vanishes at the equilibrium, and a small displacement of the kite along the eight creates a tangential component in the direction of the displacement, which amplifies it on a time scale of a tenth of a second.
+Near a tip, it is an unstable oscillation along the eight: the motion of the kite changes its apparent wind, hence its aerodynamic force, in phase with its velocity, so that the aerodynamic force feeds the motion, as in crosswind flight.
 
 \input{tables/table5}
 % web-code: src/analysis.jl#table5
@@ -111,11 +114,20 @@ The two limit cycles, one for each direction of travel of the kite along the eig
 Their periods are \SI{\LcPeriodPlus}{\second} (\(\dot\tau > 0\)) and \SI{\LcPeriodMinus}{\second} (\(\dot\tau < 0\)), and their average powers \SI{\LcPowerPlus}{\kilo\watt} and \SI{\LcPowerMinus}{\kilo\watt}.
 Along them, the arm swings by at most \ang{\LcAlphaMaxPlus} and \ang{\LcAlphaMaxMinus} from the downwind direction, within the operating limit \(\abs{\alpha} \leq \pi/2\) of Section~\ref{sec:1D-PTO}.
 The cycle with \(\dot\tau > 0\) is the starting point of the optimization of Section~\ref{sec:optimization}.
-The symmetry~\eqref{eq:symmetry} preserves the sign of \(\dot\tau\), so that it maps each cycle onto a cycle with the same direction of travel, and does not exchange the two cycles; no symmetry of the system reverses the direction of travel, as it would have to exchange a kite climbing through the centre of the eight with a kite diving through it, which gravity, the wind shear and the shape of the eight on the sphere distinguish.
-% TODO math: confirm that the system has no symmetry reversing the direction of travel (only sigma is known)
+The symmetry~\eqref{eq:symmetry} preserves the sign of \(\dot\tau\), so that it maps each cycle onto a cycle with the same direction of travel, and does not exchange the two cycles.
+% DRAFT (Claude, 2026-11-28), for jb to check: no symmetry reverses the direction of travel.
+No other symmetry of the system relates them.
+A spatial symmetry of the model is an isometry that fixes the pivot \(O\) and preserves gravity, the wind field \(\vb w(z)\), the circle \(\mathscr{A}\) of the arm and the eight \(\mathscr{E}\).
+Preserving \(\vu z\) and the altitude \(z\), on which the shear depends, it is a rotation about \(\vu z\) or a reflection through a vertical plane; preserving the direction \(\vu x\) of the wind, it is the identity or the reflection through \((O,\vu x,\vu z)\), which induces \(\sigma\).
+Both keep the direction of travel along \(\mathscr{E}\), since \(\sigma\) shifts \(\tau\) by \(\pi\).
+A map of \(\mathscr{E}\) onto itself that reverses its direction, \(\tau\mapsto\pi-\tau\) or \(\tau\mapsto-\tau\), exchanges \(\theta_0+\delta\) with \(\theta_0-\delta\), that is a kite climbing through the centre of the eight with a kite diving through it; it is not induced by an isometry, as gravity and the shear distinguish the two.
+Time reversal, \(t\mapsto-t\), which also reverses the direction of travel, is not a symmetry either, because of the dissipation by the generator and by the aerodynamic drag.
 Each cycle is in fact invariant under~\(\sigma\): \(\sigma(\vb x(t)) = \vb x(t + T/2)\), to within \(\SigmaGap\) along the cycle, so that the second half of a lap is the mirror image of the first through the plane of the wind.
 The lines remain taut along both cycles, as required in Section~\ref{sec:model-forces}, with a tension between \SI{\LcTensionMinPlus}{\kilo\newton} and \SI{\LcTensionMaxPlus}{\kilo\newton} (\(\dot\tau > 0\)), and between \SI{\LcTensionMinMinus}{\kilo\newton} and \SI{\LcTensionMaxMinus}{\kilo\newton} (\(\dot\tau < 0\)).
-% TODO physical interpretation: which direction of travel (climbing or diving at the centre) gives the larger power, and why
+The cycle with \(\dot\tau > 0\), along which the kite dives through the centre of the eight and climbs on its sides, has the longer period and produces the larger power.
+Over a lap, gravity does no net work, so that the power of the generator equals that of the aerodynamic force, \(\vb F_a\vdot\dot{\vb r} = \vb F_a\vdot\vb w - \vb F_a\vdot\vb w_a\): the power taken from the wind minus the power dissipated by the drag (the lift is normal to the apparent wind).
+Diving at the tips of the eight, the kite of the cycle with \(\dot\tau < 0\) is accelerated there by gravity: its mean speed near the tips is \SI{\LcSpeedTipMinus}{\meter\per\second}, against \SI{\LcSpeedTipPlus}{\meter\per\second} for \(\dot\tau > 0\), and \SI{\LcSpeedMinus}{\meter\per\second} against \SI{\LcSpeedPlus}{\meter\per\second} over the lap.
+The faster kite meets a stronger apparent wind, and takes more power from the wind, \SI{\LcCaptureMinus}{\kilo\watt} against \SI{\LcCapturePlus}{\kilo\watt}, but its drag dissipates more, \SI{\LcLossMinus}{\kilo\watt} against \SI{\LcLossPlus}{\kilo\watt}: the extra speed costs more than it brings, and the slower cycle, with \(\dot\tau > 0\), delivers the larger power.
 
 \begin{figure}[thpb]
     \centering
@@ -129,5 +141,5 @@ No other limit cycle was found.
 \InvSeeds{} initial states sampled on \(\Sigma\) by a Halton sequence, with \(\alpha \in [-\pi, \pi]\) and \(\abs{\dot\alpha}, \abs{\dot\tau} \leq \SI{\InvVmax}{\radian\per\second}\), are integrated with the coarser tolerance \(\sqrt{\IntTol}\) until their crossings of \(\Sigma\) settle; the settled states are clustered, and the centroid of each cluster is refined as above.
 This yields \(\InvCount\) limit cycles, the two above.
 The bound on the velocities corresponds to speeds of the arm and of the kite that the generator and the aerodynamic drag quickly damp.
-% TODO the sampling does not exclude cycles with several laps per period, or with a non-monotone tau (not detected by the section); say so, or test it
-\alter{This inventory is a numerical exploration, not a proof of uniqueness.}
+The search only finds fixed points of the first return map: it does not detect cycles with several laps of the eight per period, nor cycles along which \(\tau\) is not monotone and that do not cross \(\Sigma\) once per lap.
+This inventory is a numerical exploration, not a proof of uniqueness.

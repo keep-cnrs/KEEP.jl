@@ -214,18 +214,13 @@ so that Newton's second law for the arm yields
 \begin{equation} \label{eq:newton_arm}
     I \ddot\alpha = a F_\ell\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) + T(\dot \alpha),
 \end{equation}
-from which the line tension is
-\begin{equation} \label{eq:f_lines}
-    F_\ell = \frac{I \ddot\alpha - T(\dot \alpha)}{a\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a)},
-    \qquad
-    \vb F_\ell = -F_\ell\,\hat{\boldsymbol{\ell}}.
+where the tension \(F_\ell\) is an unknown of the problem, determined together with the accelerations: it is the reaction of the lines, which enforce the spindle torus constraint.
+The lever arm \(a\lambda\) of the tension has a geometric meaning:
+as \(\vb a\vdot(\vu z\times\vu a) = 0\),
+\begin{equation} \label{eq:lever-arm}
+    \lambda := \hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) = \frac{r}{\ell}\,\vu r\vdot(\vu z\times\vu a) = \frac{r}{\ell}\sin\theta\sin(\phi-\alpha),
 \end{equation}
-The lever arm in the denominator has a geometric meaning.
-As \(\vb a\vdot(\vu z\times\vu a) = 0\),
-\begin{equation}
-    \hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) = \frac{r}{\ell}\,\vu r\vdot(\vu z\times\vu a) = \frac{r}{\ell}\sin\theta\sin(\phi-\alpha),
-\end{equation}
-which vanishes exactly on the fold curves \(\alpha = \phi\) and \(\alpha = \phi+\pi\) of \(\Phi\): when the kite reaches an edge \(\Gamma_\pm\) of the band, i.e.\ the spindle torus, the lines and the arm are in the same vertical plane, the lines exert no torque on the arm, and \eqref{eq:f_lines} is singular.
+which vanishes exactly on the fold curves \(\alpha = \phi\) and \(\alpha = \phi+\pi\) of \(\Phi\): when the kite reaches an edge \(\Gamma_\pm\) of the band, i.e.\ the spindle torus, the lines and the arm are in the same vertical plane, the lines exert no torque on the arm, and the arm is only braked by the generator, \(I\ddot\alpha = T(\dot\alpha)\).
 Since lines can only pull, physically admissible motions moreover require \(F_\ell\geq0\); this condition is not imposed by the model and must be checked a posteriori.
 
 \subsection{Equations of motion} \label{sec:model-eom}
@@ -235,23 +230,33 @@ Equivalently, \(\vb F_c\) is normal to the cone, \(\vb F_c = F_c\,\vu n\) with \
     \vb F_c \vdot \vu r = 0, \qquad
     \vb F_c \vdot \vu r' = 0.
 \end{equation}
-The spindle torus constraint, on the other hand, is enforced by the lines, through the tension \eqref{eq:f_lines}.
+The spindle torus constraint, on the other hand, is enforced by the lines, through the tension \(F_\ell\).
 Newton's second law for the kite reads
 \begin{equation} \label{eq:newton_kite}
     m \ddot{\vb r} = \vb F_a + \vb F_g + \vb F_\ell + \vb F_c.
 \end{equation}
 Projecting it onto the tangent plane of the cone, that is, onto \(\vu r\) and \(\vu r'\), eliminates the constraint force by \eqref{eq:cone_constraint}.
-Since \(\ddot{\vb r}\) and, through \eqref{eq:f_lines}, \(\vb F_\ell\) are affine in \(\ddq\), this yields a \(2\times2\) linear system for the generalized accelerations:
-\begin{equation} \label{eq:eom_implicit}
-    M(\vq) \ddq = \vb h(\vq, \dq),
+Since \(\ddot{\vb r}\) is affine in \(\ddq\), these two projections and the equation~\eqref{eq:newton_arm} of the arm form a \(3\times3\) linear system in \((\ddot\alpha, \ddot\tau, F_\ell)\), with coefficients that depend on \(\vq\) only.
+Solving the equation of the arm for the tension, \(F_\ell = (I\ddot\alpha - T(\dot\alpha))/(a\lambda)\), would leave a \(2\times2\) system for \(\ddq\) whose matrix and right-hand side both blow up on the fold curves, where the accelerations would be obtained as \(0/0\).
+We solve it for the acceleration of the arm instead, dividing by \(I>0\):
+\begin{equation} \label{eq:ddalpha}
+    \ddot\alpha = \frac{a\lambda F_\ell + T(\dot\alpha)}{I},
 \end{equation}
-whose explicit solution is derived in Section~\ref{sec:explicit-ddq}.% TODO keep that annex?
+which leaves a \(2\times2\) linear system for the acceleration of the kite and the tension,
+\begin{equation} \label{eq:eom_regular}
+    N(\vq) \mqty(\ddot\tau \\ F_\ell) = \vb h(\vq, \dq),
+\end{equation}
+given in Appendix~\ref{sec:explicit-ddq}, together with its explicit solution.
+The determinant of \(N(\vq)\) is negative on the whole torus \(\mathbf{T}^2\) of configurations, and bounded away from zero.
+Hence the accelerations \(\ddq\) and the tension \(F_\ell\) are analytic functions of \((\vq, \dq)\) wherever the forces are, including on the fold curves.
+The only singularities of the model are aerodynamic: a vanishing apparent wind, \(\vb w_a = 0\), and an apparent wind parallel to the lines, where the frame of the kite of Section~\ref{sec:model10D-dyn-aero} is undefined.
+% (z > 0 is guaranteed by theta0 + Dtheta < pi/2, see the wind model above.)
 
 The state of the dynamical system is \(\vb x = (\vq, \dq) = (\alpha, \tau, \dot \alpha, \dot \tau) \in \mathbf{T}^2\times\mathbf{R}^2\), and the evolution function \(f\) is defined by
 \begin{equation}
     f(\vb x) = f(\vq, \dq) = (\dq, \ddq),
 \end{equation}
-where \(\ddq\) is the solution of \eqref{eq:eom_implicit}.
+where \(\ddq\) is given by \eqref{eq:ddalpha} and~\eqref{eq:eom_regular}.
 The system is symmetric through the map
 \begin{equation} \label{eq:symmetry}
     \sigma: (\alpha, \tau, \dot \alpha, \dot \tau) \mapsto (-\alpha, \tau + \pi, -\dot \alpha, \dot \tau).

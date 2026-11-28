@@ -16,12 +16,13 @@ using KEEP: LimitCycle as LC
 using KEEP: DEFAULT_TOLERANCE, TAU0
 
 using Plots
-using LinearAlgebra: norm, eigvals, ⋅
+using LinearAlgebra: norm, eigvals, eigen, ⋅
 import ForwardDiff
 using SplitApplyCombine: invert
 using QuasiMonteCarlo: sample, HaltonSample
 using PyFormattedStrings: @f_str
 using Roots
+const SA = PM4.SA  # StaticArrays, through KEEP
 
 include(joinpath(@__DIR__, "helpers.jl"))
 
@@ -267,13 +268,15 @@ fmt_complex(z) = abs(imag(z)) < 1e-8 ? f"{real(z):.2f}" :
 
 """
 Spectra of the equilibria, grouped by σ-pairs (σ(α, τ) = (-α, τ + π) conjugates the
-vector field, so both members of a pair have the same spectrum). The Jacobian is
-differentiated through the 0/0 of the line tension on the fold, and can come out
-non-finite at one member of a pair: the pair's spectrum is then the other member's.
+vector field, so both members of a pair have the same spectrum). The vector field is in
+regular form (`PM4._accelerations_tension`, no division by the lever arm of the lines),
+so its AD Jacobian is exact to rounding on the fold curves, where the equilibria lie:
+both members of each pair are computed and required to agree.
 Returns a vector of named tuples, one per pair, sorted by arm side then zone.
 """
 function equilibrium_spectra(ss, vbp; is_down, is_center)
     spec = [eigvals(state_jacobian((q[1], q[2], 0.0, 0.0), vbp)) for q in ss]
+    all(s -> all(isfinite, s), spec) || error("non-finite Jacobian at an equilibrium")
     pairs = []
     used = falses(length(ss))
     for i in eachindex(ss)
@@ -284,42 +287,90 @@ function equilibrium_spectra(ss, vbp; is_down, is_center)
             abs(rem2pi(ss[k][2] - qi[2] - π, RoundNearest)) < 1e-6, eachindex(ss))
         j === nothing && error("equilibrium $(rad2deg.(qi)) deg has no σ-twin")
         used[i] = used[j] = true
-        good = filter(k -> all(isfinite, spec[k]) && maximum(abs, spec[k]) < 1e6, [i, j])
-        isempty(good) && error("no finite spectrum for the σ-pair of $(rad2deg.(qi)) deg")
-        if length(good) == 2
-            d = maximum(abs, sort(spec[i]; by=reim) - sort(spec[j]; by=reim))
-            # the equilibria are close to the fold, where the Jacobian is sensitive: the
-            # twins agree to about 1e-4; require agreement to the printed precision
-            d < 5e-3 || @warn "σ-twins with different spectra" rad2deg.(qi) d
-        else
-            @warn "non-finite Jacobian at one equilibrium of a σ-pair: twin's spectrum used" rad2deg.(ss[setdiff([i, j], good)[1]])
-        end
-        k = good[1]
+        d = maximum(abs, sort(spec[i]; by=reim) - sort(spec[j]; by=reim))
+        d < 1e-6 || @warn "σ-twins with different spectra" rad2deg.(qi) d
         # representative with τ in [0, π), as in the figures' description
         r = rem2pi(ss[i][2], RoundDown) < π ? i : j
-        λ = sort(spec[k]; by=z -> (real(z), imag(z)))
+        λ = sort(spec[r]; by=z -> (real(z), imag(z)))
+        # weight of the arm (α, dα) in the unstable eigenvectors: the text says they
+        # move the kite along the eight, the arm staying at rest to first order
+        E = eigen(state_jacobian((ss[r][1], ss[r][2], 0.0, 0.0), vbp))
+        arm = maximum(findall(z -> real(z) > 0, E.values)) do k
+            v = E.vectors[:, k]
+            max(abs(v[1]), abs(v[3])) / maximum(abs, v)
+        end
         push!(pairs, (; q=ss[r], down=is_down(ss[r]), center=is_center(ss[r]), λ,
-            nunstable=count(z -> real(z) > 0, λ), remax=maximum(real, λ)))
+            nunstable=count(z -> real(z) > 0, λ), remax=maximum(real, λ), arm))
     end
     sort!(pairs; by=p -> (!p.down, !p.center))
     return pairs
 end
 
 """
-Line tension at the equilibrium `q`, from the balance of the kite at rest, F_a + F_g -
-F_ℓ ℓ̂ normal to the cone: its components on r̂ and on r̂' give two values of F_ℓ, which
-must agree. (`PM4.compute_line_tension` divides by the lever arm of the lines, which
-vanishes at the equilibria: it is 0/0 there.) Returns (; Fl, rel, fold), with `rel` the
-relative gap between the two values and `fold` = sin(φ - α), zero on the fold curves.
+Equilibria as roots of one scalar function per fold curve. At rest on the fold
+α = φ(τ) + s (s = 0: downwind arm, s = π: upwind arm) the lever arm of the lines vanishes,
+so α̈ = 0 identically, and the equilibria are the zeros of g_s(τ) = τ̈(φ(τ) + s, τ, 0, 0).
+They are bracketed by the sign changes of g_s on a grid of `n` values of τ, then refined.
+Returns the roots as [α, τ] (angles in (-π, π]).
 """
-function equilibrium_tension(q, vbp)
-    k = PM4._kinematics(q[1], q[2], vbp)
-    F_a, F_g, _, _ = PM4._forces(k, (0.0, 0.0), vbp)
-    lhat = (k.R * k.rhat - k.A * k.ahat) / k.ELL
-    F = F_a + F_g
-    Fl_r = (F ⋅ k.rhat) / (lhat ⋅ k.rhat)
-    Fl_t = (F ⋅ k.rhatp) / (lhat ⋅ k.rhatp)
-    return (; Fl=Fl_r, rel=abs(Fl_r - Fl_t) / abs(Fl_r), fold=sin(k.φ - q[1]))
+function fold_roots(vbp; n=3600)
+    roots = Vector{Float64}[]
+    for s in (0.0, π)
+        q(τ) = (PM4.τ_to_θφ(τ, vbp)[2] + s, τ)
+        g(τ) = PM4.dynamics(SA[q(τ)..., 0.0, 0.0, 0.0], vbp)[4]
+        τs = range(0, 2π, n + 1)
+        gs = g.(τs)
+        for i in 1:n
+            sign(gs[i]) != sign(gs[i+1]) || continue
+            τ0 = find_zero(g, (τs[i], τs[i+1]))
+            push!(roots, rem2pi.(collect(q(τ0)), RoundNearest))
+        end
+    end
+    return roots
+end
+
+"""
+Lower bound, over an `n`×`n` grid of the torus of configurations, of the ratio between
+the tangential part (on the plane of the cone) of F_a + F_g at rest and its norm. Off the
+fold curves, slack lines at rest require this tangential part to vanish (projections of
+Newton's law for the kite on r̂ and r̂'), so a positive minimum excludes equilibria with
+slack lines.
+"""
+function slack_ratio(vbp; n=721)
+    minimum(Iterators.product(range(-π, π, n), range(0, 2π, n))) do (α, τ)
+        k = PM4._kinematics(α, τ, vbp)
+        F_a, F_g, _, _ = PM4._forces(k, SA[0.0, 0.0], vbp)
+        F = F_a + F_g
+        sqrt((F ⋅ k.rhat)^2 + (F ⋅ k.rhatp)^2 / k.nrhatp2) / norm(F)
+    end
+end
+
+"""
+Energy balance of the cycle `lc` over one lap, by time averages on `n` points. Gravity does
+no net work over a lap, so the generator power equals the power of the aerodynamic force,
+F_a⋅ṙ = F_a⋅w - F_a⋅w_a: the power taken from the wind (`capture`) minus the power
+dissipated by the drag (`loss`). Also the mean speed of the kite, over the lap (`V`) and
+near the tips of the eight (`Vtip`, |τ| in [π/4, 3π/4] mod 2π, around τ = ±π/2), and
+the relative closure error of the balance (`err`).
+"""
+function energy_balance(lc, vbp; n=4000)
+    L, _, T = PM4.lmt(vbp)
+    rows = map(range(0, lc.t[end], n + 1)[1:end-1]) do t
+        u = lc(t)
+        dq = SA[u[3], u[4]]
+        k = PM4._kinematics(u[1], u[2], vbp)
+        F_a, _, torque, Rdot = PM4._forces(k, dq, vbp)
+        v = Rdot * k.rhat + k.R * u[4] * k.rhatp
+        z = k.R * k.rhat[3]
+        w = SA[abs(z / (vbp.z0 * L))^(1 / vbp.n_wind), 0, 0] * L / T   # as in PM4._forces
+        τ = abs(rem2pi(u[2], RoundNearest))                            # in [0, π]
+        (; capture=F_a ⋅ w, loss=F_a ⋅ (w - v), gen=torque * u[3], V=norm(v), tip=π / 4 <= τ <= 3π / 4)
+    end
+    m(f, r=rows) = sum(f, r) / length(r)
+    tips = filter(r -> r.tip, rows)
+    capture, loss, gen = m(r -> r.capture), m(r -> r.loss), m(r -> r.gen)
+    return (; capture, loss, gen, V=m(r -> r.V), Vtip=m(r -> r.V, tips),
+        err=abs(capture - loss - gen) / gen)
 end
 
 """
@@ -562,6 +613,7 @@ function run_analysis(; fast::Bool=false)
     #endregion
     length(ss) == 8 || @warn "the text describes 8 equilibria" n = length(ss)
     all(p -> p.nunstable > 0, pairs) || @warn "the text says that all equilibria are unstable"
+    all(p -> p.arm < 1e-2, pairs) || @warn "the text says the unstable modes of the equilibria are along the eight" getproperty.(pairs, :arm)
     pick(down, center) = only(filter(p -> p.down == down && p.center == center, pairs))
     all(c -> pick(false, c).nunstable == pick(true, c).nunstable + 1, (true, false)) ||
         @warn "the text says that an upwind equilibrium has one more unstable eigenvalue than its downwind counterpart"
@@ -574,6 +626,12 @@ function run_analysis(; fast::Bool=false)
             μ1real=abs(imag(μnt[1])) < 1e-12, μpair=abs(μnt[2]),  # dominant real; then a complex pair
             αmax=rad2deg(maximum(u -> abs(u[1]), lc.u)), dτ0=lc.u[1][4])
     end
+    eb = energy_balance.((lc_p, lc_m), Ref(vbp))
+    all(e -> e.err < 1e-6, eb) || @warn "energy balance of the cycles does not close" eb
+    eb[2].V > eb[1].V && eb[2].Vtip > eb[1].Vtip && eb[2].capture > eb[1].capture && eb[2].loss > eb[1].loss ||
+        @warn "the text says the cycle with dτ < 0 is faster (lap and tips), takes more power from the wind and loses more to drag" eb
+    cyc[1].T > cyc[2].T && cyc[1].P > cyc[2].P ||
+        @warn "the text says the cycle with dτ > 0 has the longer period and the larger power" cyc
     for (c, s) in zip(cyc, (slope_p, slope_m))
         abs(-log10(c.μn) - s) < 0.2 || @warn "convergence rate not close to the Floquet multiplier" s -log10(c.μn)
         c.αmax < 90 || @warn "the text says |α| stays below 90 deg" c.αmax
@@ -581,9 +639,13 @@ function run_analysis(; fast::Bool=false)
             @warn "the text says the dominant multiplier is real, followed by a complex pair" c
         s > -log10(c.μn) || @warn "the text says the measured rate is above the Floquet rate" s -log10(c.μn)
     end
-    ten = [equilibrium_tension(q, vbp) for q in ss]
-    all(t -> t.rel < 1e-6 && abs(t.fold) < 1e-12, ten) ||
-        @warn "the text says the equilibria lie on the fold curves, with a consistent balance of the kite" ten
+    # tension at rest, exact on the fold curves (regular form)
+    ten = [(; Fl=PM4.compute_line_tension(SA[q[1], q[2], 0.0, 0.0], vbp)) for q in ss]
+    roots = fold_roots(vbp; n=fast ? 720 : 3600)
+    length(roots) == length(ss) && all(q -> any(r -> maximum(abs, rem2pi.(r - q, RoundNearest)) < 1e-6, roots), ss) ||
+        @warn "the text says the equilibria are the roots of g± on the fold curves" roots ss
+    slack = slack_ratio(vbp; n=fast ? 181 : 721)
+    slack > 0.1 || @warn "the text says no equilibrium has slack lines (tangential force bounded below)" slack
     all(t -> t.Fl > 0, ten) || @warn "the text says the lines are taut at the equilibria"
     sig = sigma_gap.((lc_p, lc_m))
     all(g -> g.gap < 1e-7 && abs(g.half - 0.5) < 1e-7, sig) ||
@@ -624,12 +686,23 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\FloquetPairRateMinus}{$(f"{-log10(cyc[2].μpair):.2f}")}",
         "\\newcommand{\\FloquetTrivialErr}{$(expo(max(cyc[1].μerr, cyc[2].μerr)))}",
         "\\newcommand{\\EqTensionMin}{$(f"{minimum(t -> t.Fl, ten):.0f}")}",
+        "\\newcommand{\\SlackRatio}{$(f"{floor(slack, digits=2):.2f}")}",
+        "\\newcommand{\\FoldGrid}{$(fast ? 720 : 3600)}",
+        "\\newcommand{\\SlackGrid}{$(fast ? 181 : 721)}",
         "\\newcommand{\\EqTensionMax}{$(f"{maximum(t -> t.Fl, ten):.0f}")}",
         "\\newcommand{\\SigmaGap}{$(expo(maximum(g -> g.gap, sig)))}",
         "\\newcommand{\\LcTensionMinPlus}{$(f"{minimum(Fl_cyc[1]) / 1000:.2f}")}",
         "\\newcommand{\\LcTensionMaxPlus}{$(f"{maximum(Fl_cyc[1]) / 1000:.2f}")}",
         "\\newcommand{\\LcTensionMinMinus}{$(f"{minimum(Fl_cyc[2]) / 1000:.2f}")}",
         "\\newcommand{\\LcTensionMaxMinus}{$(f"{maximum(Fl_cyc[2]) / 1000:.2f}")}",
+        "\\newcommand{\\LcCapturePlus}{$(f"{eb[1].capture / 1000:.1f}")}",
+        "\\newcommand{\\LcCaptureMinus}{$(f"{eb[2].capture / 1000:.1f}")}",
+        "\\newcommand{\\LcLossPlus}{$(f"{eb[1].loss / 1000:.1f}")}",
+        "\\newcommand{\\LcLossMinus}{$(f"{eb[2].loss / 1000:.1f}")}",
+        "\\newcommand{\\LcSpeedPlus}{$(f"{eb[1].V:.1f}")}",
+        "\\newcommand{\\LcSpeedMinus}{$(f"{eb[2].V:.1f}")}",
+        "\\newcommand{\\LcSpeedTipPlus}{$(f"{eb[1].Vtip:.1f}")}",
+        "\\newcommand{\\LcSpeedTipMinus}{$(f"{eb[2].Vtip:.1f}")}",
         "\\newcommand{\\InvSeeds}{$n_inv}",
         "\\newcommand{\\InvVmax}{$vmax_inv}",
         "\\newcommand{\\InvCount}{$(length(lcs))}",

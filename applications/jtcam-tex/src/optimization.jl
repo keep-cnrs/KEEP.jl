@@ -467,10 +467,12 @@ end
 Power take-off estimate of section "Estimation of power take-off" (Alain Nême's 1D
 model) for the parameters `p` of Table 1, with the maximum wing loading `Ts` (N/m²),
 which is not a model parameter: kite speed at the centre of the eight, length of the
-eight, pulsation ω, then the optimal `I = √2 C_M/(π ω²)`, `b = I ω` and the power per
-unit kite area.
+eight, pulsation ω, then the optimal design under the amplitude constraint |α| ≤ π/2 and
+`I ≥ Imin` (the lower bound of the optimization box): `I = Imin`, `b` on the constraint,
+and the power per unit kite area (`pto`; `pto0` is its supremum as `Imin → 0`; `Iseq` the
+inertia of the sequential argument "b = Iω, then smallest admissible I").
 """
-function pto_estimate(p; Ts=PTO_TS, n=100_000)
+function pto_estimate(p; Ts=PTO_TS, Imin=I_BOUNDS[1], n=100_000)
     G = p.C_L / p.C_D
     Vk = p.w0 * (p.l * cos(p.θ0) / p.z0)^(1 / p.n_wind) * sqrt((1 + G^2) * sin(p.θ0)^2 - 1)
     τs = range(0, 2π, n + 1)[1:end-1]
@@ -478,8 +480,17 @@ function pto_estimate(p; Ts=PTO_TS, n=100_000)
                                  sin(p.θ0 + p.Δθ * sin(2τ))^2 * (p.Δφ * cos(τ))^2), τs)
     ω = 2π * Vk / (p.l * L81)
     CM = Ts * p.S * p.a * sin(p.θ0)
-    I = sqrt(2) * CM / (π * ω^2)
-    return (; I, b=I * ω, pto=π * CM * ω / (4sqrt(2)) / p.S)
+    # max of W = b CM² / (2(I²ω² + b²)) under the amplitude constraint
+    # CM / (ω √(I²ω² + b²)) ≤ π/2 and I ≥ Imin: at fixed I the best b is Iω while the
+    # constraint allows it (I ≥ √2 CM/(πω²)); below, the constraint is active and W
+    # increases as I decreases, so the optimum is I = Imin with the constraint active
+    I = Imin
+    ε = π * ω^2 * I / (2CM)
+    ε < 1 / sqrt(2) || error("PTO estimate: Imin above √2 CM/(πω²), the optimum is not on the constraint")
+    b = 2CM / (π * ω) * sqrt(1 - ε^2)
+    W = b * CM^2 / (2 * (I^2 * ω^2 + b^2))
+    W ≈ π * CM * ω / 4 * sqrt(1 - ε^2) || error("PTO estimate: closed form")
+    return (; I, b, ε, pto=W / p.S, pto0=π * CM * ω / 4 / p.S, Iseq=sqrt(2) * CM / (π * ω^2))
 end
 
 """
@@ -534,7 +545,9 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep, dtheta, dtheta_op
         "CurvMaxRadius" => r1(p_ref.l / c.K_max),
         "PtoTs" => string(round(Int, PTO_TS)),
         "PtoI" => string(round(Int, pto.I)), "PtoB" => r1(deg2rad(pto.b)),  # b per degree, as in the tables
-        "PtoPower" => r1(pto.pto / 1000),
+        "PtoPower" => r1(pto.pto / 1000), "PtoPowerZero" => r1(pto.pto0 / 1000),
+        "PtoEps" => f"{pto.ε:.3f}", "PtoISeq" => string(round(Int, pto.Iseq)),
+        "PtoGainSeq" => string(round(Int, 100 * (pto.pto / (pto.pto0 / sqrt(2)) - 1))),
         "DthetaStep" => string(DTHETA_STEP),
         "DthetaMax" => string(round(Int, last(ang))),
         "DthetaFixedLoss" => string(round(Int, 100 * (1 - last(Pfix)))),
