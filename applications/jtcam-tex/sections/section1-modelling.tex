@@ -47,7 +47,7 @@ Indeed, \(\vu r(\tau_1) = \vu r(\tau_2)\) with \(\tau_1\neq\tau_2\) requires \(\
 \begin{figure}
   \centering
   \includegraphics[width=0.6\textwidth]{figs/eight_plot}
-  \caption{The spherical eight \(\mathscr{E}\), parameterized by $\tau$, in the coordinates \((\phi,\theta)\); its shape is controlled by the design parameters $\theta_0$, $\Delta\theta$, and $\Delta\phi$. Trajectories with increasing $\tau$ (blue) result in a flight path that ascends in the middle and descends at the sides, while decreasing $\tau$ (orange) produces the inverse motion. The $\theta$-axis is inverted to align with the orientation of the kite's trajectory.}
+  \caption{The spherical eight \(\mathscr{E}\), parameterized by $\tau$, in the coordinates \((\phi,\theta)\); its shape is controlled by the design parameters $\theta_0$, $\Delta\theta$, and $\Delta\phi$. Trajectories with increasing $\tau$ (blue) result in a flight path that descends in the middle and ascends at the sides, while decreasing $\tau$ (orange) produces the inverse motion. The $\theta$-axis is inverted to align with the orientation of the kite's trajectory.}
   \label{fig:eight_plot}
   % web-code: src/modelling.jl#eight_plot
 \end{figure}
@@ -197,9 +197,11 @@ The kite is subject to gravity, to the aerodynamic force, to the tension of the 
 where \(m_\ell = n \pi \ell \rho_\ell d_\ell^2 / 4\) is the total mass of the lines, half of which is assumed to be lifted by the kite.
 The aerodynamic resultant is computed from the apparent wind using the same model detailed in Section~\ref{sec:model10D-dyn-aero}, namely
 \begin{equation} \label{eq:f_aero}
-    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu k_b,
+    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a^\perp,
 \end{equation}
-where the lift \(L\) and drag \(D\) are proportional to \(\norm{\vb w_a}^2\), and the line drag \(\tilde D_\ell\) is given by the integral approximation~\eqref{eq:line-drag-10D} of Appendix~\ref{sec:model10D}.
+where the lift \(L\) and drag \(D\) are proportional to \(\norm{\vb w_a}^2\), and the line drag \(\tilde D_\ell\), along the component \(\vu w_a^\perp\) of the apparent wind orthogonal to the lines, is given by the integral approximation~\eqref{eq:line-drag-10D} of Appendix~\ref{sec:model10D}.
+In all the computations of this paper, the drag coefficient of the lines is \(C_{D,\ell} = 0\): their drag is lumped into the drag coefficient \(C_D\) of the kite, independently of the length \(\ell\).
+As the drag of the lines grows linearly with \(\ell\), accounting for it separately would penalize long lines, and would tend to lower the optimal length found in Section~\ref{sec:optimization}.
 
 The lines pull the kite towards \(A\): with \(\hat{\boldsymbol{\ell}} = \boldsymbol{\ell}/\ell\) and \(F_\ell\) the tension, the force they exert on the kite is \(\vb F_\ell = -F_\ell\,\hat{\boldsymbol{\ell}}\), and the force they exert on the arm at \(A\) is \(-\vb F_\ell\).
 The arm has moment of inertia \(I\) about \(\Delta\), and the generator exerts on it the resistive torque
