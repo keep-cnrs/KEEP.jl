@@ -11,13 +11,13 @@ Pumping systems are thus intermittent by design: power is only produced during t
 % \paragraph{The KEEP concept.}
 This project is part of improving the performance of technologies that meet the challenges of the law concerning the energy transition.
 The innovative KEEP (Kite Electrical Energy Production) technology developed at ENSTA enables the production of electrical energy from a kite capturing wind energy.
-The project originated at ENSTA ParisTech (now ENSTA Paris).
+The project originated at ENSTA Bretagne, now part of ENSTA Paris, from the work of its kite team on the structure of leading edge inflatable kites \cite{Desenclos2023MCM}.
 In KEEP, the kite is attached by four lines, about thirty metres long, to the tip of an arm, about two metres long, which turns a platform about a vertical axis, in one direction and then in the other; the platform drives a generator through a dedicated gear train \cite{Bavoil2024KEEP}.
 The kite flies a figure of eight in the sky, downwind of the arm; the tension of the lines exerts a torque on the arm, which drives the generator, and the generator brakes the arm in return.
 There is no reeling phase: the motion is periodic, and power is produced continuously over the cycle, at the price of a strong coupling between the motion of the kite and that of the arm.
 The design of the device matters: for the model of this paper, optimizing the geometry, the inertia of the arm and the braking of the generator increases the average power by \(\PowerGain\%\) (Section~\ref{sec:optimization}).
 In the short and medium term, onshore and ship applications with a power production ranging from a few tens to hundreds of kilowatts are targeted, and the extension to offshore production at the megawatt scale, with kites of \SI{1000}{\square\meter}, is an objective.
-The development of the technology builds on the know-how of the kite community in the modelling of kites as auxiliary propulsion for ships \cite{Leloup2014OE} and of the structure of leading edge inflatable kites \cite{Desenclos2023MCM}.
+The development of the technology also builds on the know-how of the kite community in the modelling of kites as auxiliary propulsion for ships \cite{Leloup2014OE}.
 To reach these targets, the mechanical model of the complete system has to be improved, and its dynamics has to be analysed theoretically, which is the purpose of this paper.
 It builds on the technical report of the project \cite{Bavoil2024KEEP}, which sets the modelling assumptions used here (rigid lines of constant length, and a point-mass kite, whose attitude is not modelled, moving on a cone over a figure of eight), starts from a model with ten state variables, and reduces it to six and then to four variables, the angle of the arm and the position of the kite along the eight, together with their velocities.
 

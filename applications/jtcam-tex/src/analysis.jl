@@ -344,6 +344,34 @@ function slack_ratio(vbp; n=721)
 end
 
 """
+Energy balance of the cycle `lc` over one lap, by time averages on `n` points. Gravity does
+no net work over a lap, so the generator power equals the power of the aerodynamic force,
+F_a⋅ṙ = F_a⋅w - F_a⋅w_a: the power taken from the wind (`capture`) minus the power
+dissipated by the drag (`loss`). Also the mean speed of the kite, over the lap (`V`) and
+near the tips of the eight (`Vtip`, |τ| in [π/4, 3π/4] mod 2π, around τ = ±π/2), and
+the relative closure error of the balance (`err`).
+"""
+function energy_balance(lc, vbp; n=4000)
+    L, _, T = PM4.lmt(vbp)
+    rows = map(range(0, lc.t[end], n + 1)[1:end-1]) do t
+        u = lc(t)
+        dq = SA[u[3], u[4]]
+        k = PM4._kinematics(u[1], u[2], vbp)
+        F_a, _, torque, Rdot = PM4._forces(k, dq, vbp)
+        v = Rdot * k.rhat + k.R * u[4] * k.rhatp
+        z = k.R * k.rhat[3]
+        w = SA[abs(z / (vbp.z0 * L))^(1 / vbp.n_wind), 0, 0] * L / T   # as in PM4._forces
+        τ = abs(rem2pi(u[2], RoundNearest))                            # in [0, π]
+        (; capture=F_a ⋅ w, loss=F_a ⋅ (w - v), gen=torque * u[3], V=norm(v), tip=π / 4 <= τ <= 3π / 4)
+    end
+    m(f, r=rows) = sum(f, r) / length(r)
+    tips = filter(r -> r.tip, rows)
+    capture, loss, gen = m(r -> r.capture), m(r -> r.loss), m(r -> r.gen)
+    return (; capture, loss, gen, V=m(r -> r.V), Vtip=m(r -> r.V, tips),
+        err=abs(capture - loss - gen) / gen)
+end
+
+"""
 Gap between the cycle `lc` and its image by σ shifted by the time `th` at which τ has
 moved by ±π (max over the cycle, angles mod 2π); returns (; gap, half = th / T).
 """
@@ -578,6 +606,10 @@ function run_analysis(; fast::Bool=false)
             μ1real=abs(imag(μnt[1])) < 1e-12, μpair=abs(μnt[2]),  # dominant real; then a complex pair
             αmax=rad2deg(maximum(u -> abs(u[1]), lc.u)), dτ0=lc.u[1][4])
     end
+    eb = energy_balance.((lc_p, lc_m), Ref(vbp))
+    all(e -> e.err < 1e-6, eb) || @warn "energy balance of the cycles does not close" eb
+    eb[2].V > eb[1].V && eb[2].Vtip > eb[1].Vtip && eb[2].capture > eb[1].capture && eb[2].loss > eb[1].loss ||
+        @warn "the text says the cycle with dτ < 0 is faster (lap and tips), takes more power from the wind and loses more to drag" eb
     cyc[1].T > cyc[2].T && cyc[1].P > cyc[2].P ||
         @warn "the text says the cycle with dτ > 0 has the longer period and the larger power" cyc
     for (c, s) in zip(cyc, (slope_p, slope_m))
@@ -643,6 +675,14 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\LcTensionMaxPlus}{$(f"{maximum(Fl_cyc[1]) / 1000:.2f}")}",
         "\\newcommand{\\LcTensionMinMinus}{$(f"{minimum(Fl_cyc[2]) / 1000:.2f}")}",
         "\\newcommand{\\LcTensionMaxMinus}{$(f"{maximum(Fl_cyc[2]) / 1000:.2f}")}",
+        "\\newcommand{\\LcCapturePlus}{$(f"{eb[1].capture / 1000:.1f}")}",
+        "\\newcommand{\\LcCaptureMinus}{$(f"{eb[2].capture / 1000:.1f}")}",
+        "\\newcommand{\\LcLossPlus}{$(f"{eb[1].loss / 1000:.1f}")}",
+        "\\newcommand{\\LcLossMinus}{$(f"{eb[2].loss / 1000:.1f}")}",
+        "\\newcommand{\\LcSpeedPlus}{$(f"{eb[1].V:.1f}")}",
+        "\\newcommand{\\LcSpeedMinus}{$(f"{eb[2].V:.1f}")}",
+        "\\newcommand{\\LcSpeedTipPlus}{$(f"{eb[1].Vtip:.1f}")}",
+        "\\newcommand{\\LcSpeedTipMinus}{$(f"{eb[2].Vtip:.1f}")}",
         "\\newcommand{\\InvSeeds}{$n_inv}",
         "\\newcommand{\\InvVmax}{$vmax_inv}",
         "\\newcommand{\\InvCount}{$(length(lcs))}",

@@ -120,10 +120,9 @@ Time reversal, \(t\mapsto-t\), which also reverses the direction of travel, is n
 Each cycle is in fact invariant under~\(\sigma\): \(\sigma(\vb x(t)) = \vb x(t + T/2)\), to within \(\SigmaGap\) along the cycle, so that the second half of a lap is the mirror image of the first through the plane of the wind.
 The lines remain taut along both cycles, as required in Section~\ref{sec:model-forces}, with a tension between \SI{\LcTensionMinPlus}{\kilo\newton} and \SI{\LcTensionMaxPlus}{\kilo\newton} (\(\dot\tau > 0\)), and between \SI{\LcTensionMinMinus}{\kilo\newton} and \SI{\LcTensionMaxMinus}{\kilo\newton} (\(\dot\tau < 0\)).
 The cycle with \(\dot\tau > 0\), along which the kite dives through the centre of the eight and climbs on its sides, has the longer period and produces the larger power.
-% DRAFT (Claude, 2026-11-28), for jb: why? Gravity does no net work over a lap (the
-% cycle is periodic), so the difference comes from the phasing of the aerodynamic force
-% and of the motion of the arm along the lap; to be analysed (e.g. the work of the torque
-% of the lines over each half of the lap, for both cycles).
+Over a lap, gravity does no net work, so that the power of the generator equals that of the aerodynamic force, \(\vb F_a\vdot\dot{\vb r} = \vb F_a\vdot\vb w - \vb F_a\vdot\vb w_a\): the power taken from the wind minus the power dissipated by the drag (the lift is normal to the apparent wind).
+Diving at the tips of the eight, the kite of the cycle with \(\dot\tau < 0\) is accelerated there by gravity: its mean speed near the tips is \SI{\LcSpeedTipMinus}{\meter\per\second}, against \SI{\LcSpeedTipPlus}{\meter\per\second} for \(\dot\tau > 0\), and \SI{\LcSpeedMinus}{\meter\per\second} against \SI{\LcSpeedPlus}{\meter\per\second} over the lap.
+The faster kite meets a stronger apparent wind, and takes more power from the wind, \SI{\LcCaptureMinus}{\kilo\watt} against \SI{\LcCapturePlus}{\kilo\watt}, but its drag dissipates more, \SI{\LcLossMinus}{\kilo\watt} against \SI{\LcLossPlus}{\kilo\watt}: the extra speed costs more than it brings, and the slower cycle, with \(\dot\tau > 0\), delivers the larger power.
 
 \begin{figure}[thpb]
     \centering
