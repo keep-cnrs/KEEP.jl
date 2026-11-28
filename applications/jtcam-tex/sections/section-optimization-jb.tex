@@ -54,12 +54,14 @@ Starting from a physically reasonable set of parameters \(\Theta_0\), we compute
 The problem is modelled with ADNLPModels.jl \cite{migot2021adnlpmodels}, which computes all required derivatives algorithmically with ForwardDiff.jl \cite{RevelsLubinPapamarkou2016}.
 It is solved by the interior point method implemented in Ipopt \cite{WachterBiegler2006} (tolerance \(\IpoptTol\)), called through NLPModelsIpopt.jl, with linear solver MUMPS \cite{amestoy2001mumps}.
 The \ac{ivp} appearing in the nonlinear constraints is solved at tolerance \(\IvpTol\) with Vern9, Verner's Runge--Kutta 9(8) method from DifferentialEquations.jl \cite{rackauckas2017differentialequations}.
+The limit cycles from which the tables, figures and numbers of this section are computed are recomputed from the parameters, by settling and Newton's method (Section~\ref{sec:analysis-cycles}), with integration tolerance \(\PostTol\).
 % TODO cite Verner's paper (reference to be checked before adding)
 %\alter{Ipopt requires a bounding box; we give it as large as possible to avoid saturating a bound.}
 The parameters and their bounds are described in Table~\ref{tab:opt_descr}, while the result of the optimization is presented in Table~\ref{tab:opt_results}.
 %\alter{ECC run: 11 iterations, \SI{0.5}{\second} on an M2 MacBook Air, but at tolerance \(10^{-6}\); update iteration count and timing for \(10^{-8}\)}
 Ipopt solves the problem in \IpoptIter{} iterations; as for any interior point method, the solution is a local optimum.
 The pipeline stops if Ipopt does not reach its tolerance, or if the power of its periodic orbit differs from that of the cycle recomputed at the optimum by settling and Newton's method (Section~\ref{sec:analysis-cycles}).
+Figure~\ref{fig:opt-landscape} shows the average power along one-dimensional slices through the optimum, each parameter varying while the others are held.
 The optimized cycle remains attracting, but less strongly: the largest modulus of its non-trivial Floquet multipliers is \(\FloquetOpt\), against \(\FloquetInit\) for the initial guess.
 We show the limit cycles before and after optimization in Figure~\ref{fig:time_series}: the period goes from \SI{\PeriodInit}{\second} to \SI{\PeriodOpt}{\second}, and the average power from \SI{\PowerInit}{\kilo\watt} to \SI{\PowerOpt}{\kilo\watt} (\(+\PowerGain\%\)).
 These powers depend strongly on the glide ratio of the kite, \(G = C_L/C_D = \GlideRef\) here: with \(G = \GlideLow\), a value more typical of soft kites, the optimized design produces \SI{\PowerOptGlideLow}{\kilo\watt}.
@@ -118,6 +120,8 @@ Furthermore, the minimum line tension remains above \SI{\SweepMinTension}{\kilo\
   % At this level of operation and despite relatively strong changes in the environmental parameter, the braking coefficient of the arm behaves linearly with respect to wind speed.
   \label{fig:parameterized_optimization_params}
 \end{figure}
+
+The half-height \(\Delta\theta\) of the eight, held fixed in the optimization, is varied in Figure~\ref{fig:opt-dtheta}, with \(\Theta\) either held at the optimum or re-optimized at each angle.
 
 \subsection{Curvature of the kite trajectory} \label{sec:opt-curvature}
 

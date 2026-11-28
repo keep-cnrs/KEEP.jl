@@ -21,7 +21,7 @@ Slack lines are excluded: off the fold curves, \(F_\ell = 0\) at rest requires, 
 % (a Lipschitz bound of this ratio on the grid cells would turn this into a proof)
 The equilibria therefore lie on the fold curves, which are nullclines of \(\ddot\alpha\) at zero velocity, since \(\lambda = 0\) there.
 Along each fold curve, the equilibria are the zeros of the single function \(g_\pm(\tau) = \ddot\tau(\vq(\tau), 0)\), with \(\vq(\tau) = (\phi(\tau), \tau)\) or \((\phi(\tau)+\pi, \tau)\); by~\eqref{eq:K1}--\eqref{eq:K2} with \(\lambda = 0\), they are the configurations where the weight and the aerodynamic force are balanced by the tension of the lines and the reaction of the cone.
-They are bracketed by the sign changes of \(g_\pm\) on a grid of \(\FoldGrid\) values of \(\tau\), and refined by a scalar root finder; the same \(\EqCount\) equilibria are found by a nonlinear solver on the full system~\eqref{eq:equilibria} started from 100 values of \(\tau\) on each fold curve and completed by symmetry.
+They are bracketed by the sign changes of \(g_\pm\) on a grid of \(\FoldGrid\) values of \(\tau\), and refined by a scalar root finder; the same \(\EqCount\) equilibria are found by a nonlinear solver on the full system~\eqref{eq:equilibria} started from \(\EqSeeds\) values of \(\tau\) on each fold curve and completed by symmetry.
 Their tensions, given by~\eqref{eq:eom_regular}, lie between \SI{\EqTensionMin}{\newton} and \SI{\EqTensionMax}{\newton}.
 
 The solutions of~\eqref{eq:equilibria} lie at the intersections of the nullclines of \(\ddot\alpha\) and of \(\ddot\tau\), shown in Fig.~\ref{fig:equilibria-phase-space}: the nullclines of \(\ddot\tau\) cross the torus \(\mathbf{T}^2\) of configurations horizontally, those of \(\ddot\alpha\) vertically, and they meet at \(\EqCount\) points.
@@ -35,7 +35,8 @@ The two pairs with the kite near the centre of the eight have a real eigenvalue 
 With an upwind arm, each equilibrium has one more unstable eigenvalue, real and small, than its downwind counterpart.
 None of the equilibria is a possible operating point of the device, which motivates the study of the periodic motions below.
 % DRAFT (Claude, 2026-11-28), for jb to check: physical interpretation of the instability.
-At every equilibrium, the unstable eigenvectors move the kite along the eight, in \(\tau\) and \(\dot\tau\), while the arm stays at rest to first order: the instability is that of the kite on its prescribed path, not that of the arm.
+At every equilibrium, the eigenvector of the most unstable eigenvalue moves the kite along the eight, in \(\tau\) and \(\dot\tau\), while the arm stays at rest to first order: the main instability is that of the kite on its prescribed path, not that of the arm.
+The additional, slow, unstable eigenvalue of the upwind equilibria is, on the contrary, a mode of the arm: the lines pull the tip of an arm pointing upwind, away from the kite, towards the pivot, and a small rotation of the arm is amplified, as for an inverted pendulum, whereas they stabilize an arm pointing downwind, towards the kite; with the small tension at rest and the large inertia of the arm, this instability is slow.
 Near the centre of the eight, it is static: the tangential component of the aerodynamic force and of the weight vanishes at the equilibrium, and a small displacement of the kite along the eight creates a tangential component in the direction of the displacement, which amplifies it on a time scale of a tenth of a second.
 Near a tip, it is an unstable oscillation along the eight: the motion of the kite changes its apparent wind, hence its aerodynamic force, in phase with its velocity, so that the aerodynamic force feeds the motion, as in crosswind flight.
 
@@ -62,13 +63,13 @@ Near a tip, it is an unstable oscillation along the eight: the motion of the kit
 
 \subsection{Periodic orbits} \label{sec:analysis-cycles}
 
-Starting from the configuration \(\vq = (0, 0)\) at rest except for the kite, \(\vb x_0^\pm = (0, 0, 0, \pm\SI{1}{\radian\per\second})\), the trajectory settles after a few seconds into a periodic motion, along which the kite runs indefinitely along the eight in the direction given by the sign of \(\dot\tau(0)\) and the arm swings back and forth (Fig.~\ref{fig:timeseries}).
+Starting from the configuration \(\vq = (0, 0)\) at rest except for the kite, \(\vb x_0^\pm = (0, 0, 0, \pm\SI{\DtauInit}{\radian\per\second})\), the trajectory settles after a few seconds into a periodic motion, along which the kite runs indefinitely along the eight in the direction given by the sign of \(\dot\tau(0)\) and the arm swings back and forth (Fig.~\ref{fig:timeseries}).
 The angle \(\tau\) is then monotone, and a period is a lap of the eight, along which \(\tau\) increases or decreases by \(2\pi\) while \(\alpha\), \(\dot\alpha\) and \(\dot\tau\) return to their initial values.
 
 \begin{figure}[thpb]
     \centering
     \includegraphics{figs/time_series_4D}
-    \caption{Time series of the state over \SI{10}{\second} from \(\vb x_0^+\). After a few seconds the same pattern repeats: the trajectory approaches a limit cycle.}
+    \caption{Time series of the state over \SI{\TsDuration}{\second} from \(\vb x_0^+\). After a few seconds the same pattern repeats: the trajectory approaches a limit cycle.}
     \label{fig:timeseries}
 \end{figure}
 

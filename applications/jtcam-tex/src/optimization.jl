@@ -90,10 +90,11 @@ function cycle_stats(sol; n=2001)
     us = sol.(ts)
     p = sol.prob.p
     tension = PM4.compute_line_tension.(us, Ref(p))
-    ok = isfinite.(tension)
+    # the tension is exact everywhere (regular form, PM4._accelerations_tension)
+    all(isfinite, tension) || error("cycle_stats: non-finite line tension along the cycle")
     acceleration = norm.(PM4.kite_acceleration.(us, Ref(p)))
     return (; P=sol.u[end][5] / sol.t[end],
-        Tmin=minimum(tension[ok]), Tmax=maximum(tension[ok]),
+        Tmin=minimum(tension), Tmax=maximum(tension),
         amax=maximum(acceleration), period=sol.t[end])
 end
 
@@ -609,6 +610,7 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep, dtheta, dtheta_op
         "WindRef" => string(round(Int, WIND_REF)),
         "IpoptTol" => "10^{$(round(Int, log10(TOL)))}",
         "IvpTol" => "10^{$(round(Int, log10(TOL / 10)))}",
+        "PostTol" => "10^{$(round(Int, log10(TOL)))}",
         "IpoptIter" => string(opt_iter),
         "PowerInit" => r2(s0.P / 1000), "PowerOpt" => r2(s1.P / 1000),
         "PowerGain" => string(round(Int, 100 * (s1.P / s0.P - 1))),
@@ -882,7 +884,7 @@ function run_optimization(; fast::Bool=false)
     files = String[]
 
     p_start = PMP.build_para(w0=WIND_REF)
-    p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
+    p_start.b = PMP.optimal_torque_slope(p_start; tol=1e-9, rtol=1e-9, maxiter=50)  # b = I ω
     lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
     upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
 
