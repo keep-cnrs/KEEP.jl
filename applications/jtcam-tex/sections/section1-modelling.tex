@@ -21,6 +21,7 @@ The position of the kite, \(\vb r\), is restricted by two geometric constraints 
   \includestandalone[width=0.6\textwidth]{figs/configuration}
   \caption{Configuration of the system. The vector $\vb a$ represents the arm, connected at point $A$ (tip of the arm) to the kite $K$ by the lines $\boldsymbol{\ell}$.}
   \label{fig:config}
+  % web-code: figs/configuration.tex
 \end{figure}
 
 % \paragraph{The eight on the sphere and its cone.}
@@ -48,6 +49,7 @@ Indeed, \(\vu r(\tau_1) = \vu r(\tau_2)\) with \(\tau_1\neq\tau_2\) requires \(\
   \includegraphics[width=0.6\textwidth]{figs/eight_plot}
   \caption{The spherical eight \(\mathscr{E}\), parameterized by $\tau$, in the coordinates \((\phi,\theta)\); its shape is controlled by the design parameters $\theta_0$, $\Delta\theta$, and $\Delta\phi$. Trajectories with increasing $\tau$ (blue) result in a flight path that ascends in the middle and descends at the sides, while decreasing $\tau$ (orange) produces the inverse motion. The $\theta$-axis is inverted to align with the orientation of the kite's trajectory.}
   \label{fig:eight_plot}
+  % web-code: src/modelling.jl#eight_plot
 \end{figure}
 
 The kite is constrained to fly on the conical hull of the eight,
@@ -61,6 +63,7 @@ It is a ruled, developable surface (see Section~\ref{sec:opt-curvature}), smooth
   \includestandalone[width=0.7\textwidth]{figs/cone_eight}
   \caption{The cone \(\mathscr{C}\) (light blue) over the spherical eight \(\mathscr{E}\) (black) and a trajectory of the kite drawn on it (red). Each generator of the cone, such as the dashed one, meets \(\mathscr{E}\) at \(\vu r(\tau)\) and the trajectory at \(K = r\,\vu r(\tau)\). The trajectory is open and its distance to \(O\) varies. Not to scale.}
   \label{fig:cone_eight}
+  % web-code: figs/cone_eight.tex
 \end{figure}
 
 The pair \((r,\tau)\) provides coordinates on \(\mathscr{C}\): \(r = \norm{\vb r}\) is the distance to \(O\), and \(\tau\) labels the generator.
@@ -97,6 +100,7 @@ For \(a=0\), both sheets reduce to the sphere of radius \(\ell\), and so does \(
   \includegraphics[width=0.6\textwidth]{figs/spindle_torus}
   \caption{The spindle torus \(\mathscr{T}\) swept by the sphere of radius \(\ell\) centred at the arm tip, with its outer sheet (apple) and its inner sheet (lemon). The kite lies in the solid \(\mathscr{S}\) between the two sheets. The trajectory is open and its distance to \(O\) varies. Not to scale.}
   \label{fig:spindle_torus}
+  % web-code: src/modelling.jl#spindle_torus
 \end{figure}
 % TODO figure: remove title, labels, tick labels, rescale properly?
 

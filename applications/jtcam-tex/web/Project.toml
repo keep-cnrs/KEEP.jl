@@ -1,2 +1,13 @@
 [deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+KEEP = "43413fff-ad5b-4266-9485-4ac3dd215f36"
 pandoc_jll = "c5432543-76ad-5c9d-82bf-db097047a5e2"
+
+[sources]
+KEEP = {path = "../../.."}
+
+[compat]
+Documenter = "1"
+JSON = "0.21"
+julia = "1.10"

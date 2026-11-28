@@ -782,6 +782,7 @@ function run_optimization(; fast::Bool=false)
     it_ref, it_sweep, it_dtheta = fast ? (40, 25, 25) : (MAX_ITER, SWEEP_MAX_ITER, DTHETA_MAX_ITER)
     files = String[]
 
+    #region opt_setup
     p_start = PMP.build_para(w0=WIND_REF)
     p_start.b = PMP.optimal_torque_slope(p_start)  # b = I ω
     lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
@@ -790,12 +791,16 @@ function run_optimization(; fast::Bool=false)
     @info "opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, ", ")))"
     opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref)
     p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
+    #endregion
 
+    #region opt_wind_sweep
     winds = range(5, 15, length=fast ? 3 : 11)
     i_ref = findfirst(x -> x >= WIND_REF, winds)
     @info "opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s"
     sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref; iters=it_sweep, strict=!fast)
+    #endregion
 
+    #region opt_dtheta
     dtheta_angles = collect(range(DTHETA_RANGE..., length=fast ? 3 : 10))
     @info "opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles"
     dtheta = dtheta_study(p_ref, dtheta_angles)
@@ -803,33 +808,45 @@ function run_optimization(; fast::Bool=false)
     dsweep = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
         nominal=rad2deg(p_ref.Δθ), iters=it_dtheta, step=fast ? 3.0 : DTHETA_STEP)
     dtheta_opt, dtheta_lost = dsweep.stats, dsweep.lost_below
+    #endregion
 
+    #region opt_landscape
     LANDSCAPE = landscape(p_ref, SYMS; lower, upper, npoints=fast ? 5 : 21)
+    #endregion
 
+    #region opt_tables
     ## Tables
     table_descr, table_opt = latex_tables(p_start, p_ref, lower, upper)
     push!(files, write_table("table2", table_descr), write_table("table3", table_opt))
     @warn "table4: values to be checked vs. Alain's computation"
     push!(files, write_table("table4", comparison_table(p_start, p_ref)))
     push!(files, write_table("numbers", numbers_tex(; p_start, p_ref, opt_iter=opt_ref.iter, winds, sweep, dtheta, dtheta_opt, dtheta_lost)))
+    #endregion
 
     ## Figures
     my_defaults()
+    #region fig_wind_sweep
     (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
     for (f, panel) in zip(panels, ("power", "tension", "params"))
         plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
         append!(files, save_figure(f, "optimization_wind_sweep_$(panel)"))
     end
+    #endregion
 
     my_defaults()
+    #region fig_dtheta
     fig_dtheta = plot_dtheta(dtheta, dtheta_opt, GUIDES, rad2deg(p_ref.Δθ))
     append!(files, save_figure(fig_dtheta, "optimization_dtheta"))
+    #endregion
 
     my_defaults()
+    #region fig_landscape
     fig_land = plot_landscape(LANDSCAPE, GUIDES)
     append!(files, save_figure(fig_land, "optimization_landscape"))
+    #endregion
 
     my_defaults()
+    #region fig_timeseries
     sols = map((p_start, p_ref)) do p
         LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
     end
@@ -837,6 +854,7 @@ function run_optimization(; fast::Bool=false)
     # "Dynamic optimum" is the same system optimized for average power.
     fig_ts = plot_time_series_grid(sols; titles=("PTO optimum", "Dynamic optimum"))
     append!(files, save_figure(fig_ts, "optimization_timeseries_all"))
+    #endregion
     return files
 end
 

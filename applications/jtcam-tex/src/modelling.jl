@@ -14,6 +14,7 @@ using LinearAlgebra: norm
 include(joinpath(@__DIR__, "helpers.jl"))
 
 function run_modelling(; fast::Bool=false)
+    #region spindle_torus
     ## Spindle torus
     a, l = 2, 3
 
@@ -85,7 +86,9 @@ function run_modelling(; fast::Bool=false)
         zticks=edge_ticks(fig[1], :z; include_zero=true))
 
     files = save_figure(fig, "spindle_torus")
+    #endregion
 
+    #region eight_plot
     ## Parametrisation in tau
     τ_φ = 90.0
     τ_θ = 225.0
@@ -114,6 +117,7 @@ function run_modelling(; fast::Bool=false)
     annotate!(-dx + 0.05, dy + 0.25, (raw"$\dot{\tau} < 0$", ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
     plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
     append!(files, save_figure(current(), "eight_plot"))
+    #endregion
     return files
 end
 

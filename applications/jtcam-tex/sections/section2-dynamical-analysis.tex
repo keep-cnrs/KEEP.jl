@@ -37,6 +37,7 @@ None of the equilibria is a possible operating point of the device, which motiva
 % (0/0 of the line tension on the fold): the spectrum of its sigma-twin is used (src/analysis.jl, equilibrium_spectra).
 
 \input{tables/table5}
+% web-code: src/analysis.jl#table5
 
 \begin{figure}[thpb]
     \centering
@@ -46,6 +47,7 @@ None of the equilibria is a possible operating point of the device, which motiva
     The equilibria lie at their intersections: white markers for a downwind arm, black ones for an upwind arm, circles when the kite is near the centre of the eight and diamonds when it is near a tip.
     The background is light grey when the arm points downwind and light red when it points upwind.}
     \label{fig:equilibria-phase-space}
+    % web-code: src/analysis.jl#setup_analysis src/analysis.jl#equilibria_style src/analysis.jl#equilibria_phase_space
 \end{figure}
 
 \begin{figure}[thpb]
@@ -55,6 +57,7 @@ None of the equilibria is a possible operating point of the device, which motiva
     The eight is projected on the horizontal plane without the correction of the radial distance \(r\) by the angle of the arm.
     At every equilibrium, the projections of the arm and of the lines on the horizontal plane are aligned.}
     \label{fig:equilibria-eight-circle}
+    % web-code: src/analysis.jl#equilibria_eight_circle
 \end{figure}
 
 \subsection{Periodic orbits} \label{sec:analysis-cycles}
@@ -67,6 +70,7 @@ The angle \(\tau\) is then monotone, and a period is a lap of the eight, along w
     \includegraphics{figs/time_series_4D}
     \caption{Time series of the state over \SI{10}{\second} from \(\vb x_0^+\). After a few seconds the same pattern repeats: the trajectory approaches a limit cycle.}
     \label{fig:timeseries}
+    % web-code: src/analysis.jl#time_series_4D
 \end{figure}
 
 We study these motions on the Poincaré section
@@ -100,6 +104,7 @@ Both cycles are therefore strongly attracting: a perturbation is damped by more 
     \caption{Convergence to the fixed point of the first return map, for \(\dot\tau > 0\) (left) and \(\dot\tau < 0\) (right): distance from the \(i\)-th crossing of \(\Sigma\) to the limit, as a function of the number of laps of the eight (a lap is a sweep of \(\tau\) over \(2\pi\)).
     The linear trend in log scale shows an exponential convergence: at each lap, the distance to the limit is divided by about \(10^{\ConvRatePlus}\) (\(\dot\tau > 0\)) or \(10^{\ConvRateMinus}\) (\(\dot\tau < 0\)), until it stalls near the integration tolerance, set at \(\ConvTol\).}
     \label{fig:limit_cycle_convergence}
+    % web-code: src/analysis.jl#limit_cycle_convergence
 \end{figure}
 
 The two limit cycles, one for each direction of travel of the kite along the eight, are close but distinct (Fig.~\ref{fig:yz_limit_cycle}).
@@ -117,6 +122,7 @@ The lines remain taut along both cycles, as required in Section~\ref{sec:model-f
     \includegraphics{figs/yz_limit_cycles}
     \caption{Projection of the trajectory of the kite on the \(YZ\) plane for the two limit cycles, with opposite directions of travel (the arrows give the direction of motion of the kite). The inset, a zoom, shows that the two paths are distinct.}
     \label{fig:yz_limit_cycle}
+    % web-code: src/analysis.jl#yz_limit_cycles
 \end{figure}
 
 No other limit cycle was found.

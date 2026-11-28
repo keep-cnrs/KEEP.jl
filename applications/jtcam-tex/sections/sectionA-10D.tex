@@ -357,6 +357,7 @@ Another limitation of this approach include the reliance on an external symbolic
     \caption{Kite trajectory of the 10D model integrated with a loose tolerance: short horizon (left), long horizon (middle), long horizon with the manifold projection callback (right).
     Without the callback, the positions given by $\vb r$ and by $\vb a + \boldsymbol{\ell}$ drift apart.}
     \label{fig:traj-10D}
+    % web-code: src/numerics_10d.jl#setup_10d src/numerics_10d.jl#traj_10d
 \end{figure}
 
 \begin{figure}[thpb]
@@ -364,6 +365,7 @@ Another limitation of this approach include the reliance on an external symbolic
     \includegraphics{figs/residuals_10D_interp}
     \caption{Residuals of the configuration constraints of the 10D model on position (top) and on velocity (bottom) along the trajectory, without and with the manifold projection callback.}
     \label{fig:residuals-10D}
+    % web-code: src/numerics_10d.jl#setup_10d src/numerics_10d.jl#residuals_10d
 \end{figure}
 
 As previously mentioned, this model has five states but only two degrees of freedom; this observation motivates the main result of the paper, which is a whole rewrite of the model by having only two states and no configuration constraint.

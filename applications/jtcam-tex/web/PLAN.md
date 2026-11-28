@@ -54,3 +54,16 @@ The web site is a build product of both. It is never edited by hand.
   - 8 warnings for `\vb`/`\vu` in figure captions (alt text only; MathJax renders the caption itself).
   - Figures: only some `\includegraphics` came out as images; check the PDF-only ones and point all of them to the PNGs.
   - `\ac{}`: first use should give the long form (glossaries behaviour).
+
+## Implementation (P2-P5, 2026-11-28)
+
+- `web/make.jl` builds the site: `julia --project=applications/jtcam-tex/web applications/jtcam-tex/web/make.jl [--aux=main.aux] [--deploy]`. Generated pages go to `web/src/`, the site to `web/build/` (both ignored).
+- Numbering: read from `main.aux` (make.jl runs latexmk unless `--aux` is given), so sections, equations, figures and tables carry the PDF's numbers; `\eqref`/`\ref` become links across pages. Equations get explicit `\tag{n}` (MathJax `tags = "none"`), with an HTML anchor per label.
+- Text: pandoc reads a copy of the sources with web-only rewrites (`TEX_FIXES` in make.jl: siunitx `S` columns -> `r`); `web/macros.tex` is read first (`\alter` and `\addcite` empty), and pandoc reads `mymacros.sty` itself. `web/filters/paper.lua` splits the pages, numbers, rewrites `\SI`/`\si`/`\ang` in maths, and renders the text with pandoc's HTML writer inside ```` ```@raw html ```` blocks; subsection headers are Documenter headers.
+- Deviations from the plan above:
+  1. Citations: pandoc citeproc (author-date, with links to a References page) instead of DocumenterCitations.jl, since the text is raw HTML for Documenter.
+  2. Search: Documenter's search only indexes the headers and the code pages (the text is raw HTML).
+  3. Code pages: the files are shown verbatim (```` ```julia ```` blocks with a GitHub link) instead of Literate.jl, which would turn the comments into prose.
+  4. TikZ figures: SVG through `pdftocairo` in CI; locally a PNG through Ghostscript if `JTCAM_GS` points to a `gs` binary.
+- Code markers: `% web-code: <file>#<region> ...` after a `\label` (figures) or after the `\input` of a generated table; `<file>` alone shows a whole file (TikZ). Regions are `#region name` ... `#endregion` lines in `src/*.jl`.
+- CI: job `web` of `.github/workflows/jtcam-tex.yml`, after `figures`. Dispatch with `fast=false`, or a tag: `web/check_results.jl` compares the regenerated tables with the committed ones (relative tolerance 1e-6, `\SigmaGap` within one decade), then the site is built from the regenerated results and deployed to `gh-pages/jtcam/` (Documenter `deploydocs(dirname="jtcam", versions=nothing)`, KEEP's own docs untouched). Pull requests and fast dispatches: build only, uploaded as the artifact `jtcam-tex-web`.

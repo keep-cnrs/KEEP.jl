@@ -16,6 +16,7 @@ using LinearAlgebra: norm
 include(joinpath(@__DIR__, "helpers.jl"))
 
 function run_10d(; fast::Bool=false)
+    #region setup_10d
     ## Setup
     p = PMP.build_para()
     τ0, dτ0 = 1e-10, 10
@@ -25,7 +26,9 @@ function run_10d(; fast::Bool=false)
     cb_tol = 1e-10
     callback = PM10.build_manifold_projection(u0_10; save=true, tol=cb_tol)
     callback_no_save = PM10.build_manifold_projection(u0_10; save=false, tol=cb_tol)
+    #endregion
 
+    #region traj_10d
     # Physical plots at loose tolerance, to exaggerate the drift of the raw 10D model.
     tf_short, tf, tol = 20, 100, 1e-3
     sol10 = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol)
@@ -49,7 +52,9 @@ function run_10d(; fast::Bool=false)
             zticks=edge_ticks(tf_fig[i], :z; include_zero=true))
     end
     files = save_figure(tf_fig, "trajectory_10D_short_long_cb")
+    #endregion
 
+    #region residuals_10d
     ## Interpolated residuals
     tf_long = fast ? 100 : 1000
     sol10 = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6)
@@ -72,6 +77,7 @@ function run_10d(; fast::Bool=false)
     plot(fig_pos, fig_speed, layout=(2, 1), size=SIZE_HALF .* (1, 1.5))
     plot!(bottommargin=3Plots.mm, leftmargin=6Plots.mm)
     append!(files, save_figure(current(), "residuals_10D_interp"))
+    #endregion
     return files
 end
 

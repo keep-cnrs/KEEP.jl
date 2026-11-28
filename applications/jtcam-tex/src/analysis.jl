@@ -55,6 +55,7 @@ function eor_transform(sym)
     return lowercase(s)
 end
 
+#region param_table
 function param_table(p)
     # symbol, description, unit, optional value override
     params = [
@@ -106,6 +107,7 @@ function param_table(p)
 \end{table}"""
     return table_str
 end
+#endregion
 
 
 """
@@ -367,14 +369,19 @@ function equilibria_table(pairs)
 end
 
 function run_analysis(; fast::Bool=false)
+    #region setup_analysis
     ## Determine optimal parameters using kinetic model
     p0 = PMP.build_para()
     p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
     vbp = PMP.build_vbpara(p0)
+    #endregion
 
+    #region table1
     write_table("table1", param_table(p0))
+    #endregion
     files = String[]
 
+    #region equilibria_style
     #! format: off
     my_theme = (;
         downwind        = (; c=plot_color(:grey, 0.08)),
@@ -408,7 +415,9 @@ function run_analysis(; fast::Bool=false)
     theme = my_theme
 
     f = q -> SteadyState.ddq_partial(q, vbp)
+    #endregion
 
+    #region equilibria_phase_space
     # Canvas & Layout
     δ = 0
     plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
@@ -459,7 +468,9 @@ function run_analysis(; fast::Bool=false)
     plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
         topmargin=5Plots.mm, size=plot_size(1, 1.14))
     append!(files, save_figure(current(), "equilibria_phase_space"))
+    #endregion
 
+    #region equilibria_eight_circle
     ss_downwind = [_ss for _ss in ss if cos(_ss[1]) > 0]
     ss_upwind = [_ss for _ss in ss if cos(_ss[1]) <= 0]
     p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:black, lw=2),
@@ -471,13 +482,17 @@ function run_analysis(; fast::Bool=false)
 
     plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
     append!(files, save_figure(current(), "equilibria_eight_circle"))
+    #endregion
 
+    #region time_series_4D
     u0 = PM4.build_u(; dτ=1)
     sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
 
     sim_4D_fig = plot_time_series(sol)
     append!(files, save_figure(sim_4D_fig, "time_series_4D"))
+    #endregion
 
+    #region limit_cycle_convergence
     (p_conv_p, slope_p) = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
     (p_conv_m, slope_m) = plot_convergence_panel(vbp, -1, 2; ntrace=0)
     plot!(p_conv_p, leftmargin=11Plots.mm)
@@ -486,7 +501,9 @@ function run_analysis(; fast::Bool=false)
     conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
     plot!(bottommargin=7Plots.mm)
     append!(files, save_figure(conv_two, "limit_cycle_convergence"))
+    #endregion
 
+    #region yz_limit_cycles
     r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
     lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
     lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
@@ -536,10 +553,13 @@ function run_analysis(; fast::Bool=false)
     plot!(l, tickfontsize=TICKFONTSIZE - 1)
     plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
     append!(files, save_figure(current(), "yz_limit_cycles"))
+    #endregion
 
     ## Numbers of the text: equilibria, cycles, inventory
+    #region table5
     pairs = equilibrium_spectra(ss, vbp; is_down, is_center)
     push!(files, write_table("table5", equilibria_table(pairs)))
+    #endregion
     length(ss) == 8 || @warn "the text describes 8 equilibria" n = length(ss)
     all(p -> p.nunstable > 0, pairs) || @warn "the text says that all equilibria are unstable"
     pick(down, center) = only(filter(p -> p.down == down && p.center == center, pairs))
