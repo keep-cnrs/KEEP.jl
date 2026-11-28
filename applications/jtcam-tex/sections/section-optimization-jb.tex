@@ -241,7 +241,7 @@ For \(a>0\), see the a posteriori check above.
     \centering
         \includegraphics{figs/optimization_dtheta.pdf}
     \caption{Average power (left, normalized by its value \(P^*\) at the nominal \(\Delta\theta=\DthetaFixed^\circ\)) and min--max line tension (right) as \(\Delta\theta\) varies, with \(\Theta\) held at the optimum (points) and re-optimized at each angle (line with triangles, shaded envelope).
-    \(\Theta\) is re-optimized by continuation from the nominal angle, in warm-started steps of at most \SI{\DthetaStep}{\degree}; below the nominal angle, the continuation is lost at \(\DthetaLost^\circ\), so that no re-optimized value is shown at smaller angles.
+    \(\Theta\) is re-optimized by continuation from the nominal angle, in warm-started steps of at most \SI{\DthetaStep}{\degree}; \DthetaBelow.
     With \(\Theta\) held, the power peaks at the nominal angle and loses \SI{\DthetaFixedLoss}{\percent} at \(\DthetaMax^\circ\); re-optimized, it decreases steadily above the nominal angle and loses \SI{\DthetaOptLoss}{\percent} at \(\DthetaMax^\circ\).}
     \label{fig:opt-dtheta}
     % web-code: src/optimization.jl#opt_dtheta src/optimization.jl#fig_dtheta

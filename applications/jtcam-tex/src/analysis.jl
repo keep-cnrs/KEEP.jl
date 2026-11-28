@@ -335,6 +335,24 @@ function fold_roots(vbp; n=3600)
 end
 
 """
+Pendulum model of the arm at the equilibrium `q` (on a fold curve): the kite frozen and
+the tension F_ℓ held at its value at rest, the arm equation linearized in δα reads
+I δα̈ + b δα̇ = k δα with k = a F_ℓ ∂λ/∂α = -a F_ℓ (r/ℓ) sinθ cos(φ - α): k > 0 for an
+upwind arm (inverted pendulum), k < 0 for a downwind arm. Returns the largest real root `s` of I s² + b s - k = 0, and the relative
+gap `rel` to the closest real eigenvalue of the Jacobian of the full system.
+"""
+function pendulum_rate(q, vbp, p)
+    k = PM4._kinematics(q[1], q[2], vbp)
+    F = PM4.compute_line_tension(SA[q[1], q[2], 0.0, 0.0], vbp)
+    stiff = -k.A * F * (k.R / k.ELL) * sin(k.θ) * cos(k.φ - q[1])
+    s = (-p.b + sqrt(p.b^2 + 4p.I * stiff)) / (2p.I)
+    λ = eigvals(state_jacobian((q[1], q[2], 0.0, 0.0), vbp))
+    real_λ = real.(filter(z -> abs(imag(z)) < 1e-10, λ))
+    μ = real_λ[argmin(abs.(real_λ .- s))]
+    return (; s, μ, rel=abs(s - μ) / abs(μ), upwind=cos(q[1]) < 0)
+end
+
+"""
 Lower bound, over an `n`×`n` grid of the torus of configurations, of the ratio between
 the tangential part (on the plane of the cone) of F_a + F_g at rest and its norm. Off the
 fold curves, slack lines at rest require this tangential part to vanish (projections of
@@ -620,6 +638,9 @@ function run_analysis(; fast::Bool=false)
     length(ss) == 8 || @warn "the text describes 8 equilibria" n = length(ss)
     all(p -> p.nunstable > 0, pairs) || @warn "the text says that all equilibria are unstable"
     all(p -> p.arm < 1e-2, pairs) || @warn "the text says the dominant unstable mode of every equilibrium is along the eight" getproperty.(pairs, :arm)
+    pend = [pendulum_rate(p.q, vbp, p0) for p in pairs]
+    all(x -> x.upwind == (x.s > 0), pend) && maximum(x -> x.rel, pend) < 0.1 ||
+        @warn "the text says the pendulum model predicts the slow arm eigenvalue (unstable upwind, stable downwind)" pend
     all(p -> p.down ? isnan(p.armslow) : p.armslow > 0.5, pairs) ||
         @warn "the text says the extra unstable mode of the upwind equilibria is a mode of the arm" getproperty.(pairs, :armslow)
     pick(down, center) = only(filter(p -> p.down == down && p.center == center, pairs))
@@ -715,6 +736,7 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\DtauInit}{$(f"{DTAU_INIT:g}")}",
         "\\newcommand{\\TsDuration}{$TS_DURATION}",
         "\\newcommand{\\ArmLength}{$(f"{p0.a:g}")}",
+        "\\newcommand{\\PendRelErr}{$(round(Int, ceil(100 * maximum(x -> x.rel, pend))))}",
         "\\newcommand{\\InvSeeds}{$n_inv}",
         "\\newcommand{\\InvVmax}{$vmax_inv}",
         "\\newcommand{\\InvCount}{$(length(lcs))}",
