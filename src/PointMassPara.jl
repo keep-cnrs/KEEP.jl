@@ -42,7 +42,7 @@ DEFAULT_PARA = ComponentArray(
     Ωlim=deg2rad(720), # rad s^-1
     Cmax=15_000.0, # kg m^2 s^-2
     b=4_000.0, # kg m^2 s^-1 rad^-1
-    θ0=deg2rad(65), # rad, 0 for horizontal and 90 at zenith
+    θ0=deg2rad(65), # rad, polar angle: 0 at zenith, 90 deg for horizontal
     φ0=deg2rad(0), # rad
     Δθ=deg2rad(6), # rad
     Δφ=deg2rad(50), # rad
@@ -57,7 +57,7 @@ function build_para(; kwargs...)::Para
 end
 
 function awebox_para()::Para
-    p = build_para(a=2.0, l=50.0, m=36.8, S=3.0, I=2000, b=1500, C_D_l=1.2, ρ_l=1464, d_l=2e-3, z0=10.0, w0=9.0, n=1 / 0.15)
+    p = build_para(a=2.0, l=50.0, m=36.8, S=3.0, I=2000, b=1500, C_D_l=1.2, ρ_l=1464, d_l=2e-3, z0=10.0, w0=9.0, n_wind=1 / 0.15)
 end
 
 
@@ -172,17 +172,18 @@ vbp = build_vbpara(p0)
 The limit cycle solver lives in `KEEP.LimitCycle`, which is included after this
 module, hence the runtime lookup.
 """
-function optimal_torque_slope(p=build_para(); sense=+, tol=1e-3, maxiter=5, rtol=1e-4)
+function optimal_torque_slope(p=build_para(); sense=+, tol=1e-3, maxiter=20, rtol=1e-4)
     vbp = build_vbpara(p)
     L, M, T = lmt(vbp)
     b = p.b
     for _ in 1:maxiter
-        period = parentmodule(@__MODULE__).LimitCycle.compute_limit_cycle(vbp; sense, tol).t[end]
-        b = p.I * 2π / period
-        abs(vbp.b * M * L^2 / T - b) <= rtol * b && break
+        lc = parentmodule(@__MODULE__).LimitCycle.compute_limit_cycle(vbp; sense, tol)
+        lc === nothing && error("optimal_torque_slope: no limit cycle at b = \$(vbp.b * M * L^2 / T)")
+        b = p.I * 2π / lc.t[end]
+        abs(vbp.b * M * L^2 / T - b) <= rtol * b && return b
         vbp.b = b * T / (M * L^2)  # physical b -> normalized
     end
-    return b
+    error("optimal_torque_slope: the fixed point b = I ω(b) did not converge in \$maxiter iterations (rtol = \$rtol)")
 end
 
 @doc raw"""

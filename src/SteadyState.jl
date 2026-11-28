@@ -95,10 +95,11 @@ function unique_steady_states(steady_states; tol=DEFAULT_TOLERANCE)
 end
 
 """
-Take unique steady states, augment them using the symmetry of the system, and then take unique steady states again"""
+Take unique steady states, add their images by the symmetry σ: (α, τ) ↦ (-α, τ - π) of the
+system, and then take unique steady states again"""
 function process_steady_states(steady_states, tol=DEFAULT_TOLERANCE)
     steady_states = unique_steady_states(steady_states; tol=tol)
-    steady_states = [[-α, τ - π] for (α, τ) in steady_states]
+    steady_states = vcat(steady_states, [[-α, τ - π] for (α, τ) in steady_states])
     steady_states = unique_steady_states(steady_states; tol=tol)
     return steady_states
 end
