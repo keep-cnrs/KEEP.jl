@@ -8,7 +8,7 @@
 # tolerance) and get their own rule. Exits with status 1 on a difference.
 
 const ROOT = dirname(@__DIR__)
-const RTOL = 1e-6
+const RTOL = 1e-5  # tables print about 6 significant digits; b is printed with more (review finding 10)
 
 # macro => check(committed, regenerated) on the numbers of its line
 const HOST_DEPENDENT = Dict(
@@ -35,8 +35,15 @@ function compare(file, ref)
         end
         x, y = numbers(a), numbers(b)
         m = macro_of(a)
-        ok = m !== nothing && haskey(HOST_DEPENDENT, m) ? HOST_DEPENDENT[m](x, y) :
-             all(isapprox.(x, y; rtol=RTOL))
+        ok = if m !== nothing && haskey(HOST_DEPENDENT, m)
+            HOST_DEPENDENT[m](x, y)
+        elseif occursin("residual", a)
+            # solver residuals: floating-point noise below the tolerance, compare orders of magnitude
+            m = "residual"
+            all(abs.(round.(log10.(abs.(x) .+ 1e-300)) .- round.(log10.(abs.(y) .+ 1e-300))) .<= 1)
+        else
+            all(isapprox.(x, y; rtol=RTOL))
+        end
         ok ? println("  $file:$i: within tolerance ($(something(m, "numbers")))") :
              push!(errs, "$file:$i: numbers differ\n  committed:   $a\n  regenerated: $b")
     end
