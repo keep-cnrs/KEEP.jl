@@ -365,7 +365,23 @@ function build()
                 "KEEP functions" => "api.md"],
         ],
     )
+    unversioned(joinpath(WEB, "build"))
     return nothing
+end
+
+"""
+The site is not versioned (deployed to gh-pages/jtcam/ with `versions=nothing`): drop the
+`siteinfo.js` and `versions.js` scripts, which would otherwise load the version selector of
+KEEP's own documentation from the gh-pages root.
+"""
+function unversioned(dir)
+    for (root, _, files) in walkdir(dir), f in files
+        endswith(f, ".html") || continue
+        p = joinpath(root, f)
+        s = read(p, String)
+        s2 = replace(s, r"<script src=\"(\.\./)*(siteinfo|versions)\.js\"></script>" => "")
+        s2 == s || write(p, s2)
+    end
 end
 
 build()

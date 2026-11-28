@@ -75,7 +75,8 @@ local function si_unit(u)
   local out = {}
   for _, p in ipairs(parts) do
     local s
-    if p.sym == "deg" then s = "{}^\\circ"
+    if p.sym == "deg" and p.pow == 1 then s = "{}^\\circ"
+    elseif p.sym == "deg" then s = "\\mathrm{deg}"
     elseif p.sym == "%" then s = "\\%"
     else s = "\\mathrm{" .. p.sym .. "}" end
     if p.pow ~= 1 then s = s .. "^{" .. p.pow .. "}" end
@@ -111,10 +112,34 @@ local function number_line(line)
   if lab then
     local L = labels[lab]
     local n = L and L.num or tostring(eqcounter)
-    if L and tonumber(L.num) then eqcounter = tonumber(L.num) end
+    if L and tonumber(L.num) then
+      if tonumber(L.num) ~= eqcounter then
+        io.stderr:write("paper.lua: equation counter " .. eqcounter .. " resynchronized to " .. L.num .. " at " .. lab .. "\n")
+      end
+      eqcounter = tonumber(L.num)
+    end
     return (line:gsub("\\label%s*{[^}]*}", "\\tag{" .. n .. "}"))
   end
   return line .. "\\tag{" .. eqcounter .. "}"
+end
+
+-- split an align body at its top-level \\ (not inside braces nor a nested environment)
+local function split_rows(body)
+  local rows, depth, start, i, n = {}, 0, 1, 1, #body
+  while i <= n do
+    local c = body:sub(i, i)
+    if c == "{" then depth = depth + 1; i = i + 1
+    elseif c == "}" then depth = depth - 1; i = i + 1
+    elseif body:sub(i, i + 6) == "\\begin{" then depth = depth + 1; i = body:find("}", i, true) + 1
+    elseif body:sub(i, i + 4) == "\\end{" then depth = depth - 1; i = body:find("}", i, true) + 1
+    elseif body:sub(i, i + 1) == "\\\\" then
+      if depth == 0 then table.insert(rows, body:sub(start, i - 1)); start = i + 2 end
+      i = i + 2
+    elseif c == "\\" then i = i + 2  -- skip escaped characters such as \{
+    else i = i + 1 end
+  end
+  table.insert(rows, body:sub(start))
+  return rows
 end
 
 local function number_equation(m)
@@ -124,8 +149,7 @@ local function number_equation(m)
     return "\\begin{equation}" .. number_line(body) .. "\\end{equation}"
   elseif env == "align" or env == "gather" or env == "multline" then
     local body = m:match("^%s*\\begin{" .. env .. "}(.*)\\end{" .. env .. "}%s*$")
-    local lines = {}
-    for line in (body .. "\\\\"):gmatch("(.-)\\\\") do table.insert(lines, line) end
+    local lines = split_rows(body)
     if lines[#lines]:match("^%s*$") then table.remove(lines) end
     for i, l in ipairs(lines) do lines[i] = number_line(l) end
     return "\\begin{" .. env .. "}" .. table.concat(lines, "\\\\") .. "\\end{" .. env .. "}"
