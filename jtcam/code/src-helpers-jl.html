@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>src/helpers.jl · Rocking arm model for kite power generation</title><meta name="title" content="src/helpers.jl · Rocking arm model for kite power generation"/><meta property="og:title" content="src/helpers.jl · Rocking arm model for kite power generation"/><meta property="twitter:title" content="src/helpers.jl · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../intro.html">Introduction</a></li><li><a class="tocitem" href="../section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="../section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="../section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="../section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="../appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="../appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="../appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="../appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="../references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="../reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="main-jl.html">main.jl</a></li><li class="is-active"><a class="tocitem" href="src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="../api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Code</a></li><li class="is-active"><a href="src-helpers-jl.html">src/helpers.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="src-helpers-jl.html">src/helpers.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="src/helpers.jl"><a class="docs-heading-anchor" href="#src/helpers.jl"><code>src/helpers.jl</code></a><a id="src/helpers.jl-1"></a><a class="docs-heading-anchor-permalink" href="#src/helpers.jl" title="Permalink"></a></h1><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/helpers.jl">View on GitHub</a> (commit <code>6f20ab5</code>).</p><pre><code class="language-julia hljs"># helpers.jl (copied from applications/jtcam/plot_helpers.jl)
+# Shared plotting helpers for the JTCAM figures: the paper theme (fonts,
+# dimensions, palette, margins), the axis-tick helper `edge_ticks`, and the
+# time-series panels with their hand-drawn legends. Merged from jtcam_theme.jl
+# and time_series.jl so a section only includes one file.
+import Plots
+using Plots
+using Plots.PlotMeasures
+using PyFormattedStrings: @f_str
+
+using KEEP: PointMass4 as PM4
+using KEEP: PointMassPara as PMP
+using KEEP: Visualization as VIZ
+using KEEP.TorqueFunction: torque_function
+
+Plots.gr()
+
+# --- Font Setup ---
+function setup_font(font_filename=&quot;LinLibertine_R.ttf&quot;)
+    otf = replace(font_filename, &quot;.ttf&quot; =&gt; &quot;.otf&quot;)
+    dirs = [@__DIR__, expanduser(&quot;~/Library/Fonts&quot;), get(ENV, &quot;JTCAM_FONT_DIR&quot;, &quot;.&quot;),
+        &quot;/usr/share/fonts/truetype/linux-libertine&quot;, &quot;/usr/share/fonts/opentype/linux-libertine&quot;]
+    # .ttf or .otf (Debian/Ubuntu fonts-linuxlibertine ships the .otf in opentype/)
+    paths = [joinpath(d, f) for d in dirs for f in (font_filename, otf)]
+    # the TeX Live copy of the font (the one LaTeX uses for the paper), when kpsewhich knows it
+    for name in (font_filename, otf)
+        try
+            found = readchomp(pipeline(`kpsewhich $name`; stderr=devnull))
+            isempty(found) || push!(paths, found)
+        catch
+        end
+    end
+
+    idx = findfirst(isfile, paths)
+    if idx !== nothing
+        font_id = Plots.GR.loadfont(abspath(paths[idx]))
+        if font_id &gt;= 0
+            Plots.gr_font_family[&quot;linux libertine&quot;] = font_id
+            return &quot;linux libertine&quot;
+        end
+    end
+
+    # in CI, a silent fallback would commit figures in the wrong font
+    get(ENV, &quot;CI&quot;, &quot;&quot;) == &quot;true&quot; &amp;&amp; error(&quot;$font_filename (or .otf) not found&quot;)
+    @warn &quot;$font_filename not found. Drop it in ~/Library/Fonts/ or beside this script, or set JTCAM_FONT_DIR. Falling back to &#39;times&#39;.&quot;
+    return &quot;times&quot;
+end
+
+const FONT = setup_font(&quot;LinLibertine_R.ttf&quot;)
+
+# --- Dimensions ---
+# LaTeX DPI is 72.27 pt/in; JTCAM textwidth is 155 mm (~441 pt), half-width is 75 mm (~213 pt)
+
+# W = \showthe\textwidth = \showthe\columnwidth = \showthe\hsize
+# WIDTH_FULL_INCH = W
+const PT_PER_INCH = 72.27  # Latex constant
+const DPI = 72  # Plots.jl constant
+
+const WIDTH_PT = 415.41025
+
+# --- Typography ---
+const FONTSIZE = 12
+const LABELFONTSIZE = FONTSIZE
+const TITLEFONTSIZE = FONTSIZE
+const TICKFONTSIZE = 10
+const LEGENDFONTSIZE = 10
+const ANNOTATIONFONTSIZE = 10
+
+# --- Sizing Functions &amp; Global Objects ---
+&quot;&quot;&quot;
+One width unit is half the text width and one height unit 3/8 of it, so
+`plot_size(1, 1)` is a half-width 4/3 plot and `plot_size(1, 2)` spans the text
+width at the same height.
+&quot;&quot;&quot;
+function plot_size(height=1, width=1; dpi=DPI)
+    width_in = width * WIDTH_PT / 2 / PT_PER_INCH
+    height_in = height * 3 * WIDTH_PT / 8 / PT_PER_INCH
+    width_px = round(Int, width_in * dpi)
+    height_px = round(Int, height_in * dpi)
+    return (width_px, height_px)
+end
+
+const SIZE_FULL = plot_size(1, 2)
+const SIZE_HALF = plot_size(1, 1)
+
+# --- Palette ---
+const PALETTE = Plots.palette(:auto)
+# Standard 8-color Okabe-Ito (Wong) palette
+# const PALETTE = okabe_ito = [
+#     colorant&quot;#E69F00&quot;,  # Orange
+#     colorant&quot;#56B4E9&quot;,  # Sky Blue
+#     colorant&quot;#009E73&quot;,  # Bluish Green
+#     colorant&quot;#F0E442&quot;,  # Yellow
+#     colorant&quot;#0072B2&quot;,  # Blue
+#     colorant&quot;#D55E00&quot;,  # Vermilion
+#     colorant&quot;#CC79A7&quot;,  # Reddish Purple
+#     colorant&quot;#000000&quot;,  # Black
+# ]
+
+# const PALETTE = Plots.palette(:Dark2_8)
+
+# JTCAM primary dark blue RGB(10, 40, 80) with harmonious accents
+# const PALETTE = [
+#     # Plots.RGB(10/255, 40/255, 80/255),  # Main accent color is too dark
+#     Plots.RGB(0/255, 140/255, 185/255),  # Opting for the brighter one
+#     Plots.RGB(0.85, 0.35, 0.15),
+#     Plots.RGB(0.15, 0.60, 0.45),
+#     Plots.RGB(0.70, 0.20, 0.50),
+#     Plots.RGB(0.40, 0.40, 0.40),
+# ]
+
+# const PALETTE = [
+#     RGB(0/255, 140/255, 185/255),  # 1. Cerulean Blue (Your anchor)
+#     RGB(235/255, 105/255, 65/255),  # 2. Coral Orange
+#     RGB(45/255, 170/255, 110/255),  # 3. Emerald Green
+#     RGB(165/255, 90/255, 195/255),  # 4. Amethyst Violet
+#     RGB(235/255, 175/255, 30/255),  # 5. Marigold Amber
+#     RGB(225/255, 70/255, 125/255),  # 6. Raspberry Rose
+#     RGB(30/255, 180/255, 175/255),  # 7. Bright Teal
+#     RGB(90/255, 110/255, 195/255),  # 8. Cornflower Indigo
+# ]
+
+
+# --- Publication Defaults ---
+function my_defaults()
+    Plots.default()
+    Plots.default(
+        thickness_scaling=0.5,
+        dpi=DPI,
+        fontfamily=FONT,
+        size=SIZE_HALF,
+        palette=PALETTE,
+        formatter=:plain,
+        label=&quot;&quot;,
+
+        # Font sizes
+        labelfontsize=LABELFONTSIZE,
+        tickfontsize=TICKFONTSIZE,
+        legendfontsize=LEGENDFONTSIZE,
+        titlefontsize=TITLEFONTSIZE,
+        annotationfontsize=ANNOTATIONFONTSIZE,
+
+        # Line &amp; Marker aesthetics
+        linewidth=3,
+        markersize=7,
+        markerstrokewidth=0,
+
+        # Axes &amp; Grid layout
+        framestyle=:box,
+        grid=true,
+        gridalpha=0.1,
+        gridlinewidth=1,
+        minorgrid=false,
+        tick_direction=:none,
+
+        # Margins &amp; Legends
+        margin=0Plots.mm, # 4Plots.mm,
+        legend=:topright,
+        legend_background_color=Plots.RGBA(1.0, 1.0, 1.0, 0.85),
+        widen=true
+    )
+end
+
+# Outputs of the paper: figures (pdf + png) in figs/, tables (tex) in tables/,
+# both next to main.tex.
+# JTCAM_OUT_DIR redirects both (smoke tests, CI dry runs) without touching the paper files.
+const OUT_ROOT = get(ENV, &quot;JTCAM_OUT_DIR&quot;, dirname(@__DIR__))
+const FIGS_DIR = mkpath(joinpath(OUT_ROOT, &quot;figs&quot;))
+const TABLES_DIR = mkpath(joinpath(OUT_ROOT, &quot;tables&quot;))
+const PNG_DPI = 300
+
+&quot;&quot;&quot;
+Save `fig` as `figs/&lt;name&gt;.pdf` and `figs/&lt;name&gt;.png`; return the list of paths.
+&quot;&quot;&quot;
+function save_figure(fig, name::AbstractString)
+    paths = String[]
+    for ext in (&quot;pdf&quot;, &quot;png&quot;)
+        path = joinpath(FIGS_DIR, &quot;$name.$ext&quot;)
+        if ext == &quot;png&quot;
+            plot!(fig; dpi=PNG_DPI)  # high-resolution raster, after the (vector) pdf
+            Plots.png(fig, path)
+        else
+            Plots.pdf(fig, path)
+        end
+        push!(paths, path)
+    end
+    @info &quot;figure written&quot; name
+    return paths
+end
+
+&quot;Write the LaTeX string `str` to `tables/&lt;name&gt;.tex`; return the path.&quot;
+function write_table(name::AbstractString, str::AbstractString)
+    path = joinpath(TABLES_DIR, &quot;$name.tex&quot;)
+    write(path, endswith(str, &quot;\n&quot;) ? str : str * &quot;\n&quot;)
+    @info &quot;table written&quot; name
+    return path
+end
+
+my_defaults()
+
+# --- Axes ---
+&quot;&quot;&quot;
+First and last of the default ticks of the axis `axis` (`:x`, `:y` or `:z`) of
+subplot `sp`, plus zero when `include_zero` and zero lies strictly between them.
+&quot;&quot;&quot;
+function edge_ticks(sp, axis; include_zero=false)
+    ticks = first(Plots.get_ticks(sp, sp[Symbol(axis, :axis)]))
+    lo, hi = first(ticks), last(ticks)
+    return include_zero &amp;&amp; lo &lt; 0 &lt; hi ? [lo, 0.0, hi] : [lo, hi]
+end
+
+&quot;Tick label without trailing zeros: `0.9` instead of `0.900`, `1` instead of `1.0`.&quot;
+plain_tick(x) = f&quot;{x:g}&quot;
+
+# --- Time series ---
+# One simulation, three panels (states, average power, line tension), shared by
+# the numerical-analysis and optimization sections. The legends are drawn by
+# hand, one per row, in a dedicated column so every panel keeps the same width
+# and the x axes can be linked. In a grid, the y limits of a row are shared by
+# all columns.
+
+&quot;&quot;&quot;
+Wrapped-τ series: main polyline on the grid with a NaN sample at each 2π
+crossing, plus the crossings as NaN-separated vertical segments (crossing
+time twice, values π and -π) to be drawn dashed.
+&quot;&quot;&quot;
+function tau_wrap(ts, τm)
+    Δt = Base.step(ts)
+    tcross = [ts[i] + Δt * (π - τm[i]) / (τm[i+1] + 2π - τm[i])
+              for i in findall(diff(τm) .&lt; -π)]
+    t_jump, y_jump = Float64[], Float64[]
+    for tc in tcross
+        append!(t_jump, (tc, tc, NaN))
+        append!(y_jump, (π, -π, NaN))
+    end
+    perm = sortperm(vcat(ts, tcross))
+    t_main = vcat(ts, tcross)[perm]
+    y_main = vcat(τm, fill(NaN, length(tcross)))[perm]
+    return t_main, y_main, t_jump, y_jump
+end
+
+&quot;&quot;&quot;
+Same as `VIZ.plot_avg_power_4D`, but plotting in kW instead of W. Returns the
+panel and the y data range, so several simulations can share one power axis.
+&quot;&quot;&quot;
+function plot_avg_power_kW(sol, ts)
+    p = sol.prob.p
+    L, M, T = PMP.lmt(p)
+    t0, tf = first(ts), last(ts)
+    dα = sol.(ts, idxs=3)
+    power = dα .* torque_function.(dα .* T, (p,)) .* (M * L^2 * T^-2) ./ 1000
+    avg_power = sol(tf, idxs=5) / (tf - t0) / 1000
+    plt = plot(ts, power; c=:black, xlabel=&quot;t (s)&quot;, ylabel=&quot;Power (kW)&quot;, yticks=0:10:100)
+    plot!([t0, tf], [avg_power, avg_power]; c=:red)
+    return (; plt, lo=min(0.0, minimum(power)), hi=max(maximum(power), avg_power))
+end
+
+&quot;&quot;&quot;
+Three panels of one simulation `sol` (a transient or a limit cycle): the states
+(α, D(α), D(τ), with τ mod 2π), the instantaneous and average power, and the
+line tension, whose y ticks are 0 and the two extrema. Returns the panels and
+the data ranges used to share the y axes.
+&quot;&quot;&quot;
+function time_series_panels(sol; N=500)
+    ts = range(sol.t[1], sol.t[end], N)
+    q_ts = reduce(hcat, sol.(ts))&#39;  # interpolated states on the grid
+    τm = mod.(q_ts[:, 2], 2π) .- π
+    @assert all(-π .&lt;= τm .&lt; π)
+    @assert all(diff(τm) .&lt; π)  # τ is monotonically increasing through the wraps
+    one_period = abs(abs(q_ts[end, 2] - q_ts[1, 2]) - 2π) &lt;= 1e-3
+
+    t_main, y_main, t_jump, y_jump = tau_wrap(ts, τm)
+    q_deg = rad2deg.(q_ts[:, [1, 3, 4]])
+    p_wts = plot(ts, q_deg; c=[1 3 4], ylabel=&quot;x (deg, deg/s)&quot;, xlabel=&quot;&quot;, xformatter=x -&gt; &quot;&quot;, yticks=-720:180:720)
+    plot!(t_main, rad2deg.(y_main); c=2)
+    one_period || plot!(t_jump, rad2deg.(y_jump); c=2, ls=:dot, label=false)
+
+    pw_stats = plot_avg_power_kW(sol, ts)
+    pw = pw_stats.plt
+    plot!(pw, xlabel=&quot;&quot;, xformatter=x -&gt; &quot;&quot;)
+
+    # Line tension; the ticks are the two extrema and zero. Skip samples where
+    # the geometry degenerates (aligned arm and kite), which give a NaN tension
+    # and would poison the axis limits.
+    tension = PM4.compute_line_tension.(sol.(ts), Ref(sol.prob.p)) ./ 1000
+    ok = isfinite.(tension)
+    tmin, tmax = extrema(tension[ok])
+    tmin = min(0.0, tmin)
+    p_t = plot(ts[ok], tension[ok]; c=5, ylabel=&quot;Tension (kN)&quot;, xlabel=&quot;t (s)&quot;, yticks=-100:5:100, ylim=(tmin, tmax), widen=true)
+
+    y_wts = vcat(vec(q_deg), rad2deg.(filter(isfinite, y_main)),
+        one_period ? Float64[] : rad2deg.(filter(isfinite, y_jump)))
+    return (; wts=p_wts, pw, tension=p_t,
+        ylims=(states=extrema(y_wts), power=(pw_stats.lo, pw_stats.hi),
+            tension=(tmin, tmax)))
+end
+
+&quot;&quot;&quot;
+Legend tile: one fixed-width box per row (the same axis fraction in every row,
+so all three legends match), a handle long enough to read, and a label per
+entry. The entry spacing is set in points from `row_px`, the height of one
+layout row in pixels, so the entries stay clear of the text at any `plot_size`
+(a fixed axis-fraction spacing overlaps at small heights). Plots&#39; GR legend
+would instead size the box from its labels and the handle from the subplot
+width, which is why the entries are drawn by hand.
+&quot;&quot;&quot;
+function time_series_legend(names, styles, row_px)
+    p = plot(; framestyle=:none, showaxis=false, grid=false,
+        xlims=(0, 1), ylims=(0, 1), xticks=[], yticks=[], margin=0Plots.mm)
+    n = length(names)
+    dy = 1.25 * LEGENDFONTSIZE / row_px
+    ys = 0.5 .+ dy .* ((n + 1) / 2 .- (1:n))
+    pad = 0.65dy
+    plot!(p, Shape([(0.02, last(ys) - pad), (0.98, last(ys) - pad),
+        (0.98, first(ys) + pad), (0.02, first(ys) + pad)]); c=:black, lw=1, fillcolor=:white)
+    for (y, style, name) in zip(ys, styles, names)
+        plot!(p, [0.08, 0.28], [y, y]; style...)
+        annotate!(p, 0.32, y, text(name; family=FONT, pointsize=LEGENDFONTSIZE, halign=:left))
+    end
+    return p
+end
+
+&quot;One hand-drawn legend per row: states, power, tension.&quot;
+function time_series_legends(row_px)
+    return (states=time_series_legend((&quot;α&quot;, &quot;τ mod 360°&quot;, &quot;D(α)&quot;, &quot;D(τ)&quot;),
+        ((; c=1), (; c=2), (; c=3), (; c=4)), row_px),
+        power=time_series_legend((&quot;P&quot;, &quot;Avg(P)&quot;), ((; c=:black), (; c=:red)), row_px),
+        tension=time_series_legend((&quot;T&quot;,), ((; c=5),), row_px))
+end
+
+&quot;Time series of one simulation `sol`, one hand-drawn legend per row.&quot;
+function plot_time_series(sol; kwargs...)
+    return plot_time_series_grid((sol,); kwargs...)  # same layout, so the same legend width
+end
+
+&quot;&quot;&quot;
+Several simulations side by side: one column per solution, one row per panel
+(states, power, tension). The hand-drawn legend of each row sits in a dedicated
+last column, so every panel keeps the same width; the x axes are linked inside
+each column. The y limits of a row are shared by all columns, and only the
+leftmost column labels the y ticks (the others keep the ticks, so the gridlines
+stay). `legend_width` is the fraction of the figure width given to the legend
+column. With `titles` (one per solution) a shallow first row carries a title
+over each column; the legend column of that row stays empty.
+&quot;&quot;&quot;
+function plot_time_series_grid(sols; N=500, legend_width=0.22, titles=false)
+    n = length(sols)
+    @assert titles === false || length(titles) == n &quot;one title per solution&quot;
+    panels = [time_series_panels(sol; N) for sol in sols]
+
+    # one y range per row, common to every column
+    states_lims = (minimum(first(q.ylims.states) for q in panels),
+        maximum(last(q.ylims.states) for q in panels))
+    power_lims = (0.0, maximum(last(q.ylims.power) for q in panels))
+    tension_lims = (0.0, maximum(last(q.ylims.tension) for q in panels))
+    for q in panels
+        plot!(q.wts, ylims=states_lims, widen=true)
+        plot!(q.pw, ylims=power_lims, widen=true)
+        plot!(q.tension, ylims=tension_lims, widen=true)
+    end
+
+    for q in panels[2:end], p in (q.wts, q.pw, q.tension)
+        plot!(p, ylabel=&quot;&quot;, yformatter=x -&gt; &quot;&quot;)  # ticks stay, for the gridlines
+    end
+    for (j, q) in enumerate(panels)
+        for p in (q.wts, q.pw, q.tension)
+            # the leftmost column carries the y labels, the others only ticks
+            plot!(p, leftmargin=(j == 1 ? 20 : 3)Plots.mm)
+        end
+        plot!(q.tension, bottommargin=6Plots.mm)
+    end
+
+    sz = plot_size(4 / 3, 2)
+
+    # one relative height per row: the first entry sizes the title row
+    heights = Float64[1, 1, 1]
+    titles === false || prepend!(heights, 0.01)
+    leg = time_series_legends(sz[2] / sum(heights))  # one panel row, in px
+    widths = vcat(fill((1 - legend_width) / n, n), legend_width)
+    heights ./= sum(heights)
+
+    # title row: one hidden panel per column and an empty legend cell
+    header = titles === false ? () :
+             (map(t -&gt; plot(; title=t, framestyle=:none, showaxis=false, margin=-10Plots.mm),
+        titles)..., plot(; framestyle=:none, showaxis=false))
+
+    return plot(header...,
+        [q.wts for q in panels]..., leg.states,
+        [q.pw for q in panels]..., leg.power,
+        [q.tension for q in panels]..., leg.tension;
+        layout=grid(length(heights), n + 1; heights=heights, widths=widths),
+        link=:x, size=sz)
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="main-jl.html">« main.jl</a><a class="docs-footer-nextpage" href="src-modelling-jl.html">src/modelling.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>figs/cone_eight.tex · Rocking arm model for kite power generation</title><meta name="title" content="figs/cone_eight.tex · Rocking arm model for kite power generation"/><meta property="og:title" content="figs/cone_eight.tex · Rocking arm model for kite power generation"/><meta property="twitter:title" content="figs/cone_eight.tex · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../intro.html">Introduction</a></li><li><a class="tocitem" href="../section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="../section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="../section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="../section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="../appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="../appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="../appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="../appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="../references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="../reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="main-jl.html">main.jl</a></li><li><a class="tocitem" href="src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="figs-configuration-tex.html">figs/configuration.tex</a></li><li class="is-active"><a class="tocitem" href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="../api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Code</a></li><li class="is-active"><a href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="figs/cone_eight.tex"><a class="docs-heading-anchor" href="#figs/cone_eight.tex"><code>figs/cone_eight.tex</code></a><a id="figs/cone_eight.tex-1"></a><a class="docs-heading-anchor-permalink" href="#figs/cone_eight.tex" title="Permalink"></a></h1><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/figs/cone_eight.tex">View on GitHub</a> (commit <code>6f20ab5</code>).</p><pre><code class="language-latex hljs">\documentclass[tikz,border=2pt]{standalone}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{mathrsfs}
+\usepackage{tikz-3dplot}
+\begin{document}
+% Cone over the spherical eight, and a kite trajectory drawn on it (not to scale).
+\tdplotsetmaincoords{78}{100}
+\begin{tikzpicture}[tdplot_main_coords, scale=2.4, line join=round]
+
+% ---- parameters (angles in degrees; exaggerated for readability) ----
+\def\thetaZero{55} \def\DeltaTheta{16} \def\DeltaPhi{42}
+\def\ell{1.9} \def\a{0.7} \def\Rmax{2.9}
+
+\pgfmathdeclarefunction{thf}{1}{\pgfmathparse{\thetaZero + \DeltaTheta*sin(2*#1)}}
+\pgfmathdeclarefunction{phf}{1}{\pgfmathparse{\DeltaPhi*sin(#1)}}
+\pgfmathdeclarefunction{ux}{1}{\pgfmathparse{sin(thf(#1))*cos(phf(#1))}}
+\pgfmathdeclarefunction{uy}{1}{\pgfmathparse{sin(thf(#1))*sin(phf(#1))}}
+\pgfmathdeclarefunction{uz}{1}{\pgfmathparse{cos(thf(#1))}}
+% arm angle along the orbit (any smooth law; only the shape of r matters here)
+\pgfmathdeclarefunction{alf}{1}{\pgfmathparse{40 + 60*sin(#1) + 0.14*#1}}
+\pgfmathdeclarefunction{pf}{1}{\pgfmathparse{\a*sin(thf(#1))*cos(phf(#1)-alf(#1))}}
+\pgfmathdeclarefunction{rf}{1}{\pgfmathparse{pf(#1) + sqrt(pf(#1)*pf(#1) + \ell*\ell - \a*\a)}}
+
+% ---- axes ----
+\draw[-&gt;,gray] (0,0,0) -- (1.5,0,0) node[below left,black]{$x$};
+\draw[-&gt;,gray] (0,0,0) -- (0,1.5,0) node[right,black]{$y$};
+\draw[-&gt;,gray] (0,0,0) -- (0,0,1.6) node[above,black]{$z$};
+
+% ---- the unit sphere carrying the eight (very light) ----
+\begin{scope}[tdplot_screen_coords]
+  \shade[ball color=gray!35,opacity=0.28] (0,0) circle (1);
+  \draw[gray!55,opacity=0.5,thin] (0,0) circle (1);
+\end{scope}
+\foreach \p in {-60,-30,...,60}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\p)*cos(\t)},{cos(\p)*sin(\t)},{sin(\p)});
+}
+\foreach \m in {0,30,...,150}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\t)*cos(\m)},{cos(\t)*sin(\m)},{sin(\t)});
+}
+
+% ---- cone: one translucent fill (no seams) and generators ----
+\foreach \ta/\tb in {0/180,180/360}{
+  \fill[SkyBlue,opacity=0.22]
+    (0,0,0) -- plot[domain=\ta:\tb,samples=361,variable=\t]
+    ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)}) -- cycle;
+}
+% generators
+\foreach \t in {0,6,...,354}{
+  \draw[SkyBlue!80!black,opacity=0.5,very thin]
+    (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+}
+% rim of the cone at r = Rmax
+\draw[SkyBlue!80!black,opacity=0.7]
+  plot[domain=0:360,samples=721,variable=\t] ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+
+% ---- the eight on the unit sphere ----
+\draw[very thick,black]
+  plot[domain=0:360,samples=721,variable=\t] ({ux(\t)},{uy(\t)},{uz(\t)});
+\node[black] at ({ux(270)},{uy(270)},{uz(270)-0.13}) {$\mathscr{E}$};
+
+% ---- kite trajectory on the cone ----
+\draw[very thick,BrickRed,-latex]
+  plot[domain=0:500,samples=1001,variable=\t] ({rf(\t)*ux(\t)},{rf(\t)*uy(\t)},{rf(\t)*uz(\t)});
+
+% one generator highlighted: eight point, kite position
+\def\tk{62}
+\draw[dashed,black] (0,0,0) -- ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)});
+\fill[black]  ({ux(\tk)},{uy(\tk)},{uz(\tk)}) circle (0.7pt);
+\fill[BrickRed] ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)}) circle (1.2pt)
+  node[above right]{$K$};
+\fill (0,0,0) circle (0.8pt) node[below left]{$O$};
+
+% label of the cone
+\node[SkyBlue!60!black] at ({1.04*\Rmax*ux(120)},{1.04*\Rmax*uy(120)},{1.04*\Rmax*uz(120)}) {$\mathscr{C}$};
+\end{tikzpicture}
+\end{document}</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="figs-configuration-tex.html">« figs/configuration.tex</a><a class="docs-footer-nextpage" href="../api.html">KEEP functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

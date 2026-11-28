@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>1 Mathematical model of KEEP · Rocking arm model for kite power generation</title><meta name="title" content="1 Mathematical model of KEEP · Rocking arm model for kite power generation"/><meta property="og:title" content="1 Mathematical model of KEEP · Rocking arm model for kite power generation"/><meta property="twitter:title" content="1 Mathematical model of KEEP · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script><link href="assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><a class="tocitem" href="intro.html">Introduction</a></li><li class="is-active"><a class="tocitem" href="section-1.html">1 Mathematical model of KEEP</a><ul class="internal"><li><a class="tocitem" href="#sec:model-geometry"><span>1.1 Geometry of the configuration</span></a></li><li><a class="tocitem" href="#sec:model-velocities"><span>1.2 Velocities</span></a></li><li><a class="tocitem" href="#sec:model-forces"><span>1.3 Force model</span></a></li><li><a class="tocitem" href="#sec:model-eom"><span>1.4 Equations of motion</span></a></li></ul></li><li><a class="tocitem" href="section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="code/main-jl.html">main.jl</a></li><li><a class="tocitem" href="code/src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="code/src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="code/src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="code/src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="code/src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="code/figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="code/figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href="section-1.html">1 Mathematical model of KEEP</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="section-1.html">1 Mathematical model of KEEP</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="sec:model"><a class="docs-heading-anchor" href="#sec:model">1 Mathematical model of KEEP</a><a id="sec:model-1"></a><a class="docs-heading-anchor-permalink" href="#sec:model" title="Permalink"></a></h1><h2 id="sec:model-geometry"><a class="docs-heading-anchor" href="#sec:model-geometry">1.1 Geometry of the configuration</a><a id="sec:model-geometry-1"></a><a class="docs-heading-anchor-permalink" href="#sec:model-geometry" title="Permalink"></a></h2><p>The system, depicted in Fig. <a href="#fig:config">1</a>, consists of a rigid arm <span class="math inline">\(OA\)</span> of length <span class="math inline">\(a\)</span>, rotating in the horizontal plane about the vertical axis <span class="math inline">\(\Delta = (O,\vu z)\)</span>, and of a kite <span class="math inline">\(K\)</span> attached to the tip <span class="math inline">\(A\)</span> of the arm by lines of fixed length <span class="math inline">\(\ell\)</span>. We use a direct orthonormal frame <span class="math inline">\((O,\vu x,\vu y,\vu z)\)</span>, where <span class="math inline">\(\vu x\)</span> and <span class="math inline">\(\vu z\)</span> point respectively downwind and upward. For a better handling of the kite, the lines are longer than 10 m, while the arm is 2 m long, so that <a id="eq:ineq-l-a"></a><span class="math display">\begin{equation}
+ \tag{1}
+    \ell &gt; a.
+\end{equation}</span> The position of the arm tip is <span class="math display">\begin{equation}
+    \vb a = a\,\vu a(\alpha), \qquad \vu a(\alpha) = \begin{pmatrix} \cos\alpha \\ \sin\alpha \\ 0 \end{pmatrix},
+\tag{2}\end{equation}</span> where <span class="math inline">\(\alpha\in\mathbf{S}^1\)</span> is the angle of the arm with the <span class="math inline">\(x\)</span>-axis. As <span class="math inline">\(\alpha\)</span> varies, <span class="math inline">\(A\)</span> runs along the horizontal circle <span class="math inline">\(\mathscr{A}\)</span> of centre <span class="math inline">\(O\)</span> and radius <span class="math inline">\(a\)</span>. The position of the kite, <span class="math inline">\(\vb r\)</span>, is restricted by two geometric constraints of a different nature: a prescribed one, which forces the kite to fly along a figure eight, and a mechanical one, due to the arm and the lines.</p>
+<figure id="fig:config">
+<img src="figs/configuration.svg" />
+<figcaption><strong>Figure 1:</strong> Configuration of the system. The vector <span class="math inline">\(\vb a\)</span> represents the arm, connected at point <span class="math inline">\(A\)</span> (tip of the arm) to the kite <span class="math inline">\(K\)</span> by the lines <span class="math inline">\(\boldsymbol{\ell}\)</span>.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/figs/configuration.tex">figs/configuration.tex</a>, see also <a href="code/figs-configuration-tex.html">the full file</a>.</p><pre><code class="language-latex hljs">\documentclass{standalone}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{3d}
+\usepackage{tikz-3dplot}
+\begin{document}
+
+% Set main 3D view (z-up, y-in)
+\tdplotsetmaincoords{70}{-10}
+
+\begin{tikzpicture}[tdplot_main_coords, scale=2]
+
+% ==== ORIGIN AND AXES ====
+\coordinate (O) at (0,0,0);
+\node[circle,fill,inner sep=1pt] at (O) {};
+\node[below] at (O) {O};
+
+\draw[-&gt;] (0,0,0) -- (3,0,0) node[anchor=west]{$x$};
+\draw[-&gt;] (0,0,0) -- (0,1,0) node[anchor=south]{$y$};
+\draw[-&gt;] (0,0,0) -- (0,0,2) node[anchor=west]{$z$};
+
+% ==== POINT A IN XY-PLANE ====
+\def\a{2}
+\def\alphaA{20}
+\pgfmathsetmacro{\xA}{\a*cos(\alphaA)}
+\pgfmathsetmacro{\yA}{\a*sin(\alphaA)}
+\coordinate (A) at (\xA, \yA, 0);
+\node[circle,fill,inner sep=1pt] at (A) {};
+\node[below] at (A) {A};
+
+% Projections of A
+\coordinate (Ax) at (\xA, 0, 0);
+\coordinate (Ay) at (0, \yA, 0);
+
+% Lines from O
+\draw (O) -- (A) node[midway, sloped, above] {$a$};
+\draw (O) -- (Ax);
+\draw (O) -- (Ay);
+
+% ==== POINT K ====
+\def\l{2}
+\def\thetaZero{70}
+\def\DeltaTheta{5}
+\def\DeltaPhi{30}
+\def\tauK{90}
+
+\pgfmathdeclarefunction{thetaFunc}{1}{\pgfmathparse{\thetaZero + \DeltaTheta * sin(2*#1)}}
+\pgfmathdeclarefunction{phiFunc}{1}  {\pgfmathparse{\DeltaPhi * sin(#1)}}
+\pgfmathdeclarefunction{xTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * cos(phiFunc(#1))}}
+\pgfmathdeclarefunction{yTauFunc}{1} {\pgfmathparse{sin(thetaFunc(#1)) * sin(phiFunc(#1))}}
+\pgfmathdeclarefunction{zTauFunc}{1} {\pgfmathparse{cos(thetaFunc(#1))}}
+
+\pgfmathsetmacro{\dotprod}{\xA * xTauFunc(\tauK) + \yA * yTauFunc(\tauK)}
+\pgfmathsetmacro{\rK}{\dotprod + sqrt(\dotprod * \dotprod + \l^2 - \a^2)}
+
+\pgfmathsetmacro{\xK}{\rK * xTauFunc(\tauK)}
+\pgfmathsetmacro{\yK}{\rK * yTauFunc(\tauK)}
+\pgfmathsetmacro{\zK}{\rK * zTauFunc(\tauK)}
+
+\coordinate (K) at (\xK, \yK, \zK);
+\coordinate (K_xy) at (\xK, \yK, 0);
+
+% Helper points from A
+\pgfmathsetmacro{\xAel}{\xA}
+\pgfmathsetmacro{\yAel}{\yA}
+\pgfmathsetmacro{\zAel}{1.5}
+\coordinate (A_el) at (\xAel, \yAel, \zAel);
+
+\pgfmathsetmacro{\xAext}{1.5*\xA}
+\pgfmathsetmacro{\yAext}{1.5*\yA}
+\coordinate (A_ext) at (\xAext, \yAext, 0);
+
+% Draw K and lines
+\node[circle,fill,inner sep=1pt] at (K) {};
+\node[above] at (K) {K};
+
+\draw (A) -- (K) node[midway, sloped, below] {$\ell$};
+\draw[dotted, blue] (O) -- (K) node[pos=0.5, sloped, above] {$r(\alpha, \tau)$};
+
+%\draw[dotted] (A) -- (A_ext);
+\draw[dotted] (K) -- (K_xy) -- (A);
+\draw[dotted, blue] (K_xy) -- (O);
+%\draw[dotted] (A) -- (A_el);
+
+% ==== ANGLES ====
+% alpha
+\tdplotdefinepoints(0,0,0)(1,0,0)(\xA,\yA,0)
+\tdplotdrawpolytopearc[-&gt;, OrangeRed, thick]{1.3}{right, OrangeRed}{$\alpha$}
+
+% phi
+\tdplotdefinepoints(0,0,0)(1,0,0)(\xK,\yK,0)
+\tdplotdrawpolytopearc[-&gt;, blue, thick]{2.7}{above right, blue}{$\phi(\tau)$}
+
+% theta
+\tdplotdefinepoints(0,0,0)(0,0,1)(\xK,\yK,\zK)
+\tdplotdrawpolytopearc[-&gt;, blue, thick]{1}{above, blue}{$\theta(\tau)$}
+
+% % phi_ℓ
+% \tdplotdefinepoints(\xA,\yA,0)(\xAext,\yAext,0)(\xK,\yK,0)
+% \tdplotdrawpolytopearc[-&gt;]{1}{anchor=south west}{$\phi_\ell$}
+
+% % theta_ℓ
+% \tdplotdefinepoints(\xA,\yA,0)(\xAel,\yAel,\zAel)(\xK,\yK,\zK)
+% \tdplotdrawpolytopearc[-&gt;]{0.8}{anchor=north}{$\theta_\ell$}
+
+\newcommand{\KCoord}[2]{({#1 * xTauFunc(#2)}, {#1 * yTauFunc(#2)}, {#1 * zTauFunc(#2)})}
+
+% tau and eight
+\draw[domain = 0:360, samples = 20, smooth, dashed, variable = \t]
+    plot (\KCoord{\rK}{\t});
+\draw[-&gt;, domain = 0:\tauK, samples = 10, smooth, OrangeRed, thick, variable = \t]
+    plot (\KCoord{\rK}{\t});
+
+
+\node[below, OrangeRed] at \KCoord{\rK}{\tauK/2} {$\tau$};
+
+
+\end{tikzpicture}
+
+\end{document}</code></pre></details><p>Let <span class="math inline">\(\vu r(\tau)\in\mathbf{S}^2\)</span> be the point of the unit sphere with polar angle <span class="math inline">\(\theta(\tau)\)</span> and azimuth <span class="math inline">\(\phi(\tau)\)</span>, <a id="eq:sphere_Model_Deriv"></a><span class="math display">\begin{equation}
+ \tag{3}
+    \vu r(\tau) = \begin{pmatrix} \sin\theta(\tau)\cos\phi(\tau) \\ \sin\theta(\tau)\sin\phi(\tau) \\ \cos\theta(\tau) \end{pmatrix},
+\end{equation}</span> where <a id="eq:traject_Model_Deriv"></a><span class="math display">\begin{equation}
+ \tag{4}
+    \theta(\tau) = \theta_0 + \Delta\theta \sin(2\tau), \qquad \phi(\tau) = \Delta\phi \sin\tau, \qquad \tau\in\mathbf{S}^1.
+\end{equation}</span> The curve <span class="math inline">\(\mathscr{E} = \vu r(\mathbf{S}^1)\)</span> is a figure eight drawn on <span class="math inline">\(\mathbf{S}^2\)</span> (Figs. <a href="#fig:eight_plot">2</a> and <a href="#fig:cone_eight">3</a>). It is centred at the point of polar angle <span class="math inline">\(\theta_0\)</span> in the vertical plane <span class="math inline">\((O,\vu x,\vu z)\)</span> that contains the wind, and its shape is controlled by two amplitudes: <span class="math inline">\(\Delta\phi\)</span> is its half-width in azimuth, and <span class="math inline">\(\Delta\theta\)</span> its half-height in polar angle. We assume <span class="math inline">\(\Delta\theta&gt;0\)</span>, <span class="math inline">\(0&lt;\Delta\phi&lt;\pi\)</span> and <span class="math inline">\(0&lt;\theta_0-\Delta\theta&lt;\theta_0+\Delta\theta&lt;\pi/2\)</span>, so that the eight lies in the upper hemisphere. Then <span class="math inline">\(\mathscr{E}\)</span> is a regular closed curve: its speed <span class="math inline">\(v = \norm{\vu r&#39;}\)</span>, given by <span class="math display">\begin{equation}
+    v^2 = 4\Delta\theta^2\cos^2 2\tau + \Delta\phi^2\sin^2\theta\cos^2\tau,
+\tag{5}\end{equation}</span> does not vanish, since <span class="math inline">\(\cos\tau\)</span> and <span class="math inline">\(\cos2\tau\)</span> never vanish together. It has a single double point, its centre <span class="math inline">\(\vu r(0) = \vu r(\pi)\)</span>, where the kite crosses the plane of the wind. Indeed, <span class="math inline">\(\vu r(\tau_1) = \vu r(\tau_2)\)</span> with <span class="math inline">\(\tau_1\neq\tau_2\)</span> requires <span class="math inline">\(\sin\tau_1 = \sin\tau_2\)</span> (as <span class="math inline">\(\Delta\phi&lt;\pi\)</span>), i.e. <span class="math inline">\(\tau_2 = \pi-\tau_1\)</span>, and then <span class="math inline">\(\sin2\tau_1 = \sin2\tau_2 = -\sin2\tau_1\)</span>, i.e. <span class="math inline">\(\{\tau_1,\tau_2\} = \{0,\pi\}\)</span>.</p>
+<figure id="fig:eight_plot">
+<img src="figs/eight_plot.png" />
+<figcaption><strong>Figure 2:</strong> The spherical eight <span class="math inline">\(\mathscr{E}\)</span>, parameterized by <span class="math inline">\(\tau\)</span>, in the coordinates <span class="math inline">\((\phi,\theta)\)</span>; its shape is controlled by the design parameters <span class="math inline">\(\theta_0\)</span>, <span class="math inline">\(\Delta\theta\)</span>, and <span class="math inline">\(\Delta\phi\)</span>. Trajectories with increasing <span class="math inline">\(\tau\)</span> (blue) result in a flight path that descends in the middle and ascends at the sides, while decreasing <span class="math inline">\(\tau\)</span> (orange) produces the inverse motion. The <span class="math inline">\(\theta\)</span>-axis is inverted to align with the orientation of the kite’s trajectory.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/modelling.jl#L92-L119">src/modelling.jl (region eight_plot)</a>, see also <a href="code/src-modelling-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Parametrisation in tau
+    τ_φ = 90.0
+    τ_θ = 225.0
+    dx, dy = 1 / 4, 1 / 2
+    up_col, down_col = 1, 2
+
+    τ = range(0, 360, length=501)
+    θ = τ -&gt; sind(2 * τ)
+    φ = τ -&gt; sind(τ)
+
+    plot(xmirror=true)
+    plot!(xticks=([-1, 0, 1], (raw&quot;$-Δφ$&quot;, raw&quot;$φ = 0$&quot;, raw&quot;$Δφ$&quot;)),
+        yticks=([-1, 0, 1], (raw&quot;$θ_0 + Δθ$&quot;, raw&quot;$θ = θ_0$&quot;, raw&quot;$θ_0 - Δθ$&quot;))
+    )
+
+    plot!(φ.(τ), θ.(τ), c=:grey)
+
+    plot!(φ.([0, τ_φ]), θ.([τ_φ, τ_φ]), color=:black)
+    annotate!(sum(φ.([0, τ_φ])) / 2, sum(θ.([τ_φ, τ_φ])) / 2 - 0.1, (raw&quot;$Δφ$&quot;, ANNOTATIONFONTSIZE, :black, :top))
+
+    plot!(φ.([τ_θ, τ_θ]), θ.([τ_θ, 0]), color=:black)
+    annotate!(sum(φ.([τ_θ, τ_θ])) / 2 + 0.05, sum(θ.([τ_θ, 0])) / 2, (raw&quot;$Δθ$&quot;, ANNOTATIONFONTSIZE, :black, :left))
+    quiver!([0], [0], quiver=([dx], [-dy]), c=up_col)
+    quiver!([0], [0], quiver=([-dx], [dy]), c=down_col)
+    annotate!(dx - 0.05, -dy - 0.25, (raw&quot;$\dot{\tau} &gt; 0$&quot;, ANNOTATIONFONTSIZE, :center, PALETTE[up_col]))
+    annotate!(-dx + 0.05, dy + 0.25, (raw&quot;$\dot{\tau} &lt; 0$&quot;, ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
+    plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
+    append!(files, save_figure(current(), &quot;eight_plot&quot;))</code></pre></details><p>The kite is constrained to fly on the conical hull of the eight, <span class="math display">\begin{equation}
+    \mathscr{C} = \{\, r\,\vu r(\tau) \mid r&gt;0,\ \tau\in\mathbf{S}^1 \,\},
+\tag{6}\end{equation}</span> a cone of vertex <span class="math inline">\(O\)</span> whose generators are the rays through the points of <span class="math inline">\(\mathscr{E}\)</span>. It is a ruled, developable surface (see Section <a href="section-4.html#sec:opt-curvature">4.3</a>), smooth away from <span class="math inline">\(O\)</span> and from the ray through the centre of the eight, along which it crosses itself.</p>
+<figure id="fig:cone_eight">
+<img src="figs/cone_eight.svg" />
+<figcaption><strong>Figure 3:</strong> The cone <span class="math inline">\(\mathscr{C}\)</span> (light blue) over the spherical eight <span class="math inline">\(\mathscr{E}\)</span> (black) and a trajectory of the kite drawn on it (red). Each generator of the cone, such as the dashed one, meets <span class="math inline">\(\mathscr{E}\)</span> at <span class="math inline">\(\vu r(\tau)\)</span> and the trajectory at <span class="math inline">\(K = r\,\vu r(\tau)\)</span>. The trajectory is open and its distance to <span class="math inline">\(O\)</span> varies. Not to scale.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/figs/cone_eight.tex">figs/cone_eight.tex</a>, see also <a href="code/figs-cone_eight-tex.html">the full file</a>.</p><pre><code class="language-latex hljs">\documentclass[tikz,border=2pt]{standalone}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{mathrsfs}
+\usepackage{tikz-3dplot}
+\begin{document}
+% Cone over the spherical eight, and a kite trajectory drawn on it (not to scale).
+\tdplotsetmaincoords{78}{100}
+\begin{tikzpicture}[tdplot_main_coords, scale=2.4, line join=round]
+
+% ---- parameters (angles in degrees; exaggerated for readability) ----
+\def\thetaZero{55} \def\DeltaTheta{16} \def\DeltaPhi{42}
+\def\ell{1.9} \def\a{0.7} \def\Rmax{2.9}
+
+\pgfmathdeclarefunction{thf}{1}{\pgfmathparse{\thetaZero + \DeltaTheta*sin(2*#1)}}
+\pgfmathdeclarefunction{phf}{1}{\pgfmathparse{\DeltaPhi*sin(#1)}}
+\pgfmathdeclarefunction{ux}{1}{\pgfmathparse{sin(thf(#1))*cos(phf(#1))}}
+\pgfmathdeclarefunction{uy}{1}{\pgfmathparse{sin(thf(#1))*sin(phf(#1))}}
+\pgfmathdeclarefunction{uz}{1}{\pgfmathparse{cos(thf(#1))}}
+% arm angle along the orbit (any smooth law; only the shape of r matters here)
+\pgfmathdeclarefunction{alf}{1}{\pgfmathparse{40 + 60*sin(#1) + 0.14*#1}}
+\pgfmathdeclarefunction{pf}{1}{\pgfmathparse{\a*sin(thf(#1))*cos(phf(#1)-alf(#1))}}
+\pgfmathdeclarefunction{rf}{1}{\pgfmathparse{pf(#1) + sqrt(pf(#1)*pf(#1) + \ell*\ell - \a*\a)}}
+
+% ---- axes ----
+\draw[-&gt;,gray] (0,0,0) -- (1.5,0,0) node[below left,black]{$x$};
+\draw[-&gt;,gray] (0,0,0) -- (0,1.5,0) node[right,black]{$y$};
+\draw[-&gt;,gray] (0,0,0) -- (0,0,1.6) node[above,black]{$z$};
+
+% ---- the unit sphere carrying the eight (very light) ----
+\begin{scope}[tdplot_screen_coords]
+  \shade[ball color=gray!35,opacity=0.28] (0,0) circle (1);
+  \draw[gray!55,opacity=0.5,thin] (0,0) circle (1);
+\end{scope}
+\foreach \p in {-60,-30,...,60}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\p)*cos(\t)},{cos(\p)*sin(\t)},{sin(\p)});
+}
+\foreach \m in {0,30,...,150}{
+  \draw[gray!60,opacity=0.35,very thin,domain=0:360,samples=121,variable=\t]
+    plot ({cos(\t)*cos(\m)},{cos(\t)*sin(\m)},{sin(\t)});
+}
+
+% ---- cone: one translucent fill (no seams) and generators ----
+\foreach \ta/\tb in {0/180,180/360}{
+  \fill[SkyBlue,opacity=0.22]
+    (0,0,0) -- plot[domain=\ta:\tb,samples=361,variable=\t]
+    ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)}) -- cycle;
+}
+% generators
+\foreach \t in {0,6,...,354}{
+  \draw[SkyBlue!80!black,opacity=0.5,very thin]
+    (0,0,0) -- ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+}
+% rim of the cone at r = Rmax
+\draw[SkyBlue!80!black,opacity=0.7]
+  plot[domain=0:360,samples=721,variable=\t] ({\Rmax*ux(\t)},{\Rmax*uy(\t)},{\Rmax*uz(\t)});
+
+% ---- the eight on the unit sphere ----
+\draw[very thick,black]
+  plot[domain=0:360,samples=721,variable=\t] ({ux(\t)},{uy(\t)},{uz(\t)});
+\node[black] at ({ux(270)},{uy(270)},{uz(270)-0.13}) {$\mathscr{E}$};
+
+% ---- kite trajectory on the cone ----
+\draw[very thick,BrickRed,-latex]
+  plot[domain=0:500,samples=1001,variable=\t] ({rf(\t)*ux(\t)},{rf(\t)*uy(\t)},{rf(\t)*uz(\t)});
+
+% one generator highlighted: eight point, kite position
+\def\tk{62}
+\draw[dashed,black] (0,0,0) -- ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)});
+\fill[black]  ({ux(\tk)},{uy(\tk)},{uz(\tk)}) circle (0.7pt);
+\fill[BrickRed] ({rf(\tk)*ux(\tk)},{rf(\tk)*uy(\tk)},{rf(\tk)*uz(\tk)}) circle (1.2pt)
+  node[above right]{$K$};
+\fill (0,0,0) circle (0.8pt) node[below left]{$O$};
+
+% label of the cone
+\node[SkyBlue!60!black] at ({1.04*\Rmax*ux(120)},{1.04*\Rmax*uy(120)},{1.04*\Rmax*uz(120)}) {$\mathscr{C}$};
+\end{tikzpicture}
+\end{document}</code></pre></details><p>The pair <span class="math inline">\((r,\tau)\)</span> provides coordinates on <span class="math inline">\(\mathscr{C}\)</span>: <span class="math inline">\(r = \norm{\vb r}\)</span> is the distance to <span class="math inline">\(O\)</span>, and <span class="math inline">\(\tau\)</span> labels the generator. At <span class="math inline">\(K = r\,\vu r(\tau)\)</span>, the tangent plane to <span class="math inline">\(\mathscr{C}\)</span> is spanned by <span class="math inline">\(\vu r\)</span> and <span class="math inline">\(\vu r&#39;\)</span>, which are orthogonal, and the unit normal is <a id="eq:cone-normal"></a><span class="math display">\begin{equation}
+ \tag{7}
+    \vu n = \frac{\vu r\times\vu r'}{v}.
+\end{equation}</span> Thus, the trajectory <span class="math inline">\(t\mapsto\vb r(t) = r(t)\,\vu r(\tau(t))\)</span> of the kite is a curve drawn on <span class="math inline">\(\mathscr{C}\)</span>. Its radial projection <span class="math inline">\(\vu r(\tau(t))\)</span> onto the unit sphere runs along the eight, with the time law <span class="math inline">\(t\mapsto\tau(t)\)</span>, whereas its distance <span class="math inline">\(r(t)\)</span> to <span class="math inline">\(O\)</span> is fixed by the arm and the lines, as we now explain.</p>
+<p>The lines impose <span class="math inline">\(\norm{\vb r - \vb a} = \ell\)</span>: the kite lies on the sphere of radius <span class="math inline">\(\ell\)</span> centred at <span class="math inline">\(A\)</span>. As <span class="math inline">\(A\)</span> runs along <span class="math inline">\(\mathscr{A}\)</span>, this sphere sweeps a torus of revolution <span class="math inline">\(\mathscr{T}\)</span> about <span class="math inline">\(\Delta\)</span>, of major radius <span class="math inline">\(a\)</span> and minor radius <span class="math inline">\(\ell\)</span>. By <a href="#eq:ineq-l-a">(1)</a>, its generating circle crosses the axis: <span class="math inline">\(\mathscr{T}\)</span> is a <em>spindle torus</em> (Fig. <a href="#fig:spindle_torus">4</a>). In a meridian half-plane, with <span class="math inline">\(\rho\geq0\)</span> the distance to the axis and <span class="math inline">\(z\)</span> the altitude, it consists of two sheets that meet at the poles <span class="math inline">\((\rho,z) = (0,\pm\sqrt{\ell^2-a^2})\)</span>: the outer one, <span class="math inline">\(\mathscr{T}_+\)</span>, shaped like an apple, <span class="math display">\begin{equation}
+    (\rho-a)^2 + z^2 = \ell^2,
+\tag{8}\end{equation}</span> and the inner one, <span class="math inline">\(\mathscr{T}_-\)</span>, shaped like a lemon, <span class="math display">\begin{equation}
+    (\rho+a)^2 + z^2 = \ell^2.
+\tag{9}\end{equation}</span> Since the distance from a point at <span class="math inline">\((\rho,z)\)</span> to the points of <span class="math inline">\(\mathscr{A}\)</span> takes all values between <span class="math inline">\(\sqrt{(\rho-a)^2+z^2}\)</span> and <span class="math inline">\(\sqrt{(\rho+a)^2+z^2}\)</span>, the positions of the kite allowed by the arm and the lines, for some value of <span class="math inline">\(\alpha\)</span>, fill the closed solid <span class="math display">\begin{equation}
+    \mathscr{S} = \{\, (\rho-a)^2 + z^2 \leq \ell^2 \leq (\rho+a)^2 + z^2 \,\}
+\tag{10}\end{equation}</span> bounded by <span class="math inline">\(\mathscr{T}\)</span>: the kite is inside the apple and outside the lemon. The kite is on the boundary of <span class="math inline">\(\mathscr{S}\)</span> when the arm and the lines are in the same vertical plane, namely on the apple when <span class="math inline">\(A\)</span> lies on the same side of the axis as <span class="math inline">\(K\)</span>, and on the lemon when it lies on the opposite side. For <span class="math inline">\(a=0\)</span>, both sheets reduce to the sphere of radius <span class="math inline">\(\ell\)</span>, and so does <span class="math inline">\(\mathscr{S}\)</span>.</p>
+<figure id="fig:spindle_torus">
+<img src="figs/spindle_torus.png" />
+<figcaption><strong>Figure 4:</strong> The spindle torus <span class="math inline">\(\mathscr{T}\)</span> swept by the sphere of radius <span class="math inline">\(\ell\)</span> centred at the arm tip, with its outer sheet (apple) and its inner sheet (lemon). The kite lies in the solid <span class="math inline">\(\mathscr{S}\)</span> between the two sheets. The trajectory is open and its distance to <span class="math inline">\(O\)</span> varies. Not to scale.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/modelling.jl#L18-L88">src/modelling.jl (region spindle_torus)</a>, see also <a href="code/src-modelling-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Spindle torus
+    a, l = 2, 3
+
+    # sanity check: a sampled point is exactly l from its arm tip
+    β0 = deg2rad(30)  # line elevation
+    kite_pos = [a + l * cos(β0), 0, l * sin(β0)]
+    @assert isapprox(norm(kite_pos - [a, 0, 0]), l; atol=1e-8)
+
+    # mesh as flat line segments (GR&#39;s wireframe chokes on matrix grids); a mesh
+    # rather than a surface so the self-intersecting interior stays visible
+    lg = range(0, 2π, length=120)  # points along each grid line
+    lk = range(0, 2π, length=40)   # grid lines
+    xs = Float64[]
+    ys = Float64[]
+    zs = Float64[]
+    for βj in lk
+        for αi in lg
+            push!(xs, (a + l * cos(βj)) * cos(αi))
+            push!(ys, (a + l * cos(βj)) * sin(αi))
+            push!(zs, l * sin(βj))
+        end
+        push!(xs, NaN)
+        push!(ys, NaN)
+        push!(zs, NaN)
+    end
+    for αj in lk
+        for βi in lg
+            push!(xs, (a + l * cos(βi)) * cos(αj))
+            push!(ys, (a + l * cos(βi)) * sin(αj))
+            push!(zs, l * sin(βi))
+        end
+        push!(xs, NaN)
+        push!(ys, NaN)
+        push!(zs, NaN)
+    end
+
+    fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
+        xlabel=&quot;x (m)&quot;, ylabel=&quot;y (m)&quot;, zlabel=&quot;z (m)&quot;,
+        title=&quot;Spindle torus, not to scale&quot;, label=&quot;&quot;, legend=:outerright)
+
+    # set of possible arm-tip positions: circle of radius a in the xy-plane
+    θc = range(0, 2π, length=200)
+    arm_tip_pars = (; c=:blue, lw=3, label=&quot;Arm-tip locus&quot;)
+    plot!(fig, a * cos.(θc), a * sin.(θc), zero(θc); arm_tip_pars..., label=&quot;&quot;)
+
+    # example arm and kite at α = 0, β = 30°
+    arm_and_lines_pars = (; c=:black, lw=3, label=&quot;Arm and lines&quot;)
+    plot!(fig, [0, a], [0, 0], [0, 0]; arm_and_lines_pars..., label=&quot;&quot;)
+    plot!(fig, [a, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., label=&quot;&quot;)
+
+    longitude_pars = (; c=:orange, lw=2, label=&quot;Kite longitude&quot;)
+    latitude_pars = (; c=:green, lw=2, label=&quot;Kite latitude&quot;)
+    plot!(fig, a .+ l .* cos.(θc), zero(θc), l .* sin.(θc); longitude_pars..., label=&quot;&quot;)
+    plot!(fig, (a + l * cos(β0)) .* cos.(θc), (a + l * cos(β0)) .* sin.(θc), fill(l * sin(β0), length(θc)); latitude_pars..., label=&quot;&quot;)
+
+    kite_pars = (; c=:red, ms=7, label=&quot;Kite&quot;)
+    scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label=&quot;&quot;)
+
+    scatter!([]; kite_pars..., msw=20, msc=:red)
+    plot!([]; arm_and_lines_pars..., lw=default(:lw))
+    plot!([]; arm_tip_pars..., lw=default(:lw))
+    plot!([]; longitude_pars..., lw=default(:lw))
+    plot!([]; latitude_pars..., lw=default(:lw))
+    plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
+    plot!(size=plot_size(1, 1.06))
+    # one tick at each end of each axis, plus 0 when it is interior
+    plot!(fig, xticks=edge_ticks(fig[1], :x; include_zero=true),
+        yticks=edge_ticks(fig[1], :y; include_zero=true),
+        zticks=edge_ticks(fig[1], :z; include_zero=true))
+
+    files = save_figure(fig, &quot;spindle_torus&quot;)</code></pre></details><p>The kite therefore lies on the intersection <span class="math inline">\(\mathscr{C}\cap\mathscr{S}\)</span>. Its distance to <span class="math inline">\(O\)</span> follows from the loop closure: with <span class="math inline">\(\boldsymbol{\ell}\)</span> the vector from <span class="math inline">\(A\)</span> to <span class="math inline">\(K\)</span>, <a id="eq:loop"></a><span class="math display">\begin{equation}
+ \tag{11}
+    \boldsymbol{\ell} = \vb r - \vb a, \qquad \norm{\boldsymbol{\ell}} = \ell,
+\end{equation}</span> and <span class="math inline">\(\vb r = r\,\vu r(\tau)\)</span>, one gets <a id="eq:radial-quadratic"></a><span class="math display">\begin{equation}
+ \tag{12}
+    r^2 - 2p\,r + a^2 - \ell^2 = 0, \qquad p(\alpha,\tau) = \vu r(\tau)\vdot\vb a = a\sin\theta(\tau)\cos(\phi(\tau)-\alpha),
+\end{equation}</span> where <span class="math inline">\(p\)</span> is the projection of the arm onto the generator of the kite. By <a href="#eq:ineq-l-a">(1)</a>, the product of the roots, <span class="math inline">\(a^2-\ell^2\)</span>, is negative, so there is exactly one positive root, <a id="eq:radial"></a><span class="math display">\begin{equation}
+ \tag{13}
+    r(\alpha,\tau) = p + R, \qquad R = \sqrt{p^2+\ell^2-a^2},
+\end{equation}</span> the negative one corresponding to the opposite ray, which is not on <span class="math inline">\(\mathscr{C}\)</span>. The position of the kite is thus given by the kinematic map <a id="eq:kinematic-map"></a><span class="math display">\begin{equation}
+ \tag{14}
+    \Phi : \mathbf{T}^2 \to \mathscr{C}\cap\mathscr{S}, \qquad (\alpha,\tau) \mapsto \vb r(\alpha,\tau) = r(\alpha,\tau)\,\vu r(\tau),
+\end{equation}</span> and we choose <span class="math inline">\(\vb q= (\alpha,\tau)\in\mathbf{T}^2\)</span> as generalized coordinates.</p>
+<p>For a fixed generator <span class="math inline">\(\tau\)</span>, as <span class="math inline">\(\alpha\)</span> varies, <span class="math inline">\(p\)</span> sweeps <span class="math inline">\([-a\sin\theta, a\sin\theta]\)</span>, and <span class="math inline">\(r\)</span> increases with <span class="math inline">\(p\)</span> since <span class="math inline">\(\dv*{r}{p} = r/R &gt; 0\)</span>. Hence <span class="math inline">\(r\)</span> sweeps the interval <span class="math inline">\([r_-(\theta), r_+(\theta)]\)</span>, with <span class="math display">\begin{equation}
+    r_\pm(\theta) = \pm a\sin\theta + \sqrt{\ell^2 - a^2\cos^2\theta},
+\tag{15}\end{equation}</span> where <span class="math inline">\(r_+\vu r\)</span> lies on the apple and <span class="math inline">\(r_-\vu r\)</span> on the lemon, and in particular <span class="math inline">\(\ell - a \leq r \leq \ell + a\)</span>. The image of <span class="math inline">\(\Phi\)</span> is the whole of <span class="math inline">\(\mathscr{C}\cap\mathscr{S}\)</span>: a band of the cone, bounded by the two closed curves <span class="math inline">\(\Gamma_\pm = \mathscr{C}\cap\mathscr{T}_\pm\)</span>, along which the trajectory of the kite is drawn.</p>
+<p>The map <span class="math inline">\(\Phi\)</span> is not one-to-one. Its partial derivatives are <span class="math display">\begin{equation}
+    \pdv{\vb r}{\alpha} = \pdv{r}{\alpha}\,\vu r, \qquad \pdv{\vb r}{\tau} = \pdv{r}{\tau}\,\vu r + r\,\vu r',
+    \qquad\text{with}\qquad
+    \pdv{r}{\alpha} = \frac{r}{R}\,a\sin\theta\sin(\phi-\alpha).
+\tag{16}\end{equation}</span> As <span class="math inline">\(\vu r&#39;\neq0\)</span> is orthogonal to <span class="math inline">\(\vu r\)</span>, <span class="math inline">\(\Phi\)</span> is a local diffeomorphism except on the two closed curves <span class="math inline">\(\alpha = \phi(\tau)\)</span> and <span class="math inline">\(\alpha = \phi(\tau)+\pi\)</span> of <span class="math inline">\(\mathbf{T}^2\)</span>, which are mapped onto <span class="math inline">\(\Gamma_+\)</span> and <span class="math inline">\(\Gamma_-\)</span>, respectively. Away from these curves and from the self-intersection of the cone, each point of the band has exactly two preimages, <span class="math inline">\(\alpha\)</span> and its mirror image <span class="math inline">\(2\phi(\tau)-\alpha\)</span> with respect to the vertical plane of the kite. The torus <span class="math inline">\(\mathbf{T}^2\)</span> of configurations is therefore a double cover of the band, folded along its two edges. In particular, the position of the kite does not determine the angle of the arm, which is why <span class="math inline">\(\alpha\)</span>, rather than <span class="math inline">\(r\)</span>, is used as the second coordinate.</p><h2 id="sec:model-velocities"><a class="docs-heading-anchor" href="#sec:model-velocities">1.2 Velocities</a><a id="sec:model-velocities-1"></a><a class="docs-heading-anchor-permalink" href="#sec:model-velocities" title="Permalink"></a></h2><p>The generalized velocities are <span class="math inline">\(\dot{\vb q}= (\dot\alpha,\dot\tau)\)</span>. The velocity of the arm tip is <span class="math display">\begin{equation}
+    \dot{\vb a} = a\,\dot\alpha\,\vu z\times\vu a,
+\tag{17}\end{equation}</span> and that of the kite decomposes along the generator and along the eight, which span the tangent plane to <span class="math inline">\(\mathscr{C}\)</span>: <a id="eq:kite-velocity"></a><span class="math display">\begin{equation}
+ \tag{18}
+    \dot{\vb r} = \dot r\,\vu r + r\,\dot\tau\,\vu r'.
+\end{equation}</span> Differentiating <a href="#eq:radial-quadratic">(12)</a> in time, <span class="math inline">\(\dot r = r\,\dot p/R\)</span>, where <span class="math display">\begin{equation}
+    \dot p = \vu r\vdot\dot{\vb a} + \dot\tau\,\vu r'\vdot\vb a = a\,\dot\alpha\,\vu r\vdot(\vu z\times\vu a) + \dot\tau\,\vu r'\vdot\vb a.
+\tag{19}\end{equation}</span> Second-order derivatives, needed for the accelerations, can be obtained for numerical purposes by <span data-acronym-label="ad" data-acronym-form="singular+short">ad</span>.</p><h2 id="sec:model-forces"><a class="docs-heading-anchor" href="#sec:model-forces">1.3 Force model</a><a id="sec:model-forces-1"></a><a class="docs-heading-anchor-permalink" href="#sec:model-forces" title="Permalink"></a></h2><p>We model the wind velocity profile <span class="math inline">\(\vb w\)</span> using a standard power-law wind shear model. Since the unit vector <span class="math inline">\(\vu x\)</span> points downwind, the wind field is given by <span class="math display">\begin{equation}
+    \vb w(z) = w_{\text{ref}} \qty(\frac{z}{z_{\text{ref}}})^{1/7} \vu x,
+\tag{20}\end{equation}</span> where <span class="math inline">\(w_{\text{ref}}\)</span> is the reference wind speed at altitude <span class="math inline">\(z_{\text{ref}}\)</span>. The altitude of the kite is <span class="math display">\begin{equation}
+    z = \vb r \vdot \vu z = r(\alpha, \tau) \cos\theta(\tau),
+\tag{21}\end{equation}</span> which is positive under the assumption <span class="math inline">\(\theta_0+\Delta\theta&lt;\pi/2\)</span>. The apparent wind velocity experienced by the kite is <span class="math display">\begin{equation}
+    \vb w_a = \vb w(z) - \dot{\vb r}.
+\tag{22}\end{equation}</span></p>
+<p>The kite is subject to gravity, to the aerodynamic force, to the tension of the lines, and to the reaction of the cone, which enforces the prescribed motion. Gravity is modeled as <a id="eq:f_grav"></a><span class="math display">\begin{equation}
+ \tag{23}
+    \vb F_g = -\qty(m + \frac{m_\ell}{2}) g \vu z,
+\end{equation}</span> where <span class="math inline">\(m_\ell = n \pi \ell \rho_\ell d_\ell^2 / 4\)</span> is the total mass of the lines, half of which is assumed to be lifted by the kite. The aerodynamic resultant is computed from the apparent wind using the same model detailed in Section <a href="appendix-A.html#sec:model10D-dyn-aero">A.3</a>, namely <a id="eq:f_aero"></a><span class="math display">\begin{equation}
+ \tag{24}
+    \vb F_a = L \vu k_t + D \vu k_b + \tilde D_\ell \vu w_a^\perp,
+\end{equation}</span> where the lift <span class="math inline">\(L\)</span> and drag <span class="math inline">\(D\)</span> are proportional to <span class="math inline">\(\norm{\vb w_a}^2\)</span>, and the line drag <span class="math inline">\(\tilde D_\ell\)</span>, along the component <span class="math inline">\(\vu w_a^\perp\)</span> of the apparent wind orthogonal to the lines, is given by the integral approximation <a href="appendix-A.html#eq:line-drag-10D">(88)</a> of Appendix <a href="appendix-A.html#sec:model10D">A</a>. In all the computations of this paper, the drag coefficient of the lines is <span class="math inline">\(C_{D,\ell} = 0\)</span>: their drag is lumped into the drag coefficient <span class="math inline">\(C_D\)</span> of the kite, independently of the length <span class="math inline">\(\ell\)</span>. As the drag of the lines grows linearly with <span class="math inline">\(\ell\)</span>, accounting for it separately would penalize long lines, and would tend to lower the optimal length found in Section <a href="section-4.html#sec:optimization">4</a>.</p>
+<p>The lines pull the kite towards <span class="math inline">\(A\)</span>: with <span class="math inline">\(\hat{\boldsymbol{\ell}} = \boldsymbol{\ell}/\ell\)</span> and <span class="math inline">\(F_\ell\)</span> the tension, the force they exert on the kite is <span class="math inline">\(\vb F_\ell = -F_\ell\,\hat{\boldsymbol{\ell}}\)</span>, and the force they exert on the arm at <span class="math inline">\(A\)</span> is <span class="math inline">\(-\vb F_\ell\)</span>. The arm has moment of inertia <span class="math inline">\(I\)</span> about <span class="math inline">\(\Delta\)</span>, and the generator exerts on it the resistive torque <span class="math display">\begin{equation}
+    T(\dot\alpha) = -b\,\dot\alpha, \qquad b&gt;0.
+\tag{25}\end{equation}</span> The moment of <span class="math inline">\(-\vb F_\ell\)</span> about <span class="math inline">\(\Delta\)</span> is <a id="eq:moment_fell"></a><span class="math display">\begin{equation}
+ \tag{26}
+    M_\Delta(-\vb F_\ell) = \qty(\vb a\times F_\ell\,\hat{\boldsymbol{\ell}})\vdot\vu z = a F_\ell\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a),
+\end{equation}</span> so that Newton’s second law for the arm yields <a id="eq:newton_arm"></a><span class="math display">\begin{equation}
+ \tag{27}
+    I \ddot\alpha = a F_\ell\,\hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) + T(\dot \alpha),
+\end{equation}</span> where the tension <span class="math inline">\(F_\ell\)</span> is an unknown of the problem, determined together with the accelerations: it is the reaction of the lines, which enforce the spindle torus constraint. The lever arm <span class="math inline">\(a\lambda\)</span> of the tension has a geometric meaning: as <span class="math inline">\(\vb a\vdot(\vu z\times\vu a) = 0\)</span>, <a id="eq:lever-arm"></a><span class="math display">\begin{equation}
+ \tag{28}
+    \lambda := \hat{\boldsymbol{\ell}} \vdot (\vu z \times \vu a) = \frac{r}{\ell}\,\vu r\vdot(\vu z\times\vu a) = \frac{r}{\ell}\sin\theta\sin(\phi-\alpha),
+\end{equation}</span> which vanishes exactly on the fold curves <span class="math inline">\(\alpha = \phi\)</span> and <span class="math inline">\(\alpha = \phi+\pi\)</span> of <span class="math inline">\(\Phi\)</span>: when the kite reaches an edge <span class="math inline">\(\Gamma_\pm\)</span> of the band, i.e. the spindle torus, the lines and the arm are in the same vertical plane, the lines exert no torque on the arm, and the arm is only braked by the generator, <span class="math inline">\(I\ddot\alpha = T(\dot\alpha)\)</span>. Since lines can only pull, physically admissible motions moreover require <span class="math inline">\(F_\ell\geq0\)</span>; this condition is not imposed by the model and must be checked a posteriori.</p><h2 id="sec:model-eom"><a class="docs-heading-anchor" href="#sec:model-eom">1.4 Equations of motion</a><a id="sec:model-eom-1"></a><a class="docs-heading-anchor-permalink" href="#sec:model-eom" title="Permalink"></a></h2><p>The prescribed trajectory of the kite is enforced through a frictionless geometric constraint: the reaction <span class="math inline">\(\vb F_c\)</span> of the cone performs no virtual work along the admissible displacements, which span the tangent plane to <span class="math inline">\(\mathscr{C}\)</span>. Equivalently, <span class="math inline">\(\vb F_c\)</span> is normal to the cone, <span class="math inline">\(\vb F_c = F_c\,\vu n\)</span> with <span class="math inline">\(\vu n\)</span> given by <a href="#eq:cone-normal">(7)</a>, that is <a id="eq:cone_constraint"></a><span class="math display">\begin{equation}
+ \tag{29}
+    \vb F_c \vdot \vu r = 0, \qquad
+    \vb F_c \vdot \vu r' = 0.
+\end{equation}</span> The spindle torus constraint, on the other hand, is enforced by the lines, through the tension <span class="math inline">\(F_\ell\)</span>. Newton’s second law for the kite reads <a id="eq:newton_kite"></a><span class="math display">\begin{equation}
+ \tag{30}
+    m \ddot{\vb r} = \vb F_a + \vb F_g + \vb F_\ell + \vb F_c.
+\end{equation}</span> Projecting it onto the tangent plane of the cone, that is, onto <span class="math inline">\(\vu r\)</span> and <span class="math inline">\(\vu r&#39;\)</span>, eliminates the constraint force by <a href="#eq:cone_constraint">(29)</a>. Since <span class="math inline">\(\ddot{\vb r}\)</span> is affine in <span class="math inline">\(\ddot{\vb q}\)</span>, these two projections and the equation <a href="#eq:newton_arm">(27)</a> of the arm form a <span class="math inline">\(3\times3\)</span> linear system in <span class="math inline">\((\ddot\alpha, \ddot\tau, F_\ell)\)</span>, with coefficients that depend on <span class="math inline">\(\vb q\)</span> only. Solving the equation of the arm for the tension, <span class="math inline">\(F_\ell = (I\ddot\alpha - T(\dot\alpha))/(a\lambda)\)</span>, would leave a <span class="math inline">\(2\times2\)</span> system for <span class="math inline">\(\ddot{\vb q}\)</span> whose matrix and right-hand side both blow up on the fold curves, where the accelerations would be obtained as <span class="math inline">\(0/0\)</span>. We solve it for the acceleration of the arm instead, dividing by <span class="math inline">\(I&gt;0\)</span>: <a id="eq:ddalpha"></a><span class="math display">\begin{equation}
+ \tag{31}
+    \ddot\alpha = \frac{a\lambda F_\ell + T(\dot\alpha)}{I},
+\end{equation}</span> which leaves a <span class="math inline">\(2\times2\)</span> linear system for the acceleration of the kite and the tension, <a id="eq:eom_regular"></a><span class="math display">\begin{equation}
+ \tag{32}
+    N(\vb q) \mqty(\ddot\tau \\ F_\ell) = \vb h(\vb q, \dot{\vb q}),
+\end{equation}</span> given in Appendix <a href="appendix-B.html#sec:explicit-ddq">B</a>, together with its explicit solution. The determinant of <span class="math inline">\(N(\vb q)\)</span> is negative on the whole torus <span class="math inline">\(\mathbf{T}^2\)</span> of configurations, and bounded away from zero. Hence the accelerations <span class="math inline">\(\ddot{\vb q}\)</span> and the tension <span class="math inline">\(F_\ell\)</span> are analytic functions of <span class="math inline">\((\vb q, \dot{\vb q})\)</span> wherever the forces are, including on the fold curves. The only singularities of the model are aerodynamic: a vanishing apparent wind, <span class="math inline">\(\vb w_a = 0\)</span>, and an apparent wind parallel to the lines, where the frame of the kite of Section <a href="appendix-A.html#sec:model10D-dyn-aero">A.3</a> is undefined.</p>
+<p>The state of the dynamical system is <span class="math inline">\(\vb x = (\vb q, \dot{\vb q}) = (\alpha, \tau, \dot \alpha, \dot \tau) \in \mathbf{T}^2\times\mathbf{R}^2\)</span>, and the evolution function <span class="math inline">\(f\)</span> is defined by <span class="math display">\begin{equation}
+    f(\vb x) = f(\vb q, \dot{\vb q}) = (\dot{\vb q}, \ddot{\vb q}),
+\tag{33}\end{equation}</span> where <span class="math inline">\(\ddot{\vb q}\)</span> is given by <a href="#eq:ddalpha">(31)</a> and <a href="#eq:eom_regular">(32)</a>. The system is symmetric through the map <a id="eq:symmetry"></a><span class="math display">\begin{equation}
+ \tag{34}
+    \sigma: (\alpha, \tau, \dot \alpha, \dot \tau) \mapsto (-\alpha, \tau + \pi, -\dot \alpha, \dot \tau).
+\end{equation}</span> Geometrically, <span class="math inline">\(\sigma\)</span> is induced by the reflection through the vertical plane <span class="math inline">\((O,\vu x,\vu z)\)</span> that contains the wind: this reflection maps <span class="math inline">\(\vu a(\alpha)\)</span> to <span class="math inline">\(\vu a(-\alpha)\)</span> and <span class="math inline">\(\vu r(\tau)\)</span> to <span class="math inline">\(\vu r(\tau+\pi)\)</span>, since <span class="math inline">\(\theta(\tau+\pi) = \theta(\tau)\)</span> and <span class="math inline">\(\phi(\tau+\pi) = -\phi(\tau)\)</span>, and it leaves the circle <span class="math inline">\(\mathscr{A}\)</span>, the eight <span class="math inline">\(\mathscr{E}\)</span>, the cone <span class="math inline">\(\mathscr{C}\)</span>, the spindle torus <span class="math inline">\(\mathscr{T}\)</span> and the wind field invariant.</p>
+<p>The mechanical power extracted by the generator is <span class="math display">\begin{equation}
+    \dot W(t)
+    = -\dot\alpha\,T(\dot\alpha)
+    = b\dot\alpha^2\geq0,
+\tag{35}\end{equation}</span> where <span class="math inline">\(W(0)=0\)</span>. The average power of a solution spanning <span class="math inline">\([0, t_f]\)</span> is <span class="math display">\begin{equation}
+    \bar P=\frac{W_f}{t_f},
+\tag{36}\end{equation}</span> where <span class="math inline">\(W_f=W(t_f)\)</span> is the total extracted work.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="intro.html">« Introduction</a><a class="docs-footer-nextpage" href="section-2.html">2 Estimation of power take-off »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

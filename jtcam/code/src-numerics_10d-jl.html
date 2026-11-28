@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>src/numerics_10d.jl · Rocking arm model for kite power generation</title><meta name="title" content="src/numerics_10d.jl · Rocking arm model for kite power generation"/><meta property="og:title" content="src/numerics_10d.jl · Rocking arm model for kite power generation"/><meta property="twitter:title" content="src/numerics_10d.jl · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../intro.html">Introduction</a></li><li><a class="tocitem" href="../section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="../section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="../section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="../section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="../appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="../appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="../appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="../appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="../references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="../reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="main-jl.html">main.jl</a></li><li><a class="tocitem" href="src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="src-modelling-jl.html">src/modelling.jl</a></li><li class="is-active"><a class="tocitem" href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="../api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Code</a></li><li class="is-active"><a href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="src/numerics_10d.jl"><a class="docs-heading-anchor" href="#src/numerics_10d.jl"><code>src/numerics_10d.jl</code></a><a id="src/numerics_10d.jl-1"></a><a class="docs-heading-anchor-permalink" href="#src/numerics_10d.jl" title="Permalink"></a></h1><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/numerics_10d.jl">View on GitHub</a> (commit <code>6f20ab5</code>).</p><pre><code class="language-julia hljs"># Appendix A figures (10D model): drift of the raw 10D model and the effect of the
+# manifold projection callback.
+#
+# Outputs: figs/trajectory_10D_short_long_cb.{pdf,png}, figs/residuals_10D_interp.{pdf,png}.
+using KEEP: PointMass10 as PM10
+using KEEP: PointMass4 as PM4
+using KEEP: PointMassPara as PMP
+using KEEP: Visualization as VIZ
+
+using OrdinaryDiffEqTsit5: Tsit5
+
+using Plots
+using PyFormattedStrings
+using LinearAlgebra: norm
+
+include(joinpath(@__DIR__, &quot;helpers.jl&quot;))
+
+function run_10d(; fast::Bool=false)
+    #region setup_10d
+    ## Setup
+    p = PMP.build_para()
+    τ0, dτ0 = 1e-10, 10
+    u0_10 = PM10.init_u(τ0, dτ0, p)
+
+    # Projection callback: its tolerance is independent of the integrator tolerance.
+    cb_tol = 1e-10
+    callback = PM10.build_manifold_projection(u0_10; save=true, tol=cb_tol)
+    callback_no_save = PM10.build_manifold_projection(u0_10; save=false, tol=cb_tol)
+    #endregion
+
+    #region traj_10d
+    # Physical plots at loose tolerance, to exaggerate the drift of the raw 10D model.
+    tf_short, tf, tol = 20, 100, 1e-3
+    sol10 = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol)
+    sol10_cb = PM10.integrate(u0_10, tf, p, Tsit5(); save_everystep=true, tol, callback=callback_no_save)
+
+    ## 10D, Tsit5, tol=1e-3, tf = 20 vs 100 s vs callback
+    points_per_second = 30
+    fig_traj_short = VIZ.plot_trajectory_10D(sol10; tspan=(0, tf_short), points_per_second)
+    fig_traj = VIZ.plot_trajectory_10D(sol10; points_per_second)
+    fig_traj_cb = VIZ.plot_trajectory_10D(sol10_cb; points_per_second)
+    params = (; xlabel=&quot;x (m)&quot;, ylabel=&quot;y (m)&quot;, zlabel=&quot;z (m)&quot;, legend=false, widen=false)
+    plot!(fig_traj_short; title=&quot;tf = 20 s&quot;, params..., legend=:topleft)
+    plot!(fig_traj; title=&quot;tf = 100 s&quot;, params...)
+    plot!(fig_traj_cb; title=&quot;tf = 100 s + callback&quot;, params...)
+    tf_fig = plot(fig_traj_short, fig_traj, fig_traj_cb, layout=(1, 3), size=SIZE_FULL)
+    # one tick at each end of each axis, plus 0 when it is interior
+    for i in 1:3
+        plot!(tf_fig, subplot=i,
+            xticks=edge_ticks(tf_fig[i], :x; include_zero=true),
+            yticks=edge_ticks(tf_fig[i], :y; include_zero=true),
+            zticks=edge_ticks(tf_fig[i], :z; include_zero=true))
+    end
+    files = save_figure(tf_fig, &quot;trajectory_10D_short_long_cb&quot;)
+    #endregion
+
+    #region residuals_10d
+    ## Interpolated residuals
+    tf_long = fast ? 100 : 1000
+    sol10 = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6)
+    sol10_cb_t = PM10.integrate(u0_10, tf_long, p, Tsit5(); save_everystep=true, tol=1e-6, callback=callback_no_save)
+
+    ts = logrange(1, sol10.prob.tspan[2], 501)
+    res = [PM10.manifold_residuals!(similar(u0_10, 6), sol10(t), p) for t in ts]
+    res_cb = [PM10.manifold_residuals!(similar(u0_10, 6), sol10_cb_t(t), p) for t in ts]
+    ylim = exp10.((-9.5, 0.5))
+    xticks_ = exp10.(-18:1:10)
+    yticks_ = exp10.(-18:3:10)
+
+    plot(; xscale=:log10, xticks=xticks_, xformatter=x -&gt; &quot;&quot;, ylim, yscale=:log10, yticks=yticks_, ylabel=&quot;Residual on position (m)&quot;, legend=:topleft)
+    plot!(ts, norm.(getindex.(res, Ref(1:3))), label=&quot;Without callback&quot;)
+    fig_pos = plot!(ts, norm.(getindex.(res_cb, Ref(1:3))), label=&quot;With callback&quot;)
+
+    plot(; xscale=:log10, xticks=xticks_, xlabel=&quot;Time (s)&quot;, ylim, yscale=:log10, yticks=yticks_, ylabel=&quot;Residual on speed (m/s)&quot;)
+    plot!(ts, norm.(getindex.(res, Ref(4:6))))
+    fig_speed = plot!(ts, norm.(getindex.(res_cb, Ref(4:6))))
+    plot(fig_pos, fig_speed, layout=(2, 1), size=SIZE_HALF .* (1, 1.5))
+    plot!(bottommargin=3Plots.mm, leftmargin=6Plots.mm)
+    append!(files, save_figure(current(), &quot;residuals_10D_interp&quot;))
+    #endregion
+    return files
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    run_10d()
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="src-modelling-jl.html">« src/modelling.jl</a><a class="docs-footer-nextpage" href="src-analysis-jl.html">src/analysis.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

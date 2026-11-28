@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>src/analysis.jl · Rocking arm model for kite power generation</title><meta name="title" content="src/analysis.jl · Rocking arm model for kite power generation"/><meta property="og:title" content="src/analysis.jl · Rocking arm model for kite power generation"/><meta property="twitter:title" content="src/analysis.jl · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../intro.html">Introduction</a></li><li><a class="tocitem" href="../section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="../section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="../section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="../section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="../appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="../appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="../appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="../appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="../references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="../reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="main-jl.html">main.jl</a></li><li><a class="tocitem" href="src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li class="is-active"><a class="tocitem" href="src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="../api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Code</a></li><li class="is-active"><a href="src-analysis-jl.html">src/analysis.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="src-analysis-jl.html">src/analysis.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="src/analysis.jl"><a class="docs-heading-anchor" href="#src/analysis.jl"><code>src/analysis.jl</code></a><a id="src/analysis.jl-1"></a><a class="docs-heading-anchor-permalink" href="#src/analysis.jl" title="Permalink"></a></h1><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl">View on GitHub</a> (commit <code>6f20ab5</code>).</p><pre><code class="language-julia hljs"># Section 2 figures and Table 1: equilibria, one simulation and the convergence of
+# the two limit cycles of the 4D point-mass model, plus the parameter table.
+#
+# Outputs: figs/{equilibria_phase_space,equilibria_eight_circle,time_series_4D,
+# limit_cycle_convergence,yz_limit_cycles}.{pdf,png} and tables/table1.tex.
+#
+# Not part of the paper build (kept in applications/jtcam/Section_Numerical_analysis.jl):
+# the eigenvalue and equilibrium-trajectory figures, the Floquet check of the
+# convergence slopes and the limit-cycle inventory (deflated shooting vs
+# quasi-Monte-Carlo), which print diagnostics only.
+using KEEP: PointMass4 as PM4
+using KEEP: PointMassPara as PMP
+using KEEP: SteadyState
+using KEEP: Visualization as VIZ
+using KEEP: LimitCycle as LC
+using KEEP: DEFAULT_TOLERANCE, TAU0
+
+using Plots
+using LinearAlgebra: norm, eigvals, eigen, ⋅
+import ForwardDiff
+using SplitApplyCombine: invert
+using QuasiMonteCarlo: sample, HaltonSample
+using PyFormattedStrings: @f_str
+using Roots
+const SA = PM4.SA  # StaticArrays, through KEEP
+
+include(joinpath(@__DIR__, &quot;helpers.jl&quot;))
+
+## Parameter table for the paper
+# LaTeX table of the parameter set used here, sorted alphabetically by symbol.
+# b is the optimized PTO slope (kinetic criterion); angles are in degrees
+# and b per degree, so b·dα is a torque when dα is read in deg/s.
+
+struct Parameter
+    key::Symbol
+    sym::String
+    descr::String
+    unit::String
+    value_override::Union{String,Nothing}
+end
+
+const LATEX_TO_UNICODE = Dict(
+    raw&quot;\ell&quot; =&gt; &quot;l&quot;,
+    raw&quot;\rho&quot; =&gt; &quot;ρ&quot;,
+    raw&quot;\theta&quot; =&gt; &quot;θ&quot;,
+    raw&quot;\Delta&quot; =&gt; &quot;Δ&quot;,
+    raw&quot;\phi&quot; =&gt; &quot;φ&quot;
+)
+
+function eor_transform(sym)
+    s = sym
+    for (k, v) in LATEX_TO_UNICODE
+        s = replace(s, k =&gt; v)
+    end
+    s = replace(s, raw&quot;_&quot; =&gt; &quot;&quot;, raw&quot;{&quot; =&gt; &quot;&quot;, raw&quot;}&quot; =&gt; &quot;&quot;, raw&quot;\\&quot; =&gt; &quot;&quot;)
+    return lowercase(s)
+end
+
+#region param_table
+function param_table(p)
+    # symbol, description, unit, optional value override
+    params = [
+        Parameter(:a, &quot;a&quot;, &quot;Arm length&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:l, raw&quot;\ell&quot;, &quot;Line length&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:m, &quot;m&quot;, &quot;Kite mass&quot;, raw&quot;\kg&quot;, nothing),
+        Parameter(:I, &quot;I&quot;, &quot;Arm inertia&quot;, raw&quot;\kg\square\meter&quot;, nothing),
+        Parameter(:ρ_a, raw&quot;\rho_a&quot;, &quot;Air density&quot;, raw&quot;\kg\per\cubic\meter&quot;, nothing),
+        Parameter(:d_l, raw&quot;d_\ell&quot;, &quot;Line diameter&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:S, &quot;S&quot;, &quot;Kite surface&quot;, raw&quot;\square\meter&quot;, nothing),
+        Parameter(:C_L, &quot;C_L&quot;, &quot;Kite lift coefficient&quot;, &quot;&quot;, nothing),
+        Parameter(:C_D, &quot;C_D&quot;, &quot;Kite drag coefficient&quot;, &quot;&quot;, &quot;C_L / 7&quot;),
+        Parameter(:C_D_l, raw&quot;C_{D,\ell}&quot;, &quot;Line drag coefficient&quot;, &quot;&quot;, nothing),
+        Parameter(:ρ_l, raw&quot;\rho_\ell&quot;, &quot;Line density&quot;, raw&quot;\kg\per\cubic\meter&quot;, nothing),
+        Parameter(:g, &quot;g&quot;, &quot;Gravity&quot;, raw&quot;\meter\per\square\second&quot;, nothing),
+        Parameter(:z0, &quot;z_0&quot;, &quot;Wind reference altitude&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:w0, &quot;w_0&quot;, &quot;Wind reference speed&quot;, raw&quot;\meter\per\second&quot;, nothing),
+        Parameter(:b, &quot;b&quot;, &quot;Arm braking coefficient&quot;,
+            raw&quot;\newton\meter\second\per\degree&quot;, f&quot;{p.b / rad2deg(1):.4g}&quot;),  # 4 digits: fixed point b = I ω
+        Parameter(:θ0, raw&quot;\theta_0&quot;, &quot;Lemniscate mean polar angle&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.θ0):.0f}&quot;),
+        Parameter(:Δθ, raw&quot;\Delta\theta&quot;, &quot;Lemniscate polar half-height&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.Δθ):.0f}&quot;),
+        Parameter(:Δφ, raw&quot;\Delta\phi&quot;, &quot;Lemniscate azimuthal half-width&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.Δφ):.0f}&quot;),
+    ]
+
+    sort!(params, by=x -&gt; eor_transform(x.sym))
+    table_rows = map(params) do p_item
+        val = isnothing(p_item.value_override) ? f&quot;{p[p_item.key]:.9g}&quot; : p_item.value_override
+        unit_col = isempty(p_item.unit) ? &quot;&quot; : raw&quot;\si{&quot; * p_item.unit * &quot;}&quot;
+        f&quot;    ${p_item.sym}$ &amp; {p_item.descr} &amp; ${val}$ &amp; {unit_col} \\\\ &quot;
+    end
+
+
+    table_str = raw&quot;&quot;&quot;
+\begin{table}[thpb]
+\centering
+\caption{Parameter Description and Values}
+\label{tab:params}
+\begin{tabular}{l p{3.2cm} r l}
+    \toprule
+    {Symbol} &amp; {Description} &amp; {Value} &amp; {Unit} \\
+    \midrule
+&quot;&quot;&quot; * join(table_rows, &quot;\n&quot;) * raw&quot;&quot;&quot;
+
+    \bottomrule
+\end{tabular}
+\end{table}&quot;&quot;&quot;
+    return table_str
+end
+#endregion
+
+
+&quot;&quot;&quot;
+Port of Makie&#39;s streamplot_impl (src/basic_recipes/streamplot.jl), 2D.
+
+A visited-cell mask covers the domain; seeds are drawn at cell centers from a
+quasirandom (plastic-number) low-discrepancy sequence; from each unvisited seed
+the NORMALIZED field is RK4-integrated with fixed `stepsize` forward and
+backward, stopping on domain exit, on a near-zero field (equilibrium), or on
+entering any visited cell (which also terminates closed loops). Repeat until
+`density` of the cells are visited.
+Seeding and one-arrow-per-streamline follow Makie&#39;s streamplot, which steps
+explicit Euler on the unit field; the RK4 integration here is a deliberate
+deviation, as Euler chatters across the attracting ddτ = 0 nullcline near
+equilibria.
+
+Returns (line_x, line_y, ax, ay, au, av): NaN-separated polyline coordinates
+and seed positions / unit field directions for the arrows.
+&quot;&quot;&quot;
+function streamlines(f, xlims, ylims; gridsize=(20, 20), stepsize=0.1, maxsteps=10, density=1.0)
+    gx, gy = gridsize
+    xmin, xmax = xlims
+    ymin, ymax = ylims
+    rx, ry = LinRange(xmin, xmax, gx + 1), LinRange(ymin, ymax, gy + 1)
+    dx, dy = step(rx), step(ry)
+    mask = trues(gx, gy)  # unvisited cells
+    φ = 1.324717957244746  # plastic number
+    acoeff = (φ^-1, φ^-2)
+    # Unit field; nothing near an equilibrium (norm &lt; 1e-12), which terminates
+    # the integration instead of dividing 0/0.
+    unit = x -&gt; begin
+        v = f(x)
+        n = norm(v)
+        n &lt; 1e-12 ? nothing : (v[1] / n, v[2] / n)
+    end
+    # One RK4 step of size h along (or against, d = -1) the unit field.
+    function step_rk4(x, d, h)
+        k1 = unit(x)
+        k1 === nothing &amp;&amp; return nothing
+        k2 = unit((x[1] + d * h / 2 * k1[1], x[2] + d * h / 2 * k1[2]))
+        k2 === nothing &amp;&amp; return nothing
+        k3 = unit((x[1] + d * h / 2 * k2[1], x[2] + d * h / 2 * k2[2]))
+        k3 === nothing &amp;&amp; return nothing
+        k4 = unit((x[1] + d * h * k3[1], x[2] + d * h * k3[2]))
+        k4 === nothing &amp;&amp; return nothing
+        (x[1] + d * h / 6 * (k1[1] + 2k2[1] + 2k3[1] + k4[1]),
+            x[2] + d * h / 6 * (k1[2] + 2k2[2] + 2k3[2] + k4[2]))
+    end
+    line_x, line_y = Float32[], Float32[]
+    ax, ay, au, av = Float32[], Float32[], Float32[], Float32[]
+    visited = 0
+    ind = 0
+    while visited &lt; gx * gy * min(1.0, density)
+        cind = ind
+        ind += 1
+        ci = clamp(ceil(Int, ((0.5 + acoeff[1] * cind) % 1) * gx), 1, gx)
+        cj = clamp(ceil(Int, ((0.5 + acoeff[2] * cind) % 1) * gy), 1, gy)
+        mask[ci, cj] || continue
+        x0 = (xmin + (ci - 0.5) * dx, ymin + (cj - 0.5) * dy)
+        v0 = f(x0)
+        n0 = norm(v0)
+        push!(ax, x0[1])
+        push!(ay, x0[2])
+        push!(au, v0[1] / n0)
+        push!(av, v0[2] / n0)
+        mask[ci, cj] = false
+        visited += 1
+        for d in (-1, 1)
+            x = x0
+            ccur = (ci, cj)
+            push!(line_x, NaN)
+            push!(line_y, NaN)
+            push!(line_x, x[1])
+            push!(line_y, x[2])
+            npts = 1
+            while xmin ≤ x[1] ≤ xmax &amp;&amp; ymin ≤ x[2] ≤ ymax &amp;&amp; npts &lt; maxsteps
+                x = step_rk4(x, d, stepsize)
+                x === nothing &amp;&amp; break
+                (xmin ≤ x[1] ≤ xmax &amp;&amp; ymin ≤ x[2] ≤ ymax) || break
+                idx = (clamp(searchsortedlast(rx, x[1]), 1, gx), clamp(searchsortedlast(ry, x[2]), 1, gy))
+                if idx != ccur
+                    mask[idx...] || break
+                    mask[idx...] = false
+                    visited += 1
+                    ccur = idx
+                end
+                push!(line_x, x[1])
+                push!(line_y, x[2])
+                npts += 1
+            end
+        end
+    end
+    return (line_x, line_y, ax, ay, au, av)
+end
+
+## Convergence rate of the two cycles (helpers)
+const LC_CONV_TOL = 1e-13
+const EQ_SEEDS = 100      # initial values of τ per fold curve for SteadyState.all_steady_states
+const DTAU_INIT = 1.0     # |dτ(0)| (rad/s) of the initial states x0± (KEEP&#39;s LC.compute_limit_cycle default)
+const TS_DURATION = 10    # duration (s) of the time series of fig:timeseries
+const CB = LC.build_poincare_callback(eps(1.0))
+
+function get_slope(distances; tol_start, tol_end)
+    i1 = findfirst(&lt;(tol_start), distances)
+    i2 = findlast(&gt;(tol_end), distances)
+    return -(log10(distances[i2]) - log10(distances[i1])) / (i2 - i1)
+end
+
+function plot_convergence_panel(p, dτ, color; tf=50, ntrace=5, legend=true, tol=LC_CONV_TOL)
+    sol = PM4.integrate(PM4.build_u(; dτ), tf, p; callback=CB, save_end=false, tol)
+    u_infty = sol.u[end]
+    n_max = 11
+    distances = [LC.distance_on_section(u, u_infty) for u in sol.u[1:(end-1)]][1:min(end, n_max-1)]
+
+    tol_start, tol_end = 1e-2, 10tol
+    slope = get_slope(distances; tol_start, tol_end)
+    i1 = findfirst(&lt;(tol_start), distances)
+
+    plt = plot(; yscale=:log10, xlim=(0, n_max), xticks=0:2:100,
+        ylim=(1e-16, 1e2), yticks=10.0 .^ (0:-3:-16),
+        xlabel=f&quot;&quot;&quot;Lemniscate revolutions, D(τ) {dτ&gt;0 ? &quot;&gt;&quot; : &quot;&lt;&quot;} 0&quot;&quot;&quot;,
+    )
+
+    perturbed_params = (; ls=:dot, lw=2, alpha=0.4, c=:gray, label=&quot;Perturbed trajectories&quot;)
+    plot!(i -&gt; distances[i1] * exp10(-slope * (i - i1)); c=:black)
+    if ntrace &gt; 0
+        for (α, τ) in eachcol(sample(ntrace, Float64[-π, -π], Float64[π, π], HaltonSample()))
+            s = PM4.integrate(PM4.build_u(; α, τ, dτ), tf, p; callback=CB, save_end=false, tol)
+            plot!([LC.distance_on_section(u, u_infty) for u in s.u] .+ 1e-16;
+                perturbed_params..., label=&quot;&quot;)
+        end
+    end
+
+    annotate!((5, 1e-11, (f&quot;slope = {slope:.2f}&quot;, :right, ANNOTATIONFONTSIZE, colorant&quot;black&quot;)))
+    distance_style = (; c=color, ls=:dot, marker=:circle)
+    plot!(distances .+ 1e-16; distance_style...)
+
+    if legend
+        plot!([NaN]; distance_style..., label=raw&quot;$|| x_i - x_\infty  ||$&quot;)
+        ntrace &gt; 0 &amp;&amp; plot!([NaN]; perturbed_params...)
+    end
+    return (; plt, slope)
+end
+
+## Spectra of the equilibria and Floquet multipliers of the cycles (numbers of the text)
+
+&quot;Jacobian of the 4D vector field f(x) = (dq, ddq) at the state `x`.&quot;
+state_jacobian(x, vbp) = ForwardDiff.jacobian(
+    y -&gt; PM4.dynamics(PM4.build_u(y[1], y[2], y[3], y[4], zero(y[1])), vbp, 0)[1:4], collect(x))
+
+&quot;Monodromy matrix of the cycle `lc`: derivative of the time-T flow at its initial state.&quot;
+function monodromy(lc, vbp; tol=DEFAULT_TOLERANCE)
+    T = lc.t[end]
+    flow = y -&gt; PM4.integrate(PM4.build_u(y[1], y[2], y[3], y[4], zero(y[1])), T, vbp; tol).u[end][1:4]
+    return ForwardDiff.jacobian(flow, collect(lc.u[1][1:4]))
+end
+
+fmt_complex(z) = abs(imag(z)) &lt; 1e-8 ? f&quot;{real(z):.2f}&quot; :
+    f&quot;{real(z):.2f} \\pm {abs(imag(z)):.2f}\\,i&quot;
+
+&quot;&quot;&quot;
+Spectra of the equilibria, grouped by σ-pairs (σ(α, τ) = (-α, τ + π) conjugates the
+vector field, so both members of a pair have the same spectrum). The vector field is in
+regular form (`PM4._accelerations_tension`, no division by the lever arm of the lines),
+so its AD Jacobian is exact to rounding on the fold curves, where the equilibria lie:
+both members of each pair are computed and required to agree.
+Returns a vector of named tuples, one per pair, sorted by arm side then zone.
+&quot;&quot;&quot;
+function equilibrium_spectra(ss, vbp; is_down, is_center)
+    spec = [eigvals(state_jacobian((q[1], q[2], 0.0, 0.0), vbp)) for q in ss]
+    all(s -&gt; all(isfinite, s), spec) || error(&quot;non-finite Jacobian at an equilibrium&quot;)
+    pairs = []
+    used = falses(length(ss))
+    for i in eachindex(ss)
+        used[i] &amp;&amp; continue
+        qi = ss[i]
+        j = findfirst(k -&gt; !used[k] &amp;&amp; k != i &amp;&amp;
+            abs(rem2pi(ss[k][1] + qi[1], RoundNearest)) &lt; 1e-6 &amp;&amp;
+            abs(rem2pi(ss[k][2] - qi[2] - π, RoundNearest)) &lt; 1e-6, eachindex(ss))
+        j === nothing &amp;&amp; error(&quot;equilibrium $(rad2deg.(qi)) deg has no σ-twin&quot;)
+        used[i] = used[j] = true
+        d = maximum(abs, sort(spec[i]; by=reim) - sort(spec[j]; by=reim))
+        d &lt; 1e-6 || @warn &quot;σ-twins with different spectra&quot; rad2deg.(qi) d
+        # representative with τ in [0, π), as in the figures&#39; description
+        r = rem2pi(ss[i][2], RoundDown) &lt; π ? i : j
+        λ = sort(spec[r]; by=z -&gt; (real(z), imag(z)))
+        # weight of the arm (α, dα) in the unstable eigenvectors: the text says they
+        # move the kite along the eight, the arm staying at rest to first order
+        E = eigen(state_jacobian((ss[r][1], ss[r][2], 0.0, 0.0), vbp))
+        armw(k) = (v = E.vectors[:, k]; max(abs(v[1]), abs(v[3])) / maximum(abs, v))
+        iun = findall(z -&gt; real(z) &gt; 0, E.values)
+        kdom = iun[argmax(real.(E.values[iun]))]
+        arm = armw(kdom)                                    # dominant unstable mode
+        others = setdiff(iun, findall(==(E.values[kdom]), E.values), findall(==(conj(E.values[kdom])), E.values))
+        armslow = isempty(others) ? NaN : minimum(armw, others)  # extra slow unstable mode (upwind)
+        push!(pairs, (; q=ss[r], down=is_down(ss[r]), center=is_center(ss[r]), λ,
+            nunstable=count(z -&gt; real(z) &gt; 0, λ), remax=maximum(real, λ), arm, armslow))
+    end
+    sort!(pairs; by=p -&gt; (!p.down, !p.center))
+    return pairs
+end
+
+&quot;&quot;&quot;
+Equilibria as roots of one scalar function per fold curve. At rest on the fold
+α = φ(τ) + s (s = 0: downwind arm, s = π: upwind arm) the lever arm of the lines vanishes,
+so α̈ = 0 identically, and the equilibria are the zeros of g_s(τ) = τ̈(φ(τ) + s, τ, 0, 0).
+They are bracketed by the sign changes of g_s on a grid of `n` values of τ, then refined.
+Returns the roots as [α, τ] (angles in (-π, π]).
+&quot;&quot;&quot;
+function fold_roots(vbp; n=3600)
+    roots = Vector{Float64}[]
+    for s in (0.0, π)
+        q(τ) = (PM4.τ_to_θφ(τ, vbp)[2] + s, τ)
+        g(τ) = PM4.dynamics(SA[q(τ)..., 0.0, 0.0, 0.0], vbp)[4]
+        τs = range(0, 2π, n + 1)
+        gs = g.(τs)
+        for i in 1:n
+            sign(gs[i]) != sign(gs[i+1]) || continue
+            τ0 = find_zero(g, (τs[i], τs[i+1]))
+            push!(roots, rem2pi.(collect(q(τ0)), RoundNearest))
+        end
+    end
+    return roots
+end
+
+&quot;&quot;&quot;
+Lower bound, over an `n`×`n` grid of the torus of configurations, of the ratio between
+the tangential part (on the plane of the cone) of F_a + F_g at rest and its norm. Off the
+fold curves, slack lines at rest require this tangential part to vanish (projections of
+Newton&#39;s law for the kite on r̂ and r̂&#39;), so a positive minimum excludes equilibria with
+slack lines.
+&quot;&quot;&quot;
+function slack_ratio(vbp; n=721)
+    minimum(Iterators.product(range(-π, π, n), range(0, 2π, n))) do (α, τ)
+        k = PM4._kinematics(α, τ, vbp)
+        F_a, F_g, _, _ = PM4._forces(k, SA[0.0, 0.0], vbp)
+        F = F_a + F_g
+        sqrt((F ⋅ k.rhat)^2 + (F ⋅ k.rhatp)^2 / k.nrhatp2) / norm(F)
+    end
+end
+
+&quot;&quot;&quot;
+Energy balance of the cycle `lc` over one lap, by time averages on `n` points. Gravity does
+no net work over a lap, so the generator power equals the power of the aerodynamic force,
+F_a⋅ṙ = F_a⋅w - F_a⋅w_a: the power taken from the wind (`capture`) minus the power
+dissipated by the drag (`loss`). Also the mean speed of the kite, over the lap (`V`) and
+near the tips of the eight (`Vtip`, |τ| in [π/4, 3π/4] mod 2π, around τ = ±π/2), and
+the relative closure error of the balance (`err`).
+&quot;&quot;&quot;
+function energy_balance(lc, vbp; n=4000)
+    L, _, T = PM4.lmt(vbp)
+    rows = map(range(0, lc.t[end], n + 1)[1:end-1]) do t
+        u = lc(t)
+        dq = SA[u[3], u[4]]
+        k = PM4._kinematics(u[1], u[2], vbp)
+        F_a, _, torque, Rdot = PM4._forces(k, dq, vbp)
+        v = Rdot * k.rhat + k.R * u[4] * k.rhatp
+        z = k.R * k.rhat[3]
+        w = SA[abs(z / (vbp.z0 * L))^(1 / vbp.n_wind), 0, 0] * L / T   # as in PM4._forces
+        τ = abs(rem2pi(u[2], RoundNearest))                            # in [0, π]
+        (; capture=F_a ⋅ w, loss=F_a ⋅ (w - v), gen=torque * u[3], V=norm(v), tip=π / 4 &lt;= τ &lt;= 3π / 4)
+    end
+    m(f, r=rows) = sum(f, r) / length(r)
+    tips = filter(r -&gt; r.tip, rows)
+    capture, loss, gen = m(r -&gt; r.capture), m(r -&gt; r.loss), m(r -&gt; r.gen)
+    return (; capture, loss, gen, V=m(r -&gt; r.V), Vtip=m(r -&gt; r.V, tips),
+        err=abs(capture - loss - gen) / gen)
+end
+
+&quot;&quot;&quot;
+Gap between the cycle `lc` and its image by σ shifted by the time `th` at which τ has
+moved by ±π (max over the cycle, angles mod 2π); returns (; gap, half = th / T).
+&quot;&quot;&quot;
+function sigma_gap(lc; n=200)
+    σ(u) = (-u[1], u[2] + π, -u[3], u[4])
+    T, u0 = lc.t[end], lc.u[1]
+    th = find_zero(t -&gt; lc(t)[2] - (u0[2] + sign(u0[4]) * π), (0.0, T))
+    gap = maximum(range(0, T, n)) do t
+        y, z = σ(lc(t)), lc(mod(t + th, T))
+        maximum(abs, (rem2pi(y[1] - z[1], RoundNearest), rem2pi(y[2] - z[2], RoundNearest),
+            y[3] - z[3], y[4] - z[4]))
+    end
+    return (; gap, half=th / T)
+end
+
+function equilibria_table(pairs)
+    rows = map(pairs) do p
+        λs = String[]
+        λ = p.λ
+        k = 1
+        while k &lt;= length(λ)  # a complex pair once, with ±
+            push!(λs, fmt_complex(λ[k]))
+            k += abs(imag(λ[k])) &lt; 1e-8 ? 1 : 2
+        end
+        arm, zone = p.down ? &quot;downwind&quot; : &quot;upwind&quot;, p.center ? &quot;centre&quot; : &quot;tip&quot;
+        α, τ = rad2deg(p.q[1]), rad2deg(rem2pi(p.q[2], RoundDown))
+        ev = join(λs, raw&quot;,\ &quot;)
+        &quot;    $arm &amp; $zone &amp; \$($(f&quot;{α:.1f}&quot;), $(f&quot;{τ:.1f}&quot;))\$ &amp; \$$ev\$ &amp; $(p.nunstable) \\\\&quot;
+    end
+    return raw&quot;&quot;&quot;
+\begin{table}[thpb]
+\centering
+\caption{Equilibria of the system for the parameters of Table~\ref{tab:params}, by pairs exchanged by the symmetry~\eqref{eq:symmetry}: one representative \((\alpha, \tau)\) of each pair (in degrees, \(0 \leq \tau &lt; 180\)), eigenvalues of the Jacobian of \(f\) (in \si{\per\second}) and number of eigenvalues with positive real part.}
+\label{tab:equilibria}
+\begin{tabular}{l l c l c}
+    \toprule
+    {Arm} &amp; {Kite} &amp; {\((\alpha, \tau)\)} &amp; {Eigenvalues} &amp; {Unstable} \\
+    \midrule
+&quot;&quot;&quot; * join(rows, &quot;\n&quot;) * raw&quot;&quot;&quot;
+
+    \bottomrule
+\end{tabular}
+\end{table}&quot;&quot;&quot;
+end
+
+function run_analysis(; fast::Bool=false)
+    #region setup_analysis
+    ## Determine optimal parameters using kinetic model
+    p0 = PMP.build_para()
+    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-9, rtol=1e-9, maxiter=50)  # errors if not converged
+    vbp = PMP.build_vbpara(p0)
+    #endregion
+
+    #region table1
+    write_table(&quot;table1&quot;, param_table(p0))
+    #endregion
+    files = String[]
+
+    #region equilibria_style
+    #! format: off
+    my_theme = (;
+        downwind        = (; c=plot_color(:grey, 0.08)),
+        upwind          = (; c=plot_color(:red, 0.08)),
+        streamlines     = (; c=:black, alpha=0.7, lw=default(:lw) / 6),
+        heads           = (; c=:black, alpha=0.5, lw=0),
+        nullcline_tau   = (; c=1, ls=:solid),
+        nullcline_alpha = (; c=2, ls=:solid),
+        eq_legend       = (; c=:black, shape=:circle, ms=default(:ms), msw=20),
+    )
+
+    # Equilibrium characteristics: the symmetry (α, τ) -&gt; (-α, τ+π) flips the kite
+    # left↔right (φ = φ0 + Δφ·sin(τ)) and preserves the arm wind region and the
+    # center/side zone, so the 8 equilibria realize all 2×2×2 combinations.
+    φkite(τ) = vbp.φ0 + vbp.Δφ * sin(τ)                     # kite azimuth (PM4.τ_to_θφ)
+    is_down(q) = cos(q[1]) &gt; 0                              # arm downwind
+    is_left(q) = φkite(q[2]) &gt; vbp.φ0                       # kite left of window center
+    is_center(q) = abs(φkite(q[2]) - vbp.φ0) &lt; vbp.Δφ / 2   # closer to φ0 than to ±Δφ
+
+    &quot;Marker style from the equilibrium characteristics: fill = arm wind, shape = zone, stroke = kite side.&quot;
+    ss_style(q) = (
+        c = is_down(q) ? :white : :black,
+        markerstrokecolor = is_down(q) ? :black : :white,
+        shape = is_center(q) ? :circle : :diamond,
+        ms = default(:ms),
+        markerstrokewidth = is_down(q) ? 8 : 10,
+        # markerstrokewidth = 10,
+    )
+    #! format: on
+
+    theme = my_theme
+
+    f = q -&gt; SteadyState.ddq_partial(q, vbp)
+    #endregion
+
+    #region equilibria_phase_space
+    # Canvas &amp; Layout
+    δ = 0
+    plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
+        xticks=([-180, 0, 180], [&quot;-180&quot;, &quot;0&quot;, &quot;180&quot;]),
+        yticks=([-180, 0, 180], [&quot;-180&quot;, &quot;0&quot;, &quot;180&quot;]),
+        xlabel=&quot;α (deg)&quot;, ylabel=&quot;τ (deg)&quot;,
+        grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+    # Background wind spans
+    vspan!([-180, -90]; theme.upwind..., label=&quot;Upwind arm&quot;)
+    vspan!([90, 180]; theme.upwind...)
+    vspan!([-90, 90]; theme.downwind...) #, label=&quot;Downwind arm&quot;)
+
+    # Streamlines &amp; Arrowheads
+    line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
+    plot!(rad2deg.(line_x), rad2deg.(line_y); theme.streamlines...)
+
+    ax, ay = rad2deg.(ax), rad2deg.(ay)
+    L, W = rad2deg(0.2), rad2deg(0.06)
+    heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
+             for (s, u, v) in zip(zip(ax, ay), au, av)]
+    plot!(heads; theme.heads...)
+
+    # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
+    N = 20
+    αs = range(-π, π, N + 1)
+    τs = range(-π, π, 2N + 1)
+    dd = [f((α, τ)) for τ in τs, α in αs]
+
+    contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], theme.nullcline_tau...)
+    contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], theme.nullcline_alpha...)
+    plot!([NaN], [NaN]; theme.nullcline_tau..., label=&quot;D²(τ) = 0&quot;)
+    plot!([NaN], [NaN]; theme.nullcline_alpha..., label=&quot;D²(α) = 0&quot;)
+
+    # Equilibria
+    ss = SteadyState.all_steady_states(vbp; N=EQ_SEEDS)
+
+    styles = ss_style.(ss)
+    scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
+        c=getproperty.(styles, :c),
+        markerstrokecolor=getproperty.(styles, :markerstrokecolor),
+        shape=getproperty.(styles, :shape),
+        ms=getproperty.(styles, :ms),
+        markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+    scatter!([NaN], [NaN]; theme.eq_legend..., label=&quot;Equilibrium&quot;)
+    plot!(widen=1.06)
+    plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
+        topmargin=5Plots.mm, size=plot_size(1, 1.14))
+    append!(files, save_figure(current(), &quot;equilibria_phase_space&quot;))
+    #endregion
+
+    #region equilibria_eight_circle
+    ss_downwind = [_ss for _ss in ss if cos(_ss[1]) &gt; 0]
+    ss_upwind = [_ss for _ss in ss if cos(_ss[1]) &lt;= 0]
+    p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:black, lw=2),
+        marker_kwargs=ss_style.(ss_downwind), project_eight=true)
+    plot!(title=&quot;Downwind arm&quot;, background_color_subplot=theme.downwind.c)
+    p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw=2),
+        marker_kwargs=ss_style.(ss_upwind), project_eight=true)
+    plot!(title=&quot;Upwind arm&quot;, background_color_subplot=theme.upwind.c)
+
+    plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
+    append!(files, save_figure(current(), &quot;equilibria_eight_circle&quot;))
+    #endregion
+
+    #region time_series_4D
+    u0 = PM4.build_u(; dτ=DTAU_INIT)
+    sol = PM4.integrate(u0, TS_DURATION, vbp; save_everystep=true)
+
+    sim_4D_fig = plot_time_series(sol)
+    append!(files, save_figure(sim_4D_fig, &quot;time_series_4D&quot;))
+    #endregion
+
+    #region limit_cycle_convergence
+    (p_conv_p, slope_p) = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
+    (p_conv_m, slope_m) = plot_convergence_panel(vbp, -1, 2; ntrace=0)
+    plot!(p_conv_p, leftmargin=11Plots.mm)
+    plot!(p_conv_m, leftmargin=5Plots.mm)
+    plot!(p_conv_p, ylabel=&quot;Distance to limit&quot;)
+    conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
+    plot!(bottommargin=7Plots.mm)
+    append!(files, save_figure(conv_two, &quot;limit_cycle_convergence&quot;))
+    #endregion
+
+    #region yz_limit_cycles
+    r_vec = (t, sol) -&gt; PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
+    lc_p = LC.compute_limit_cycle(PM4.build_u(; dτ=+DTAU_INIT), vbp; save_everystep=true)
+    lc_m = LC.compute_limit_cycle(PM4.build_u(; dτ=-DTAU_INIT), vbp; save_everystep=true)
+    (lc_p === nothing || lc_m === nothing) &amp;&amp; error(&quot;no limit cycle from x0±&quot;)
+    function compute_lens(lc_p, lc_m, τ, δ_factor; idxs=2:3)
+        # τ(t) is monotone along a cycle and spans TAU0 ± 2π: find the time where
+        # the τ state hits τ mod 2π, mapped into the cycle&#39;s τ range.
+        function phase_time(sol, τ)
+            t0, t1 = sol.prob.tspan
+            lo, hi = minmax(sol(t0)[2], sol(t1)[2])
+            τ_target = clamp(τ + 2π * ceil((lo - τ) / 2π), lo, hi)
+            return find_zero(t -&gt; sol(t)[2] - τ_target, (t0, t1))
+        end
+        yz(sol, t) = r_vec(t, sol)[idxs]
+        r_p = yz(lc_p, phase_time(lc_p, τ))
+        r_m = yz(lc_m, phase_time(lc_m, τ))
+        c = (r_p + r_m) / 2
+        δ = δ_factor * norm(r_p - r_m)
+        return c, δ
+    end
+
+    function yz_split(sol, n_splits)
+        t = range(sol.prob.tspan..., 300)
+        yz = [r_vec(t, sol)[2:3] for t in t]
+        Δt = (t[end] - t[1]) / (n_splits + 1)
+        for i in 1:n_splits
+            t_split = (i - 0.2) * Δt
+            ind = searchsortedfirst(t, t_split)
+            insert!(yz, ind + i - 1, [NaN, NaN])
+        end
+        return yz
+    end
+    n_splits = 4
+    # arrows = [permutedims(repeat([true], n_splits - 1)) false]
+    plot(aspect_ratio=:equal, xlabel=&quot;y (m)&quot;, ylabel=&quot;z (m)&quot;, xtick=-40:10:40, ytick=10:5:20)
+    plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
+    plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
+    plot!([NaN], [NaN], c=1, label=&quot;D(τ) &gt; 0&quot;)
+    plot!([NaN], [NaN], c=2, label=&quot;D(τ) &lt; 0&quot;)
+    plot!([0], [26])
+    c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ was set by hand
+    lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
+    l = plot!().inset_subplots[1]
+    xticks_ = (c[1]-δ):δ:(c[1]+δ)
+    yticks_ = (c[2]-δ):δ:(c[2]+δ)
+    xticks!(l, xticks_, [f&quot;{t:.1f}&quot; for t in xticks_])
+    yticks!(l, yticks_, [f&quot;{t:.1f}&quot; for t in yticks_])
+    plot!(l, tickfontsize=TICKFONTSIZE - 1)
+    plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
+    append!(files, save_figure(current(), &quot;yz_limit_cycles&quot;))
+    #endregion
+
+    ## Numbers of the text: equilibria, cycles, inventory
+    #region table5
+    pairs = equilibrium_spectra(ss, vbp; is_down, is_center)
+    push!(files, write_table(&quot;table5&quot;, equilibria_table(pairs)))
+    #endregion
+    length(ss) == 8 || @warn &quot;the text describes 8 equilibria&quot; n = length(ss)
+    all(p -&gt; p.nunstable &gt; 0, pairs) || @warn &quot;the text says that all equilibria are unstable&quot;
+    all(p -&gt; p.arm &lt; 1e-2, pairs) || @warn &quot;the text says the dominant unstable mode of every equilibrium is along the eight&quot; getproperty.(pairs, :arm)
+    all(p -&gt; p.down ? isnan(p.armslow) : p.armslow &gt; 0.5, pairs) ||
+        @warn &quot;the text says the extra unstable mode of the upwind equilibria is a mode of the arm&quot; getproperty.(pairs, :armslow)
+    pick(down, center) = only(filter(p -&gt; p.down == down &amp;&amp; p.center == center, pairs))
+    all(c -&gt; pick(false, c).nunstable == pick(true, c).nunstable + 1, (true, false)) ||
+        @warn &quot;the text says that an upwind equilibrium has one more unstable eigenvalue than its downwind counterpart&quot;
+    cyc = map((lc_p, lc_m)) do lc
+        μ = eigvals(monodromy(lc, vbp))
+        itriv = argmin(abs.(μ .- 1))
+        μnt = sort(μ[setdiff(eachindex(μ), itriv)]; by=abs, rev=true)  # non-trivial multipliers
+        μn = abs(μnt[1])                                     # largest non-trivial modulus
+        (; T=lc.t[end], P=lc.u[end][end] / lc.t[end], μn, μerr=abs(μ[itriv] - 1),
+            μ1real=abs(imag(μnt[1])) &lt; 1e-12, μpair=abs(μnt[2]),  # dominant real; then a complex pair
+            αmax=rad2deg(maximum(u -&gt; abs(u[1]), lc.u)), dτ0=lc.u[1][4])
+    end
+    eb = energy_balance.((lc_p, lc_m), Ref(vbp))
+    all(e -&gt; e.err &lt; 1e-6, eb) || @warn &quot;energy balance of the cycles does not close&quot; eb
+    eb[2].V &gt; eb[1].V &amp;&amp; eb[2].Vtip &gt; eb[1].Vtip &amp;&amp; eb[2].capture &gt; eb[1].capture &amp;&amp; eb[2].loss &gt; eb[1].loss ||
+        @warn &quot;the text says the cycle with dτ &lt; 0 is faster (lap and tips), takes more power from the wind and loses more to drag&quot; eb
+    cyc[1].T &gt; cyc[2].T &amp;&amp; cyc[1].P &gt; cyc[2].P ||
+        @warn &quot;the text says the cycle with dτ &gt; 0 has the longer period and the larger power&quot; cyc
+    for (c, s) in zip(cyc, (slope_p, slope_m))
+        abs(-log10(c.μn) - s) &lt; 0.2 || @warn &quot;convergence rate not close to the Floquet multiplier&quot; s -log10(c.μn)
+        c.αmax &lt; 90 || @warn &quot;the text says |α| stays below 90 deg&quot; c.αmax
+        c.μ1real &amp;&amp; c.μpair &lt; c.μn ||
+            @warn &quot;the text says the dominant multiplier is real, followed by a complex pair&quot; c
+        s &gt; -log10(c.μn) || @warn &quot;the text says the measured rate is above the Floquet rate&quot; s -log10(c.μn)
+    end
+    # tension at rest, exact on the fold curves (regular form)
+    ten = [(; Fl=PM4.compute_line_tension(SA[q[1], q[2], 0.0, 0.0], vbp)) for q in ss]
+    roots = fold_roots(vbp; n=fast ? 720 : 3600)
+    length(roots) == length(ss) &amp;&amp; all(q -&gt; any(r -&gt; maximum(abs, rem2pi.(r - q, RoundNearest)) &lt; 1e-6, roots), ss) ||
+        @warn &quot;the text says the equilibria are the roots of g± on the fold curves&quot; roots ss
+    slack = slack_ratio(vbp; n=fast ? 181 : 721)
+    slack &gt; 0.1 || @warn &quot;the text says no equilibrium has slack lines (tangential force bounded below)&quot; slack
+    all(t -&gt; t.Fl &gt; 0, ten) || @warn &quot;the text says the lines are taut at the equilibria&quot;
+    sig = sigma_gap.((lc_p, lc_m))
+    all(g -&gt; g.gap &lt; 1e-7 &amp;&amp; abs(g.half - 0.5) &lt; 1e-7, sig) ||
+        @warn &quot;the text says each cycle is invariant under σ with a half-period shift&quot; sig
+    Fl_cyc = [[PM4.compute_line_tension(lc(t), vbp) for t in range(lc.t[1], lc.t[end], 400)] for lc in (lc_p, lc_m)]
+    all(F -&gt; minimum(F) &gt; 0, Fl_cyc) || @warn &quot;the text says the lines stay taut along the cycles&quot;
+    n_inv, vmax_inv = 200, 10  # α sampled in [-π, π]: σ maps Σ onto {τ = π}, not onto Σ
+    lcs = LC.all_limit_cycles(vbp; αmin=-π, αmax=π, N=n_inv, vmax=vmax_inv)
+    length(lcs) == 2 || @warn &quot;the text says the inventory finds the two cycles only&quot; n = length(lcs)
+    sci(x) = (e = floor(Int, log10(x)); f&quot;{x / exp10(e):.1f} \\times 10^{{{e}}}&quot;)
+    expo(x) = &quot;10^{$(ceil(Int, log10(x)))}&quot;
+    # numbers quoted in the text of the analysis section (`tables/numbers.tex` belongs
+    # to the optimization section); the rates with the precision of the figure&#39;s annotations
+    push!(files, write_table(&quot;numbers_analysis&quot;, join([
+        &quot;% Generated by main.jl (analysis section): numbers quoted in the text.&quot;,
+        &quot;\\newcommand{\\ConvRatePlus}{$(f&quot;{slope_p:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\ConvRateMinus}{$(f&quot;{slope_m:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\ConvTol}{10^{$(round(Int, log10(LC_CONV_TOL)))}}&quot;,
+        &quot;\\newcommand{\\IntTol}{10^{$(round(Int, log10(DEFAULT_TOLERANCE)))}}&quot;,
+        &quot;\\newcommand{\\EqCount}{$(length(ss))}&quot;,
+        &quot;\\newcommand{\\EqReCenterMin}{$(f&quot;{min(pick(true, true).remax, pick(false, true).remax):.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\EqReCenterMax}{$(f&quot;{max(pick(true, true).remax, pick(false, true).remax):.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\EqReTipMin}{$(f&quot;{min(pick(true, false).remax, pick(false, false).remax):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\EqReTipMax}{$(f&quot;{max(pick(true, false).remax, pick(false, false).remax):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcPeriodPlus}{$(f&quot;{cyc[1].T:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcPeriodMinus}{$(f&quot;{cyc[2].T:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcPowerPlus}{$(f&quot;{cyc[1].P / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcPowerMinus}{$(f&quot;{cyc[2].P / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcAlphaMaxPlus}{$(f&quot;{cyc[1].αmax:.0f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcAlphaMaxMinus}{$(f&quot;{cyc[2].αmax:.0f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcDtauPlus}{$(f&quot;{cyc[1].dτ0:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcDtauMinus}{$(f&quot;{cyc[2].dτ0:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FloquetPlus}{$(sci(cyc[1].μn))}&quot;,
+        &quot;\\newcommand{\\FloquetMinus}{$(sci(cyc[2].μn))}&quot;,
+        &quot;\\newcommand{\\FloquetRatePlus}{$(f&quot;{-log10(cyc[1].μn):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FloquetRateMinus}{$(f&quot;{-log10(cyc[2].μn):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FloquetPairRatePlus}{$(f&quot;{-log10(cyc[1].μpair):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FloquetPairRateMinus}{$(f&quot;{-log10(cyc[2].μpair):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FloquetTrivialErr}{$(expo(max(cyc[1].μerr, cyc[2].μerr)))}&quot;,
+        &quot;\\newcommand{\\EqTensionMin}{$(f&quot;{minimum(t -&gt; t.Fl, ten):.0f}&quot;)}&quot;,
+        &quot;\\newcommand{\\SlackRatio}{$(f&quot;{floor(slack, digits=2):.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\FoldGrid}{$(fast ? 720 : 3600)}&quot;,
+        &quot;\\newcommand{\\SlackGrid}{$(fast ? 181 : 721)}&quot;,
+        &quot;\\newcommand{\\EqTensionMax}{$(f&quot;{maximum(t -&gt; t.Fl, ten):.0f}&quot;)}&quot;,
+        &quot;\\newcommand{\\SigmaGap}{$(expo(maximum(g -&gt; g.gap, sig)))}&quot;,
+        &quot;\\newcommand{\\LcTensionMinPlus}{$(f&quot;{minimum(Fl_cyc[1]) / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcTensionMaxPlus}{$(f&quot;{maximum(Fl_cyc[1]) / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcTensionMinMinus}{$(f&quot;{minimum(Fl_cyc[2]) / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcTensionMaxMinus}{$(f&quot;{maximum(Fl_cyc[2]) / 1000:.2f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcCapturePlus}{$(f&quot;{eb[1].capture / 1000:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcCaptureMinus}{$(f&quot;{eb[2].capture / 1000:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcLossPlus}{$(f&quot;{eb[1].loss / 1000:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcLossMinus}{$(f&quot;{eb[2].loss / 1000:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcSpeedPlus}{$(f&quot;{eb[1].V:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcSpeedMinus}{$(f&quot;{eb[2].V:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcSpeedTipPlus}{$(f&quot;{eb[1].Vtip:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\LcSpeedTipMinus}{$(f&quot;{eb[2].Vtip:.1f}&quot;)}&quot;,
+        &quot;\\newcommand{\\EqSeeds}{$EQ_SEEDS}&quot;,
+        &quot;\\newcommand{\\DtauInit}{$(f&quot;{DTAU_INIT:g}&quot;)}&quot;,
+        &quot;\\newcommand{\\TsDuration}{$TS_DURATION}&quot;,
+        &quot;\\newcommand{\\ArmLength}{$(f&quot;{p0.a:g}&quot;)}&quot;,
+        &quot;\\newcommand{\\InvSeeds}{$n_inv}&quot;,
+        &quot;\\newcommand{\\InvVmax}{$vmax_inv}&quot;,
+        &quot;\\newcommand{\\InvCount}{$(length(lcs))}&quot;,
+    ], &quot;\n&quot;)))
+    return files
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    run_analysis()
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="src-numerics_10d-jl.html">« src/numerics_10d.jl</a><a class="docs-footer-nextpage" href="src-optimization-jl.html">src/optimization.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

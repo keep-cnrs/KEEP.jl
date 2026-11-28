@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>2 Estimation of power take-off · Rocking arm model for kite power generation</title><meta name="title" content="2 Estimation of power take-off · Rocking arm model for kite power generation"/><meta property="og:title" content="2 Estimation of power take-off · Rocking arm model for kite power generation"/><meta property="twitter:title" content="2 Estimation of power take-off · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script><link href="assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><a class="tocitem" href="intro.html">Introduction</a></li><li><a class="tocitem" href="section-1.html">1 Mathematical model of KEEP</a></li><li class="is-active"><a class="tocitem" href="section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="code/main-jl.html">main.jl</a></li><li><a class="tocitem" href="code/src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="code/src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="code/src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="code/src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="code/src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="code/figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="code/figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href="section-2.html">2 Estimation of power take-off</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="section-2.html">2 Estimation of power take-off</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="sec:1D-PTO"><a class="docs-heading-anchor" href="#sec:1D-PTO">2 Estimation of power take-off</a><a id="sec:1D-PTO-1"></a><a class="docs-heading-anchor-permalink" href="#sec:1D-PTO" title="Permalink"></a></h1><p>A simple 1D dynamic model is derived in order to estimate the <span data-acronym-label="pto" data-acronym-form="singular+short">pto</span> by the KEEP device, that is the mechanical power extracted from the rotation of the arm by the generator, modelled as a viscous torque <span class="math inline">\(-b\dot\alpha\)</span> (average of <span class="math inline">\(b\dot\alpha^2\)</span>). Significant assumptions are made. An <span class="math inline">\(\omega\)</span>-pulsation harmonic couple around <span class="math inline">\(\vu z\)</span>, caused by the tether attached to the end of the arm, is modelled by <span class="math inline">\(C_M\,\cos(\omega\,t)\)</span>, where <span class="math inline">\(C_M=F_s\,a \sin \theta_0\)</span> and <span class="math inline">\(F_s\)</span> is a constant tension in the line. Thus, the variation of the aerodynamics forces along the kite’s figure-of-eight trajectory is averaged and projected onto the horizontal plane (<span class="math inline">\(z=0\)</span>). The Newton’s second law for the arm <a href="section-1.html#eq:newton_arm">(27)</a> yields <a id="eq:newton_arm_PTO"></a><span class="math display">\begin{equation}
+ \tag{37}
+    I \ddot\alpha = C_M\,\cos(\omega\,t) -b \dot\alpha.
+\end{equation}</span> The following non dimensional parameters <span class="math inline">\(\overline{b}=b/(I\,\omega)\)</span>, <span class="math inline">\(\overline{C_M}=C_M/(I\,\omega^2)\)</span> and <span class="math inline">\(\tau=\omega\,t\)</span> are defined. The derivative of <span class="math inline">\(\alpha\)</span> with respect to <span class="math inline">\(\tau\)</span> is denoted by <span class="math inline">\(\alpha&#39;\)</span>, such that <span class="math inline">\(\alpha&#39;=\dot{\alpha}/\omega\)</span>. The Newton’s second law for the arm <a href="#eq:newton_arm_PTO">(37)</a> simplifies as follows <a id="eq:newton_arm_PTO_adim"></a><span class="math display">\begin{equation}
+ \tag{38}
+    \alpha''+\overline{b}\, \alpha' = \overline{C_M}\,\cos(\tau).
+\end{equation}</span> The steady-state harmonic solution of <a href="#eq:newton_arm_PTO_adim">(38)</a> is <a id="eq:sol_alpha_PTO"></a><span class="math display">\begin{equation}
+ \tag{39}
+    \alpha = -\frac{\overline{C_M}}{B}\,\cos(\tau+\delta),
+\end{equation}</span> where <span class="math inline">\(B=(1+\overline{b}^2)^{1/2}\)</span> and <span class="math inline">\(\delta=\arctan \overline{b}\)</span>. This last relationship shows that the phase difference between the angular position of the arm and that of the kite is closely linked to the rotor resistance <span class="math inline">\(b\)</span>. The mechanical power produced by the device is expressed as <a id="eq:inst_power_PTO"></a><span class="math display">\begin{equation}
+ \tag{40}
+    \dot{W} = b \, \dot \alpha^2=I\,\omega^3\,\overline{b}\,\alpha'^2.
+\end{equation}</span> Consequently, the average power produced over a steady-state operating cycle of the KEEP system is given by <a id="eq:power_PTO"></a><span class="math display">\begin{equation}
+ \tag{41}
+    W_a =  \frac{1}{2\pi}\,\int \limits_{\tau=0}^{\tau=2\pi} \dot{W} \dd{\tau}=\frac{\overline{b}}{2\,\left(1+\overline{b}^2\right)}\, \frac{{C_M}^2}{I\,\omega}.
+\end{equation}</span> A maximum tension condition is imposed on the cable whilst seeking to preserve the structural integrity of the kite (maximum stress, local buckling of the inflatable tubes, etc.) <span class="citation" data-cites="Desenclos2023MCM">(<a href="references.html#ref-Desenclos2023MCM">Desenclos et al. 2023</a>)</span>. Denoting <span class="math inline">\(F_s\)</span> the maximum tension, it is generally expressed as <span class="math inline">\(F_s=T_s\, S\)</span>, where <span class="math inline">\(T_s\)</span> is a maximum wing loading independent of the kite’s surface area <span class="math inline">\(S\)</span>. Thus, the amplitude of the harmonic couple <span class="math inline">\(C_M\)</span> can be expressed as follows: <a id="eq:C_M_PTO"></a><span class="math display">\begin{equation}
+ \tag{42}
+    C_M=T_s\, S\,a \sin(\theta_0).
+\end{equation}</span> Furthermore, the pulsation <span class="math inline">\(\omega\)</span> introduced in the simple formulation <a href="#eq:newton_arm_PTO">(37)</a> can be determined using a zero-mass model of the kite <span class="citation" data-cites="Leloup2014OE">(<a href="references.html#ref-Leloup2014OE">Leloup et al. 2014</a>)</span>. We consider line length <span class="math inline">\(\ell\)</span> that are much greater than the arm length <span class="math inline">\(a\)</span>, so that <span class="math inline">\(r=\ell\)</span> is a reasonable assumption. Futhermore, assuming a constant kite speed <span class="math inline">\(V_k=\lVert \dot{\boldsymbol{r}} \rVert\)</span> along its figure-of-eight trajectory, equal to the value at the center <span class="math inline">\((x,y,z)=(\ell\,\sin(\theta_0),0,\ell\,\cos(\theta_0))\)</span>, it can be shown that <a id="eq:Vk_PTO"></a><span class="math display">\begin{equation}
+ \tag{43}
+    V_k=w_\ell\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1},
+\end{equation}</span> where <span class="math inline">\(G=C_L/C_D\)</span> is the glide ratio of the kite. According to <a href="section-1.html#eq:sphere_Model_Deriv">(3)</a> and <a href="section-1.html#eq:traject_Model_Deriv">(4)</a>, the total length of the figure-of-eight trajectory <span class="math inline">\(L_{81}\)</span> on the unit sphere (<span class="math inline">\(\ell=1\)</span>) is given by <a id="eq:L81_PTO"></a><span class="math display">\begin{equation}
+ \tag{44}
+    L_{81}=\int \limits_{\tau=0}^{\tau=2\pi} \sqrt{\left[2 \, \Delta\theta\, \cos(2\,\tau)\right]^2+{\sin(\theta_0 + \Delta\theta \sin(2\tau))}^2\,\left[\Delta\phi\, \cos(\tau)\right]^2} \dd{\tau},
+\end{equation}</span> hence the following expression of the pulsation <a id="eq:Omega_PTO"></a><span class="math display">\begin{equation}
+ \tag{45}
+    \omega=\frac{2\,\pi\,V_k}{\ell\,L_{81}}.
+\end{equation}</span> As detailed in appendix <a href="appendix-C.html#app8">C</a>, one has the following estimate: <a id="eq:L81_PTO_approx"></a><span class="math display">\begin{equation}
+ \tag{46}
+L_{81}=4\Delta\phi\sin\theta_0+\frac{8\,\Delta\theta^2}{\Delta\phi\sin\theta_0}\Bigl[\ln\frac{2\Delta\phi\sin\theta_0}{\Delta\theta}-\frac56-\frac2{15}\Delta\phi^2\sin^2\theta_0\Bigr]+o(\Delta\theta^2).
+\end{equation}</span> Assuming that the values of the aerodynamics parameters <span class="math inline">\(G\)</span>, <span class="math inline">\(w_r\)</span> and <span class="math inline">\(z_r\)</span>, of the geometry parameters <span class="math inline">\(a\)</span>, <span class="math inline">\(\ell\)</span>, <span class="math inline">\(\theta_0\)</span>, <span class="math inline">\(\Delta \theta\)</span> and <span class="math inline">\(\Delta \phi\)</span>, as well as those of the kite properties <span class="math inline">\(S\)</span> and <span class="math inline">\(T_s\)</span>, have been selected, the independent parameters <span class="math inline">\(b\)</span> and <span class="math inline">\(I\)</span> can be optimized. At fixed inertia <span class="math inline">\(I\)</span>, the last term of the relationship <a href="#eq:power_PTO">(41)</a> reaches its maximum value for <span class="math inline">\(\overline{b}=1\)</span>, that is <a id="pto_optimality_constraint"></a><span class="math display">\begin{equation}
+ \tag{47}
+    b=I\,\omega,
+\end{equation}</span> which gives the average power <span class="math inline">\(W_a = C_M^2/(4I\omega)\)</span>. For operating reasons, the magnitude of the angle <span class="math inline">\(\alpha\)</span> is limited to <span class="math inline">\(\pi/2\)</span>. By <a href="#eq:sol_alpha_PTO">(39)</a>, the amplitude is <span class="math inline">\(\overline{C_M}/B = C_M/(\omega\sqrt{I^2\omega^2+b^2})\)</span>, hence the condition <a id="eq:opti_I_PTO"></a><span class="math display">\begin{equation}
+ \tag{48}
+    \omega^2\qty(I^2\omega^2 + b^2) \geqslant \qty(\frac{2\,C_M}{\pi})^2,
+\end{equation}</span> which depends on both parameters. With <span class="math inline">\(Z = I^2\omega^2+b^2\)</span>, the power <a href="#eq:power_PTO">(41)</a> reads <span class="math inline">\(W_a = b\,C_M^2/(2Z)\)</span>. At fixed <span class="math inline">\(Z\)</span>, it increases with <span class="math inline">\(b\)</span>, that is as <span class="math inline">\(I\)</span> decreases, and at fixed <span class="math inline">\(b\)</span> it decreases with <span class="math inline">\(Z\)</span>: in this model, the inertia of the arm only costs power, and the supremum <span class="math inline">\(\pi C_M\omega/4\)</span> is approached as <span class="math inline">\(I\to0\)</span>, with <a href="#eq:opti_I_PTO">(48)</a> active. The inertia is bounded below by the structure of the arm, <span class="math inline">\(I\geq I_{\min}\)</span>, with <span class="math inline">\(I_{\min} = 62\,\mathrm{kg}\,\mathrm{m}^{2}\)</span> the lower bound of Table <a href="section-4.html#tab:opt_descr">3</a> (a tube that withstands the maximum tension of the lines). As long as <span class="math inline">\(I_{\min} &lt; \sqrt2\,C_M/(\pi\omega^2)\)</span>, which holds here, the condition <a href="#eq:opti_I_PTO">(48)</a> is active at the optimum, and the parameters <span class="math inline">\(b\)</span> and <span class="math inline">\(I\)</span> are optimal when <a id="eq:opti_b_I_PTO"></a><span class="math display">\begin{equation}
+ \tag{49}
+    I = I_{\min}, \qquad b = \frac{2\,C_M}{\pi\,\omega}\sqrt{1-\varepsilon^2}, \qquad \varepsilon = \frac{\pi\,\omega^2 I_{\min}}{2\,C_M},
+\end{equation}</span> where <span class="math inline">\(C_M\)</span> and <span class="math inline">\(\omega\)</span> are given by <a href="#eq:C_M_PTO">(42)</a> and <a href="#eq:Omega_PTO">(45)</a> respectively, which leads to the following average power: <a id="eq:opti_power_PTO_final"></a><span class="math display">\begin{equation}
+ \tag{50}
+    W_a =\frac{\pi\,C_M\,\omega}{4}\sqrt{1-\varepsilon^2}.
+\end{equation}</span> The design <span class="math inline">\(b = I\omega\)</span> with the smallest admissible <span class="math inline">\(I\)</span>, <span class="math inline">\(I = \sqrt2\,C_M/(\pi\omega^2) = 646\,\mathrm{kg}\,\mathrm{m}^{2}\)</span>, satisfies the constraint but gives only <span class="math inline">\(\pi C_M\omega/(4\sqrt2)\)</span>: the condition <a href="#pto_optimality_constraint">(47)</a> is optimal at fixed <span class="math inline">\(I\)</span>, not jointly, and the optimum <a href="#eq:opti_b_I_PTO">(49)</a> gives <span class="math inline">\(41\,\%\)</span> more power. Thus, the power take-off per unit area of kite <span class="math inline">\(pto\)</span> by the KEEP device can be estimated as follows: <a id="eq:pto_PTO"></a><span class="math display">\begin{equation}
+ \tag{51}
+    pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\sqrt{1-\varepsilon^2}.
+\end{equation}</span> The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of <span class="math inline">\(pto\)</span> on wind speed <span class="math inline">\(w_r\)</span> is due to the structural constraint <span class="math inline">\(T_s\)</span>. Without this constraint, the dependence of <span class="math inline">\(pto\)</span> on wind speed <span class="math inline">\(w_r\)</span> is normally of the third order, since the aerodynamic pressures – and therefore the wing loading – are of the second order. The <span class="math inline">\(pto\)</span> appears to increase linearly as the arm length <span class="math inline">\(a\)</span> increases. The shorter the length of the line <span class="math inline">\(\ell\)</span>, the higher <span class="math inline">\(pto\)</span> is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation <span class="math inline">\(\omega\)</span> and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table <a href="#tab:params">1</a> with <span class="math inline">\(T_s = 1000\,\mathrm{N}\,\mathrm{m}^{-2}\)</span>, <span class="math inline">\(\varepsilon = 0.068\)</span>, and the KEEP device achieves a maximum power take-off of about <span class="math inline">\(5.0\,\mathrm{kW}\,\mathrm{m}^{-2}\)</span> (5.1 kW m<sup>−2</sup> as <span class="math inline">\(I_{\min}\to0\)</span>), regardless of whether expression <a href="#eq:L81_PTO">(44)</a> or <a href="#eq:L81_PTO_approx">(46)</a> is used for <span class="math inline">\(L_{81}\)</span>. This estimate assumes a glide ratio <span class="math inline">\(G = 7\)</span> (Table <a href="#tab:params">1</a>); with <span class="math inline">\(G = 5\)</span>, a value more typical of soft kites, it drops to <span class="math inline">\(3.6\,\mathrm{kW}\,\mathrm{m}^{-2}\)</span>.</p>
+<table id="tab:params">
+<caption><strong>Table 1:</strong> Parameter Description and Values</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><span>Symbol</span></th>
+<th style="text-align: left;"><span>Description</span></th>
+<th style="text-align: right;"><span>Value</span></th>
+<th style="text-align: left;"><span>Unit</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(a\)</span></td>
+<td style="text-align: left;">Arm length</td>
+<td style="text-align: right;"><span class="math inline">\(2\)</span></td>
+<td style="text-align: left;">m</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(b\)</span></td>
+<td style="text-align: left;">Arm braking coefficient</td>
+<td style="text-align: right;"><span class="math inline">\(50.41\)</span></td>
+<td style="text-align: left;">N m s °<sup>−1</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(C_D\)</span></td>
+<td style="text-align: left;">Kite drag coefficient</td>
+<td style="text-align: right;"><span class="math inline">\(C_L / 7\)</span></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(C_{D,\ell}\)</span></td>
+<td style="text-align: left;">Line drag coefficient</td>
+<td style="text-align: right;"><span class="math inline">\(0\)</span></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(C_L\)</span></td>
+<td style="text-align: left;">Kite lift coefficient</td>
+<td style="text-align: right;"><span class="math inline">\(0.6\)</span></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(d_\ell\)</span></td>
+<td style="text-align: left;">Line diameter</td>
+<td style="text-align: right;"><span class="math inline">\(0.003\)</span></td>
+<td style="text-align: left;">m</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(g\)</span></td>
+<td style="text-align: left;">Gravity</td>
+<td style="text-align: right;"><span class="math inline">\(9.81\)</span></td>
+<td style="text-align: left;">m s<sup>−2</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(I\)</span></td>
+<td style="text-align: left;">Arm inertia</td>
+<td style="text-align: right;"><span class="math inline">\(1300\)</span></td>
+<td style="text-align: left;">kg m<sup>2</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\ell\)</span></td>
+<td style="text-align: left;">Line length</td>
+<td style="text-align: right;"><span class="math inline">\(31\)</span></td>
+<td style="text-align: left;">m</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(m\)</span></td>
+<td style="text-align: left;">Kite mass</td>
+<td style="text-align: right;"><span class="math inline">\(6\)</span></td>
+<td style="text-align: left;">kg</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(S\)</span></td>
+<td style="text-align: left;">Kite surface</td>
+<td style="text-align: right;"><span class="math inline">\(10\)</span></td>
+<td style="text-align: left;">m<sup>2</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(w_0\)</span></td>
+<td style="text-align: left;">Wind reference speed</td>
+<td style="text-align: right;"><span class="math inline">\(9\)</span></td>
+<td style="text-align: left;">m s<sup>−1</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(z_0\)</span></td>
+<td style="text-align: left;">Wind reference altitude</td>
+<td style="text-align: right;"><span class="math inline">\(10\)</span></td>
+<td style="text-align: left;">m</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\Delta\theta\)</span></td>
+<td style="text-align: left;">Lemniscate polar half-height</td>
+<td style="text-align: right;"><span class="math inline">\(6\)</span></td>
+<td style="text-align: left;">°</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\Delta\phi\)</span></td>
+<td style="text-align: left;">Lemniscate azimuthal half-width</td>
+<td style="text-align: right;"><span class="math inline">\(50\)</span></td>
+<td style="text-align: left;">°</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\theta_0\)</span></td>
+<td style="text-align: left;">Lemniscate mean polar angle</td>
+<td style="text-align: right;"><span class="math inline">\(65\)</span></td>
+<td style="text-align: left;">°</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\rho_a\)</span></td>
+<td style="text-align: left;">Air density</td>
+<td style="text-align: right;"><span class="math inline">\(1.225\)</span></td>
+<td style="text-align: left;">kg m<sup>−3</sup></td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\rho_\ell\)</span></td>
+<td style="text-align: left;">Line density</td>
+<td style="text-align: right;"><span class="math inline">\(707\)</span></td>
+<td style="text-align: left;">kg m<sup>−3</sup></td>
+</tr>
+</tbody>
+</table><details class="web-code"><summary>Code that produced this table</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L429-L432">src/analysis.jl (region setup_analysis)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Determine optimal parameters using kinetic model
+    p0 = PMP.build_para()
+    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-9, rtol=1e-9, maxiter=50)  # errors if not converged
+    vbp = PMP.build_vbpara(p0)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L60-L110">src/analysis.jl (region param_table)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">function param_table(p)
+    # symbol, description, unit, optional value override
+    params = [
+        Parameter(:a, &quot;a&quot;, &quot;Arm length&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:l, raw&quot;\ell&quot;, &quot;Line length&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:m, &quot;m&quot;, &quot;Kite mass&quot;, raw&quot;\kg&quot;, nothing),
+        Parameter(:I, &quot;I&quot;, &quot;Arm inertia&quot;, raw&quot;\kg\square\meter&quot;, nothing),
+        Parameter(:ρ_a, raw&quot;\rho_a&quot;, &quot;Air density&quot;, raw&quot;\kg\per\cubic\meter&quot;, nothing),
+        Parameter(:d_l, raw&quot;d_\ell&quot;, &quot;Line diameter&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:S, &quot;S&quot;, &quot;Kite surface&quot;, raw&quot;\square\meter&quot;, nothing),
+        Parameter(:C_L, &quot;C_L&quot;, &quot;Kite lift coefficient&quot;, &quot;&quot;, nothing),
+        Parameter(:C_D, &quot;C_D&quot;, &quot;Kite drag coefficient&quot;, &quot;&quot;, &quot;C_L / 7&quot;),
+        Parameter(:C_D_l, raw&quot;C_{D,\ell}&quot;, &quot;Line drag coefficient&quot;, &quot;&quot;, nothing),
+        Parameter(:ρ_l, raw&quot;\rho_\ell&quot;, &quot;Line density&quot;, raw&quot;\kg\per\cubic\meter&quot;, nothing),
+        Parameter(:g, &quot;g&quot;, &quot;Gravity&quot;, raw&quot;\meter\per\square\second&quot;, nothing),
+        Parameter(:z0, &quot;z_0&quot;, &quot;Wind reference altitude&quot;, raw&quot;\meter&quot;, nothing),
+        Parameter(:w0, &quot;w_0&quot;, &quot;Wind reference speed&quot;, raw&quot;\meter\per\second&quot;, nothing),
+        Parameter(:b, &quot;b&quot;, &quot;Arm braking coefficient&quot;,
+            raw&quot;\newton\meter\second\per\degree&quot;, f&quot;{p.b / rad2deg(1):.4g}&quot;),  # 4 digits: fixed point b = I ω
+        Parameter(:θ0, raw&quot;\theta_0&quot;, &quot;Lemniscate mean polar angle&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.θ0):.0f}&quot;),
+        Parameter(:Δθ, raw&quot;\Delta\theta&quot;, &quot;Lemniscate polar half-height&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.Δθ):.0f}&quot;),
+        Parameter(:Δφ, raw&quot;\Delta\phi&quot;, &quot;Lemniscate azimuthal half-width&quot;,
+            raw&quot;\degree&quot;, f&quot;{rad2deg(p.Δφ):.0f}&quot;),
+    ]
+
+    sort!(params, by=x -&gt; eor_transform(x.sym))
+    table_rows = map(params) do p_item
+        val = isnothing(p_item.value_override) ? f&quot;{p[p_item.key]:.9g}&quot; : p_item.value_override
+        unit_col = isempty(p_item.unit) ? &quot;&quot; : raw&quot;\si{&quot; * p_item.unit * &quot;}&quot;
+        f&quot;    ${p_item.sym}$ &amp; {p_item.descr} &amp; ${val}$ &amp; {unit_col} \\\\ &quot;
+    end
+
+
+    table_str = raw&quot;&quot;&quot;
+\begin{table}[thpb]
+\centering
+\caption{Parameter Description and Values}
+\label{tab:params}
+\begin{tabular}{l p{3.2cm} r l}
+    \toprule
+    {Symbol} &amp; {Description} &amp; {Value} &amp; {Unit} \\
+    \midrule
+&quot;&quot;&quot; * join(table_rows, &quot;\n&quot;) * raw&quot;&quot;&quot;
+
+    \bottomrule
+\end{tabular}
+\end{table}&quot;&quot;&quot;
+    return table_str
+end</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L436-L436">src/analysis.jl (region table1)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    write_table(&quot;table1&quot;, param_table(p0))</code></pre></details></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="section-1.html">« 1 Mathematical model of KEEP</a><a class="docs-footer-nextpage" href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

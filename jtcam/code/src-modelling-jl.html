@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>src/modelling.jl · Rocking arm model for kite power generation</title><meta name="title" content="src/modelling.jl · Rocking arm model for kite power generation"/><meta property="og:title" content="src/modelling.jl · Rocking arm model for kite power generation"/><meta property="twitter:title" content="src/modelling.jl · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../intro.html">Introduction</a></li><li><a class="tocitem" href="../section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="../section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="../section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li><a class="tocitem" href="../section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="../appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="../appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="../appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="../appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="../references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="../reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="main-jl.html">main.jl</a></li><li><a class="tocitem" href="src-helpers-jl.html">src/helpers.jl</a></li><li class="is-active"><a class="tocitem" href="src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="../api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Code</a></li><li class="is-active"><a href="src-modelling-jl.html">src/modelling.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="src-modelling-jl.html">src/modelling.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="src/modelling.jl"><a class="docs-heading-anchor" href="#src/modelling.jl"><code>src/modelling.jl</code></a><a id="src/modelling.jl-1"></a><a class="docs-heading-anchor-permalink" href="#src/modelling.jl" title="Permalink"></a></h1><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/modelling.jl">View on GitHub</a> (commit <code>6f20ab5</code>).</p><pre><code class="language-julia hljs"># Section 1 figures: the spindle torus of the possible kite positions, and the
+# parametrisation of the eight in tau.
+#
+#   arm tip  A(α) = a * (cos α, sin α, 0)
+#   kite     K(α, β) = A(α) + l * (cos β * (cos α, sin α, 0) + sin β * ẑ)
+#
+# The line of length l points anywhere in the radial-vertical plane. Revolving
+# the sphere of radius l about the arm axis gives a torus; l &gt; a =&gt; spindle.
+#
+# Outputs: figs/spindle_torus.{pdf,png}, figs/eight_plot.{pdf,png}.
+using Plots
+using LinearAlgebra: norm
+
+include(joinpath(@__DIR__, &quot;helpers.jl&quot;))
+
+function run_modelling(; fast::Bool=false)
+    #region spindle_torus
+    ## Spindle torus
+    a, l = 2, 3
+
+    # sanity check: a sampled point is exactly l from its arm tip
+    β0 = deg2rad(30)  # line elevation
+    kite_pos = [a + l * cos(β0), 0, l * sin(β0)]
+    @assert isapprox(norm(kite_pos - [a, 0, 0]), l; atol=1e-8)
+
+    # mesh as flat line segments (GR&#39;s wireframe chokes on matrix grids); a mesh
+    # rather than a surface so the self-intersecting interior stays visible
+    lg = range(0, 2π, length=120)  # points along each grid line
+    lk = range(0, 2π, length=40)   # grid lines
+    xs = Float64[]
+    ys = Float64[]
+    zs = Float64[]
+    for βj in lk
+        for αi in lg
+            push!(xs, (a + l * cos(βj)) * cos(αi))
+            push!(ys, (a + l * cos(βj)) * sin(αi))
+            push!(zs, l * sin(βj))
+        end
+        push!(xs, NaN)
+        push!(ys, NaN)
+        push!(zs, NaN)
+    end
+    for αj in lk
+        for βi in lg
+            push!(xs, (a + l * cos(βi)) * cos(αj))
+            push!(ys, (a + l * cos(βi)) * sin(αj))
+            push!(zs, l * sin(βi))
+        end
+        push!(xs, NaN)
+        push!(ys, NaN)
+        push!(zs, NaN)
+    end
+
+    fig = plot(xs, ys, zs; c=:black, alpha=0.4, lw=0.5, aspect_ratio=:equal,
+        xlabel=&quot;x (m)&quot;, ylabel=&quot;y (m)&quot;, zlabel=&quot;z (m)&quot;,
+        title=&quot;Spindle torus, not to scale&quot;, label=&quot;&quot;, legend=:outerright)
+
+    # set of possible arm-tip positions: circle of radius a in the xy-plane
+    θc = range(0, 2π, length=200)
+    arm_tip_pars = (; c=:blue, lw=3, label=&quot;Arm-tip locus&quot;)
+    plot!(fig, a * cos.(θc), a * sin.(θc), zero(θc); arm_tip_pars..., label=&quot;&quot;)
+
+    # example arm and kite at α = 0, β = 30°
+    arm_and_lines_pars = (; c=:black, lw=3, label=&quot;Arm and lines&quot;)
+    plot!(fig, [0, a], [0, 0], [0, 0]; arm_and_lines_pars..., label=&quot;&quot;)
+    plot!(fig, [a, kite_pos[1]], [0, 0], [0, kite_pos[3]]; arm_and_lines_pars..., label=&quot;&quot;)
+
+    longitude_pars = (; c=:orange, lw=2, label=&quot;Kite longitude&quot;)
+    latitude_pars = (; c=:green, lw=2, label=&quot;Kite latitude&quot;)
+    plot!(fig, a .+ l .* cos.(θc), zero(θc), l .* sin.(θc); longitude_pars..., label=&quot;&quot;)
+    plot!(fig, (a + l * cos(β0)) .* cos.(θc), (a + l * cos(β0)) .* sin.(θc), fill(l * sin(β0), length(θc)); latitude_pars..., label=&quot;&quot;)
+
+    kite_pars = (; c=:red, ms=7, label=&quot;Kite&quot;)
+    scatter!(fig, [kite_pos[1]], [0], [kite_pos[3]]; kite_pars..., label=&quot;&quot;)
+
+    scatter!([]; kite_pars..., msw=20, msc=:red)
+    plot!([]; arm_and_lines_pars..., lw=default(:lw))
+    plot!([]; arm_tip_pars..., lw=default(:lw))
+    plot!([]; longitude_pars..., lw=default(:lw))
+    plot!([]; latitude_pars..., lw=default(:lw))
+    plot!(leftmargin=-4Plots.mm, rightmargin=-20Plots.mm)
+    plot!(size=plot_size(1, 1.06))
+    # one tick at each end of each axis, plus 0 when it is interior
+    plot!(fig, xticks=edge_ticks(fig[1], :x; include_zero=true),
+        yticks=edge_ticks(fig[1], :y; include_zero=true),
+        zticks=edge_ticks(fig[1], :z; include_zero=true))
+
+    files = save_figure(fig, &quot;spindle_torus&quot;)
+    #endregion
+
+    #region eight_plot
+    ## Parametrisation in tau
+    τ_φ = 90.0
+    τ_θ = 225.0
+    dx, dy = 1 / 4, 1 / 2
+    up_col, down_col = 1, 2
+
+    τ = range(0, 360, length=501)
+    θ = τ -&gt; sind(2 * τ)
+    φ = τ -&gt; sind(τ)
+
+    plot(xmirror=true)
+    plot!(xticks=([-1, 0, 1], (raw&quot;$-Δφ$&quot;, raw&quot;$φ = 0$&quot;, raw&quot;$Δφ$&quot;)),
+        yticks=([-1, 0, 1], (raw&quot;$θ_0 + Δθ$&quot;, raw&quot;$θ = θ_0$&quot;, raw&quot;$θ_0 - Δθ$&quot;))
+    )
+
+    plot!(φ.(τ), θ.(τ), c=:grey)
+
+    plot!(φ.([0, τ_φ]), θ.([τ_φ, τ_φ]), color=:black)
+    annotate!(sum(φ.([0, τ_φ])) / 2, sum(θ.([τ_φ, τ_φ])) / 2 - 0.1, (raw&quot;$Δφ$&quot;, ANNOTATIONFONTSIZE, :black, :top))
+
+    plot!(φ.([τ_θ, τ_θ]), θ.([τ_θ, 0]), color=:black)
+    annotate!(sum(φ.([τ_θ, τ_θ])) / 2 + 0.05, sum(θ.([τ_θ, 0])) / 2, (raw&quot;$Δθ$&quot;, ANNOTATIONFONTSIZE, :black, :left))
+    quiver!([0], [0], quiver=([dx], [-dy]), c=up_col)
+    quiver!([0], [0], quiver=([-dx], [dy]), c=down_col)
+    annotate!(dx - 0.05, -dy - 0.25, (raw&quot;$\dot{\tau} &gt; 0$&quot;, ANNOTATIONFONTSIZE, :center, PALETTE[up_col]))
+    annotate!(-dx + 0.05, dy + 0.25, (raw&quot;$\dot{\tau} &lt; 0$&quot;, ANNOTATIONFONTSIZE, :center, PALETTE[down_col]))
+    plot!(size=SIZE_HALF .* (1, 0.5), topmargin=1Plots.mm, leftmargin=5Plots.mm)
+    append!(files, save_figure(current(), &quot;eight_plot&quot;))
+    #endregion
+    return files
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    run_modelling()
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="src-helpers-jl.html">« src/helpers.jl</a><a class="docs-footer-nextpage" href="src-numerics_10d-jl.html">src/numerics_10d.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>4 Optimization · Rocking arm model for kite power generation</title><meta name="title" content="4 Optimization · Rocking arm model for kite power generation"/><meta property="og:title" content="4 Optimization · Rocking arm model for kite power generation"/><meta property="twitter:title" content="4 Optimization · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script><link href="assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><a class="tocitem" href="intro.html">Introduction</a></li><li><a class="tocitem" href="section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="section-2.html">2 Estimation of power take-off</a></li><li><a class="tocitem" href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li><li class="is-active"><a class="tocitem" href="section-4.html">4 Optimization</a><ul class="internal"><li><a class="tocitem" href="#sec:opt-power"><span>4.1 Optimizing for maximum average power</span></a></li><li><a class="tocitem" href="#sec:opt-wind"><span>4.2 Optimal design as a function of wind speed</span></a></li><li><a class="tocitem" href="#sec:opt-curvature"><span>4.3 Curvature of the kite trajectory</span></a></li></ul></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="code/main-jl.html">main.jl</a></li><li><a class="tocitem" href="code/src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="code/src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="code/src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="code/src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="code/src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="code/figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="code/figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href="section-4.html">4 Optimization</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="section-4.html">4 Optimization</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="sec:optimization"><a class="docs-heading-anchor" href="#sec:optimization">4 Optimization</a><a id="sec:optimization-1"></a><a class="docs-heading-anchor-permalink" href="#sec:optimization" title="Permalink"></a></h1><p>We designed this model to evaluate the average power output of KEEP. In the previous section, we computed limit cycles for a given set of environment and design parameters. We now fix the environment, mainly the reference wind speed <span class="math inline">\(w_0\)</span>, and maximize the average power output over one revolution of a periodic orbit by tuning a selection of design parameters.</p><h2 id="sec:opt-power"><a class="docs-heading-anchor" href="#sec:opt-power">4.1 Optimizing for maximum average power</a><a id="sec:opt-power-1"></a><a class="docs-heading-anchor-permalink" href="#sec:opt-power" title="Permalink"></a></h2><p>To assess the quality of a set of parameters, we measure the total work done by the generator, <em>i.e.</em> the amount of energy extracted from the system. We obtain this information by augmenting the state with the work <span class="math inline">\(W\)</span> done since the start of the simulation, whose time derivative is the instantaneous power, namely the product of (the opposite of) the torque and the arm angular velocity: <a id="eq:work"></a><span class="math display">\begin{equation}
+ \tag{56}
+    W(0) = 0, \qquad
+    \dot W = P = - \dot \alpha \, T(\dot \alpha) = b \, \dot \alpha^2 \geq 0.
+\end{equation}</span> The work is integrated concurrently with <span class="math inline">\(\vb x = (\alpha, \tau, \dot \alpha, \dot \tau)\)</span>, using the same numerical scheme, and we denote the augmented state <span class="math inline">\(\tilde{\vb x} = (\vb x, W)\)</span>. The average power over a periodic orbit of period <span class="math inline">\(t_f\)</span> is then <span class="math display">\begin{equation}
+    \bar P = W_f / t_f, \qquad W_f = W(t_f).
+\tag{57}\end{equation}</span> Since the trajectory converges to the same periodic orbit (given <span class="math inline">\(\dot \tau &gt; 0\)</span>), maximizing the average power as <span class="math inline">\(t \to \infty\)</span> is equivalent to maximizing it over one period of this orbit.</p>
+<p>For the solution of the <span data-acronym-label="ivp" data-acronym-form="singular+short">ivp</span> to be a periodic orbit, looping constraints must be enforced at <span class="math inline">\(t_f\)</span>, which yields a <span data-acronym-label="bvp" data-acronym-form="singular+short">bvp</span>. Without loss of generality, we fix the phase by imposing <span class="math inline">\(\tau(0) = 0\)</span>, so that <span class="math inline">\(\tau(t_f) = \pm 2\pi\)</span>. The sign determines the direction of travel of the kite: it rises either on the sides of the eight (<span class="math inline">\(\tau(t_f) = +2\pi\)</span>) or in its center (<span class="math inline">\(\tau(t_f) = -2\pi\)</span>). To avoid the lines sliding against each other, we choose the former.</p>
+<p>We optimize the line length <span class="math inline">\(\ell\)</span>, the arm inertia <span class="math inline">\(I\)</span>, the braking coefficient <span class="math inline">\(b\)</span> of the generator and the half-width <span class="math inline">\(\Delta\varphi\)</span> of the eight, and denote by <span class="math inline">\(\Theta = (\ell, I, b, \Delta\varphi)\)</span> the vector of design parameters; the half-height <span class="math inline">\(\Delta\theta = 6.0^\circ\)</span> of the eight is held fixed. The optimization problem reads <a id="eq:opt-problem"></a><span class="math display">\begin{equation}
+ \tag{58}
+W_f / t_f \underset{\substack{\alpha_0, \dot{\alpha}_0, \dot{\tau}_0 \\ W_f, t_f \\ \Theta}}{\longrightarrow} \max
+\end{equation}</span> subject to constraints <a id="eq:opt-constraints"></a><span class="math display">\begin{equation}
+ \tag{59}
+\begin{split}
+    &amp;\alpha(t_f, \Theta) = \alpha_0 \\
+    &amp;\tau(t_f, \Theta) = 2\pi \\
+    &amp;\dot \alpha(t_f, \Theta) = \dot \alpha_0 \\
+    &amp;\dot \tau(t_f, \Theta) = \dot \tau_0 \\
+    &amp;W(t_f, \Theta) = W_f,
+\end{split}
+\end{equation}</span> where the components of <span class="math inline">\(\tilde{\vb x}(t_f, \Theta)\)</span> are obtained by integrating the <span data-acronym-label="ivp" data-acronym-form="singular+short">ivp</span> from <span class="math inline">\(\tilde{\vb x}_0 = (\alpha_0, 0, \dot \alpha_0, \dot \tau_0, 0)\)</span> with parameters <span class="math inline">\(\Theta\)</span>, and <span class="math inline">\(W_f\)</span> is a slack variable for the final work. In the search for parameters that provide more power, the solver thus also determines the corresponding initial condition lying on the periodic orbit.</p>
+<p>We reuse our work on equilibria and limit cycles to provide the solver with an initial guess that satisfies the constraints. Starting from a physically reasonable set of parameters <span class="math inline">\(\Theta_0\)</span>, we compute the corresponding limit cycle (with the correct direction of travel), from which we extract <span class="math inline">\(\alpha_0, \dot \alpha_0, \dot \tau_0, t_f\)</span> and <span class="math inline">\(W_f\)</span>; this results into a feasible point.</p>
+<p>The problem is modelled with ADNLPModels.jl <span class="citation" data-cites="migot2021adnlpmodels">(<a href="references.html#ref-migot2021adnlpmodels">Migot et al. 2021</a>)</span>, which computes all required derivatives algorithmically with ForwardDiff.jl <span class="citation" data-cites="RevelsLubinPapamarkou2016">(<a href="references.html#ref-RevelsLubinPapamarkou2016">Revels et al. 2016</a>)</span>. It is solved by the interior point method implemented in Ipopt <span class="citation" data-cites="WachterBiegler2006">(<a href="references.html#ref-WachterBiegler2006">Wächter and Biegler 2006</a>)</span> (tolerance <span class="math inline">\(10^{-5}\)</span>), called through NLPModelsIpopt.jl, with linear solver MUMPS <span class="citation" data-cites="amestoy2001mumps">(<a href="references.html#ref-amestoy2001mumps">Amestoy et al. 2001</a>)</span>. The <span data-acronym-label="ivp" data-acronym-form="singular+short">ivp</span> appearing in the nonlinear constraints is solved at tolerance <span class="math inline">\(10^{-6}\)</span> with Vern9, Verner’s Runge–Kutta 9(8) method from DifferentialEquations.jl <span class="citation" data-cites="rackauckas2017differentialequations">(<a href="references.html#ref-rackauckas2017differentialequations">Rackauckas and Nie 2017</a>)</span>. The limit cycles from which the tables, figures and numbers of this section are computed are recomputed from the parameters, by settling and Newton’s method (Section <a href="section-3.html#sec:analysis-cycles">3.2</a>), with integration tolerance <span class="math inline">\(10^{-5}\)</span>. The parameters and their bounds are described in Table <a href="#tab:opt_descr">3</a>, while the result of the optimization is presented in Table <a href="#tab:opt_results">4</a>. Ipopt solves the problem in 20 iterations; as for any interior point method, the solution is a local optimum. The pipeline stops if Ipopt does not reach its tolerance, or if the power of its periodic orbit differs from that of the cycle recomputed at the optimum by settling and Newton’s method (Section <a href="section-3.html#sec:analysis-cycles">3.2</a>). Figure <a href="#fig:opt-landscape">15</a> shows the average power along one-dimensional slices through the optimum, each parameter varying while the others are held. The optimized cycle remains attracting, but less strongly: the largest modulus of its non-trivial Floquet multipliers is <span class="math inline">\(2.2 \times 10^{-1}\)</span>, against <span class="math inline">\(8.5 \times 10^{-3}\)</span> for the initial guess. We show the limit cycles before and after optimization in Figure <a href="#fig:time_series">10</a>: the period goes from 2.83 s to 0.95 s, and the average power from 9.64 kW to 12.25 kW (<span class="math inline">\(+27\%\)</span>). These powers depend strongly on the glide ratio of the kite, <span class="math inline">\(G = C_L/C_D = 7\)</span> here: with <span class="math inline">\(G = 5\)</span>, a value more typical of soft kites, the optimized design produces 5.38 kW.</p>
+<table id="tab:opt_descr">
+<caption><strong>Table 3:</strong> Description of the optimized parameters (<span class="math inline">\(\Delta\theta = 6.0{}^\circ\)</span> fixed).</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><span>Symbol (Unit)</span></th>
+<th style="text-align: right;"><span>Lower bound</span></th>
+<th style="text-align: right;"><span>Upper bound</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\ell\)</span> (m)</td>
+<td style="text-align: right;">15.0</td>
+<td style="text-align: right;">200.0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(I\)</span> (kg m<sup>2</sup>)</td>
+<td style="text-align: right;">62.0</td>
+<td style="text-align: right;">1000000.0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(b\)</span> (N m s °<sup>−1</sup>)</td>
+<td style="text-align: right;">0.0175</td>
+<td style="text-align: right;">17453.3</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\Delta\varphi\)</span> (°)</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">90.0</td>
+</tr>
+</tbody>
+</table><details class="web-code"><summary>Code that produced this table</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L887-L900">src/optimization.jl (region opt_setup)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    p_start = PMP.build_para(w0=WIND_REF)
+    p_start.b = PMP.optimal_torque_slope(p_start; tol=1e-9, rtol=1e-9, maxiter=50)  # b = I ω
+    lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
+    upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
+
+    @info &quot;opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, &quot;, &quot;)))&quot;
+    opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref, strict=!fast)
+    p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
+    # the power of the solver&#39;s orbit must be that of the cycle recomputed from p_ref
+    # (settling + Newton), which every table and figure uses
+    let Pc = cycle_report(p_ref).P, gap = abs(opt_ref.P - Pc) / abs(Pc)
+        msg = &quot;optimum: solver power $(opt_ref.P) vs recomputed cycle $Pc (rel. gap $gap)&quot;
+        gap &lt; 1e-3 || (fast ? @warn(msg) : error(msg))
+    end</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L925-L930">src/optimization.jl (region opt_tables)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Tables
+    table_descr, table_opt = latex_tables(p_start, p_ref, lower, upper)
+    push!(files, write_table(&quot;table2&quot;, table_descr), write_table(&quot;table3&quot;, table_opt))
+    @warn &quot;table4: values to be checked vs. Alain&#39;s computation&quot;
+    push!(files, write_table(&quot;table4&quot;, comparison_table(p_start, p_ref)))
+    push!(files, write_table(&quot;numbers&quot;, numbers_tex(; p_start, p_ref, opt_iter=opt_ref.iter, winds, sweep, dtheta, dtheta_opt, dtheta_lost)))</code></pre></details><p><span id="tab:opt_descr" data-label="tab:opt_descr"></span></p>
+<table id="tab:opt_results">
+<caption><strong>Table 4:</strong> Optimization results at <span class="math inline">\(w_0 = 9\,\mathrm{m}\,\mathrm{s}^{-1}\)</span>.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><span>Symbol (Unit)</span></th>
+<th style="text-align: right;"><span>Initial Guess</span></th>
+<th style="text-align: right;"><span>Solution</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\ell\)</span> (m)</td>
+<td style="text-align: right;">31.0</td>
+<td style="text-align: right;">27.0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(I\)</span> (kg m<sup>2</sup>)</td>
+<td style="text-align: right;">1300.0</td>
+<td style="text-align: right;">351.6</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(b\)</span> (N m s °<sup>−1</sup>)</td>
+<td style="text-align: right;">50.4</td>
+<td style="text-align: right;">12.9</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\Delta\varphi\)</span> (°)</td>
+<td style="text-align: right;">50.0</td>
+<td style="text-align: right;">16.6</td>
+</tr>
+<tr>
+<td style="text-align: left;">Average power (kW)</td>
+<td style="text-align: right;">9.64</td>
+<td style="text-align: right;">12.25</td>
+</tr>
+<tr>
+<td style="text-align: left;">Period (s)</td>
+<td style="text-align: right;">2.83</td>
+<td style="text-align: right;">0.95</td>
+</tr>
+<tr>
+<td style="text-align: left;">Min line tension (kN)</td>
+<td style="text-align: right;">3.36</td>
+<td style="text-align: right;">5.75</td>
+</tr>
+<tr>
+<td style="text-align: left;">Max line tension (kN)</td>
+<td style="text-align: right;">8.86</td>
+<td style="text-align: right;">10.83</td>
+</tr>
+<tr>
+<td style="text-align: left;">Norm of residual</td>
+<td style="text-align: right;"><span><span class="math inline">\(5.6\times10^{-8}\)</span></span></td>
+<td style="text-align: right;"><span><span class="math inline">\(9.9\times10^{-9}\)</span></span></td>
+</tr>
+</tbody>
+</table><details class="web-code"><summary>Code that produced this table</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L887-L900">src/optimization.jl (region opt_setup)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    p_start = PMP.build_para(w0=WIND_REF)
+    p_start.b = PMP.optimal_torque_slope(p_start; tol=1e-9, rtol=1e-9, maxiter=50)  # b = I ω
+    lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
+    upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
+
+    @info &quot;opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, &quot;, &quot;)))&quot;
+    opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref, strict=!fast)
+    p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
+    # the power of the solver&#39;s orbit must be that of the cycle recomputed from p_ref
+    # (settling + Newton), which every table and figure uses
+    let Pc = cycle_report(p_ref).P, gap = abs(opt_ref.P - Pc) / abs(Pc)
+        msg = &quot;optimum: solver power $(opt_ref.P) vs recomputed cycle $Pc (rel. gap $gap)&quot;
+        gap &lt; 1e-3 || (fast ? @warn(msg) : error(msg))
+    end</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L925-L930">src/optimization.jl (region opt_tables)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Tables
+    table_descr, table_opt = latex_tables(p_start, p_ref, lower, upper)
+    push!(files, write_table(&quot;table2&quot;, table_descr), write_table(&quot;table3&quot;, table_opt))
+    @warn &quot;table4: values to be checked vs. Alain&#39;s computation&quot;
+    push!(files, write_table(&quot;table4&quot;, comparison_table(p_start, p_ref)))
+    push!(files, write_table(&quot;numbers&quot;, numbers_tex(; p_start, p_ref, opt_iter=opt_ref.iter, winds, sweep, dtheta, dtheta_opt, dtheta_lost)))</code></pre></details><p><span id="tab:opt_results" data-label="tab:opt_results"></span></p>
+<figure id="fig:time_series" data-latex-placement="thpb">
+<img src="figs/optimization_timeseries_all.png" />
+<figcaption><strong>Figure 10:</strong> Limit cycles for the initial guess (left) and the optimized parameters (dynamic optimum, right): angles and angular velocities (top), instantaneous and average power (middle), line tension (bottom). The period goes from 2.83 s to 0.95 s, and the average power increases by <span class="math inline">\(27\%\)</span>.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L887-L900">src/optimization.jl (region opt_setup)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    p_start = PMP.build_para(w0=WIND_REF)
+    p_start.b = PMP.optimal_torque_slope(p_start; tol=1e-9, rtol=1e-9, maxiter=50)  # b = I ω
+    lower = [first(L_BOUNDS), first(I_BOUNDS), first(B_BOUNDS), first(DPHI_BOUNDS)]
+    upper = [last(L_BOUNDS), last(I_BOUNDS), last(B_BOUNDS), last(DPHI_BOUNDS)]
+
+    @info &quot;opt: reference at $(WIND_REF) m/s over Θ = ($(join(SYMS, &quot;, &quot;)))&quot;
+    opt_ref = opt_step(p_start, SYMS, lower, upper; iters=it_ref, strict=!fast)
+    p_ref = opt_ref.p  # the Θ optimum at the reference wind speed
+    # the power of the solver&#39;s orbit must be that of the cycle recomputed from p_ref
+    # (settling + Newton), which every table and figure uses
+    let Pc = cycle_report(p_ref).P, gap = abs(opt_ref.P - Pc) / abs(Pc)
+        msg = &quot;optimum: solver power $(opt_ref.P) vs recomputed cycle $Pc (rel. gap $gap)&quot;
+        gap &lt; 1e-3 || (fast ? @warn(msg) : error(msg))
+    end</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L957-L963">src/optimization.jl (region fig_timeseries)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    sols = map((p_start, p_ref)) do p
+        LC.compute_limit_cycle(PMP.build_vbpara(p); sense=SENSE, tol=TOL, save_everystep=true)
+    end
+    # initial guess (I = 1300, b = Iω; not the PTO optimum of section C) and the same
+    # system optimized for average power
+    fig_ts = plot_time_series_grid(sols; titles=(&quot;Initial guess&quot;, &quot;Dynamic optimum&quot;))
+    append!(files, save_figure(fig_ts, &quot;optimization_timeseries_all&quot;))</code></pre></details><h2 id="sec:opt-wind"><a class="docs-heading-anchor" href="#sec:opt-wind">4.2 Optimal design as a function of wind speed</a><a id="sec:opt-wind-1"></a><a class="docs-heading-anchor-permalink" href="#sec:opt-wind" title="Permalink"></a></h2><p>Since the optimization converges quickly, we repeat the procedure for a range of reference wind speeds <span class="math inline">\(w_0\)</span>. For each integer wind speed from 5 m s<sup>−1</sup>–15 m s<sup>−1</sup>, we find the set of parameters (Figure <a href="#fig:parameterized_optimization_params">13</a>) that maximizes power (Figure <a href="#fig:parameterized_optimization_power">11</a>) and show the corresponding minimum and maximum line tension over the limit cycle (Figure <a href="#fig:parameterized_optimization_tension">12</a>). For comparison, we also compute the power and line tension extrema using the set of parameters obtained in Section <a href="#sec:opt-power">4.1</a>, optimized for a wind speed of 9 m s<sup>−1</sup>. Over this whole range, this fixed set of parameters yields at most <span class="math inline">\(11.9\%\)</span> less power than the actual optimum, with a maximum line tension at most <span class="math inline">\(11.7\%\)</span> higher. The system exhibits quasilinear scaling along this parameterized optimization, even though the length of the arm (and other parameters) is kept constant, which makes it impossible to scale the model perfectly to wind speed. Least-squares power laws along the optimized sweep give the following trends:</p>
+<ul>
+<li><p>the average power grows like <span class="math inline">\(w_0^{3.0}\)</span>, to be compared with the <span class="math inline">\(w_0^3\)</span> scaling of wind power;</p></li>
+<li><p>the maximum line tension grows like <span class="math inline">\(w_0^{2.0}\)</span>;</p></li>
+<li><p>the line length <span class="math inline">\(\ell\)</span> and the arm inertia <span class="math inline">\(I\)</span> vary as shown in Figure <a href="#fig:parameterized_optimization_params">13</a>;</p></li>
+<li><p>the arm braking coefficient <span class="math inline">\(b\)</span> grows like <span class="math inline">\(w_0^{0.8}\)</span>;</p></li>
+<li><p>(not shown) the period varies like <span class="math inline">\(w_0^{-1.1}\)</span>.</p></li>
+</ul>
+<p>The maximum line tension defines the strength requirements for the kite fabric and lines. Furthermore, the minimum line tension remains above 1.72 kN over the whole sweep, confirming <em>a posteriori</em> the modeling assumption that the lines are always in tension and never exert compression on the arm.</p>
+<figure id="fig:parameterized_optimization_power" data-latex-placement="thpb">
+<img src="figs/optimization_wind_sweep_power.png" />
+<figcaption><strong>Figure 11:</strong> Average generated power for optimized (blue) and reference (black) parameters when the reference wind speed <span class="math inline">\(w_0\)</span> is varied. The reference curve is generated by fixing the design parameters to the optimal values for <span class="math inline">\(w_0 = 9\,\mathrm{m}\,\mathrm{s}^{-1}\)</span>.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L904-L907">src/optimization.jl (region opt<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    winds = range(5, 15, length=fast ? 3 : 11)
+    i_ref = findfirst(x -&gt; x &gt;= WIND_REF, winds)
+    @info &quot;opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s&quot;
+    sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref; iters=it_sweep, strict=!fast)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L936-L940">src/optimization.jl (region fig<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
+    for (f, panel) in zip(panels, (&quot;power&quot;, &quot;tension&quot;, &quot;params&quot;))
+        plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
+        append!(files, save_figure(f, &quot;optimization_wind_sweep_$(panel)&quot;))
+    end</code></pre></details><figure id="fig:parameterized_optimization_tension" data-latex-placement="thpb">
+<img src="figs/optimization_wind_sweep_tension.png" />
+<figcaption><strong>Figure 12:</strong> Minimum and maximum line tension <span class="math inline">\(\vb F_\ell\)</span> for optimized (blue) and reference (black) parameters.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L904-L907">src/optimization.jl (region opt<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    winds = range(5, 15, length=fast ? 3 : 11)
+    i_ref = findfirst(x -&gt; x &gt;= WIND_REF, winds)
+    @info &quot;opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s&quot;
+    sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref; iters=it_sweep, strict=!fast)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L936-L940">src/optimization.jl (region fig<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
+    for (f, panel) in zip(panels, (&quot;power&quot;, &quot;tension&quot;, &quot;params&quot;))
+        plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
+        append!(files, save_figure(f, &quot;optimization_wind_sweep_$(panel)&quot;))
+    end</code></pre></details><figure id="fig:parameterized_optimization_params" data-latex-placement="thpb">
+<img src="figs/optimization_wind_sweep_params.png" />
+<figcaption><strong>Figure 13:</strong> Optimal parameters for each wind speed (color) and reference parameters fixed at the optimum for <span class="math inline">\(w_0 = 9\,\mathrm{m}\,\mathrm{s}^{-1}\)</span> (black dashed lines).</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L904-L907">src/optimization.jl (region opt<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    winds = range(5, 15, length=fast ? 3 : 11)
+    i_ref = findfirst(x -&gt; x &gt;= WIND_REF, winds)
+    @info &quot;opt: wind sweep, $(length(winds)) speeds from $(first(winds)) to $(last(winds)) m/s&quot;
+    sweep = wind_sweep(SYMS, p_ref, winds, lower, upper, i_ref; iters=it_sweep, strict=!fast)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L936-L940">src/optimization.jl (region fig<em>wind</em>sweep)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    (; fig, panels) = plot_wind_sweep(winds, sweep, i_ref, GUIDES)
+    for (f, panel) in zip(panels, (&quot;power&quot;, &quot;tension&quot;, &quot;params&quot;))
+        plot!(f, size=plot_size(1, 1), leftmargin=10Plots.mm, bottommargin=6Plots.mm)
+        append!(files, save_figure(f, &quot;optimization_wind_sweep_$(panel)&quot;))
+    end</code></pre></details><p>The half-height <span class="math inline">\(\Delta\theta\)</span> of the eight, held fixed in the optimization, is varied in Figure <a href="#fig:opt-dtheta">14</a>, with <span class="math inline">\(\Theta\)</span> either held at the optimum or re-optimized at each angle.</p><h2 id="sec:opt-curvature"><a class="docs-heading-anchor" href="#sec:opt-curvature">4.3 Curvature of the kite trajectory</a><a id="sec:opt-curvature-1"></a><a class="docs-heading-anchor-permalink" href="#sec:opt-curvature" title="Permalink"></a></h2><p>Besides power, a design has to be compatible with the flight of the kite: the turns of the curve <span class="math inline">\(t\mapsto\vb r(t)\)</span> it describes must not be too strong. We therefore derive upper bounds on the curvature <span class="math inline">\(\kappa\)</span> of this curve; the computations and proofs are given in Appendix <a href="appendix-D.html#app:curv">D</a>.</p>
+<p>Recall that the kite position is <span class="math inline">\(\vb r = r\,\vu r(\tau)\)</span>, where <span class="math inline">\(\vu r\)</span> is the spherical eight <a href="section-1.html#eq:sphere_Model_Deriv">(3)</a>–<a href="section-1.html#eq:traject_Model_Deriv">(4)</a>, a closed curve on the unit sphere with <span class="math inline">\(0&lt;\theta_0-\Delta\theta\)</span> and <span class="math inline">\(\theta_0+\Delta\theta&lt;\pi\)</span>, and where <span class="math inline">\(r\)</span> solves the line-length constraint: <span class="math display">\begin{equation}
+    r = p + \sqrt{p^2+\ell^2-a^2}, \qquad p = a\,g, \qquad g = \sin\theta\cos(\phi-\alpha),
+\tag{60}\end{equation}</span> so that <span class="math inline">\(\ell-a\le r\le\ell+a\)</span>, and <span class="math inline">\(r\equiv\ell\)</span> when <span class="math inline">\(a=0\)</span>. We write <span class="math inline">\(\varepsilon = a/\ell\)</span> and <span class="math inline">\(\varepsilon&#39; = a/\sqrt{\ell^2-a^2}\)</span>. The kite trajectory is drawn on the <em>cone</em> <span class="math inline">\(\mathscr C = \{r\,\vu r(\tau) : r&gt;0,\ \tau\in\mathbf{S}^1\}\)</span>, the conical hull of the spherical eight. Along a periodic orbit with <span class="math inline">\(\dot\tau\ne0\)</span>, the arm angle is a function <span class="math inline">\(\alpha(\tau)\)</span>, and since curvature does not depend on the parametrisation, the curvature <span class="math inline">\(\kappa = \norm{\vb r&#39;\times\vb r&#39;&#39;}/\norm{\vb r&#39;}^3\)</span> of the space curve (prime <span class="math inline">\(=\dv*{}{\tau}\)</span>) does not depend on the time law <span class="math inline">\(\tau(t)\)</span>: <span class="math inline">\(\kappa(t) = \kappa(\tau(t))\)</span>. It depends on <span class="math inline">\(\ell\)</span>, <span class="math inline">\(\Delta\theta\)</span>, <span class="math inline">\(\Delta\phi\)</span>, <span class="math inline">\(\theta_0\)</span>, <span class="math inline">\(a\)</span>, and on the arm law through <span class="math inline">\(\alpha,\alpha&#39;,\alpha&#39;&#39;\)</span>; for <span class="math inline">\(a=0\)</span>, only on <span class="math inline">\(\ell,\Delta\theta,\Delta\phi,\theta_0\)</span>.</p>
+<p>Let <span class="math inline">\(v = \norm{\vu r&#39;}\)</span> be the speed on the sphere, <span class="math display">\begin{equation}
+    v^2 = 4\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau &gt; 0,
+\tag{61}\end{equation}</span> <span class="math inline">\(\sigma(\tau) = \int_0^\tau v\)</span> its arclength (so that <span class="math inline">\(f_\sigma = f&#39;/v\)</span> and <span class="math inline">\(f_{\sigma\sigma} = (f&#39;&#39;v-f&#39;v&#39;)/v^3\)</span> for any function <span class="math inline">\(f\)</span> of <span class="math inline">\(\tau\)</span>), <span class="math inline">\(\vu t = \vu r_\sigma\)</span> its unit tangent, <span class="math inline">\(\vu n = \vu r\times\vu t\)</span>, and <span class="math inline">\(\kappa_g\)</span> its geodesic curvature on the sphere, defined by <span class="math inline">\(\vu t_\sigma = -\vu r + \kappa_g\vu n\)</span>: <a id="eq:curv-kg"></a><span class="math display">\begin{equation}
+ \tag{62}
+    \kappa_g = \frac{2\Delta\theta\Delta\phi\sin\theta\,\sin\tau\,(2+\cos2\tau) + \Delta\phi\cos\theta\cos\tau\,\bigl(8\Delta\theta^2\cos^22\tau + \Delta\phi^2\sin^2\theta\cos^2\tau\bigr)}{v^3}.
+\end{equation}</span> Finally let <span class="math inline">\(u = \ln r\)</span>. For every <span class="math inline">\(\tau\)</span>, <a id="eq:curv-formula"></a><span class="math display">\begin{equation}
+ \tag{63}
+    r\,\kappa = \frac{\sqrt{\kappa_g^2\,(1+u_\sigma^2) + (1+u_\sigma^2-u_{\sigma\sigma})^2}}{(1+u_\sigma^2)^{3/2}}.
+\end{equation}</span> The cone <span class="math inline">\(\mathscr C\)</span> is a developable surface, with principal curvatures <span class="math inline">\(0\)</span> along the generators and <span class="math inline">\(\kappa_g/r\)</span> across them. Formula <a href="#eq:curv-formula">(63)</a> is the decomposition <span class="math inline">\(\kappa^2 = \kappa_n^2 + (\kappa_g^{\mathscr C})^2\)</span> of the curvature of a curve drawn on <span class="math inline">\(\mathscr C\)</span> into its normal and geodesic parts: <span class="math display">\begin{equation}
+    \kappa_n = \frac{\kappa_g}{r}\sin^2\beta = \frac{\kappa_g}{r\,(1+u_\sigma^2)}, \qquad \kappa_g^{\mathscr C} = \frac{1+u_\sigma^2-u_{\sigma\sigma}}{r\,(1+u_\sigma^2)^{3/2}},
+\tag{64}\end{equation}</span> where <span class="math inline">\(\beta\)</span> is the angle between the trajectory and the generator. The normal part is controlled by the curvature of the surface, <span class="math inline">\(\abs{\kappa_n}\le\abs{\kappa_g}/r\)</span>, and is entirely due to the bending of the spherical eight; the geodesic part is the curvature of the planar polar curve <span class="math inline">\(\sigma\mapsto r(\sigma)\)</span> obtained by unrolling the cone, and is due to the variation of <span class="math inline">\(r=\norm{\vb r}\)</span> along the cycle. The surface therefore bounds <span class="math inline">\(\kappa\)</span> from below only, by <span class="math inline">\(\abs{\kappa_n}\)</span>; this lower bound vanishes at the inflection points of the eight, where <span class="math inline">\(\kappa_g=0\)</span>, and it gives no upper bound.</p>
+<p>For <span class="math inline">\(a=0\)</span>, the trajectory lies on the sphere of radius <span class="math inline">\(\ell\)</span>, the unrolled curve is a circle of radius <span class="math inline">\(\ell\)</span>, and <span class="math display">\begin{equation}
+    \kappa = \frac{\sqrt{1+\kappa_g^2}}{\ell} \ \ge\ \frac1\ell,
+\tag{65}\end{equation}</span> with equality at the inflection points of the eight, which exist on each lobe. In particular, the floor <span class="math inline">\(1/\ell\)</span> is a property of the trajectory in the cone, not of the cone. Large curvature is produced where the spherical eight turns sharply, <em>i.e.</em> where <span class="math inline">\(v\)</span> is small compared with the bending of the eight: at the lobe tips <span class="math inline">\(\tau=\pi/2,3\pi/2\)</span> for a wide eight (<span class="math inline">\(\Delta\theta\)</span> small compared with <span class="math inline">\(\Delta\phi\sin\theta_0\)</span>), and at the top and bottom <span class="math inline">\(\tau=\pi/4,3\pi/4\)</span> for a tall eight. Indeed, exactly, <span class="math display">\begin{equation}
+    \kappa_g(\pi/2) = \frac{\Delta\phi\sin\theta_0}{4\Delta\theta^2}, \qquad
+    \kappa_g(3\pi/4) = \frac{8\Delta\theta}{\Delta\phi^2\sin^2(\theta_0-\Delta\theta)} - \cot(\theta_0-\Delta\theta),
+\tag{66}\end{equation}</span> so that, for <span class="math inline">\(a=0\)</span>, <span class="math inline">\(\max\kappa\to\infty\)</span> as <span class="math inline">\(\Delta\theta\to0\)</span> or as <span class="math inline">\(\Delta\phi\to0\)</span>, the other parameters being fixed.</p>
+<p>Consider a box of parameters: let <span class="math inline">\(\ell\ge\ell_-&gt;a\)</span>, <span class="math inline">\(\Delta\theta\in[\Delta\theta_-,\Delta\theta_+]\)</span>, <span class="math inline">\(\Delta\phi\in[\Delta\phi_-,\Delta\phi_+]\)</span> with <span class="math inline">\(\Delta\theta_-&gt;0\)</span>, <span class="math inline">\(\Delta\phi_-&gt;0\)</span>, and <span class="math inline">\(\theta_0\in[\theta_{0-},\theta_{0+}]\)</span> with <span class="math inline">\(\mathscr J = [\theta_{0-}-\Delta\theta_+,\ \theta_{0+}+\Delta\theta_+]\subset(0,\pi)\)</span>. Set <span class="math display">\begin{equation}
+    m = \min_{\mathscr J}\sin, \qquad M = \max_{\mathscr J}\sin, \qquad C = \max_{\mathscr J}\abs{\cos},
+\tag{67}\end{equation}</span> <span class="math display">\begin{equation}
+    v_* = \begin{cases}
+        2\Delta\theta_- &amp; \text{if } m\Delta\phi_-\ge4\Delta\theta_-, \\[2pt]
+        m\Delta\phi_-\sqrt{\dfrac12 - \dfrac{m^2\Delta\phi_-^2}{64\,\Delta\theta_-^2}} &amp; \text{otherwise,}
+    \end{cases}
+    \qquad
+    \bar\kappa_g = \frac{2\sqrt2\,M\,\Delta\theta_+\Delta\phi_+}{v_*^3} + \frac{2C}{m}.
+\tag{68}\end{equation}</span> Let the arm law satisfy <span class="math inline">\(\abs{\alpha&#39;}\le A_1\)</span> and <span class="math inline">\(\abs{\alpha&#39;&#39;}\le A_2\)</span>, and set <span class="math display">\begin{equation}
+\begin{split}
+    &amp;\Gamma_1 = 2\Delta\theta_+ + \Delta\phi_+ + A_1, \qquad \Gamma_2 = \Gamma_1^2 + 4\Delta\theta_+ + \Delta\phi_+ + A_2, \\
+    &amp;V_1 = 4\Delta\theta_+ + \Delta\phi_+ + \tfrac12\Delta\phi_+^2 + 4\Delta\theta_+\Delta\phi_+, \qquad
+    U = \varepsilon'\,\frac{\Gamma_2 + \varepsilon'^2\,\Gamma_1^2}{v_*^2} + \varepsilon'\,\frac{\Gamma_1V_1}{v_*^3}.
+\end{split}
+\tag{69}\end{equation}</span> Then, for all parameters in the box, every such arm law, and every <span class="math inline">\(\tau\)</span>, <a id="eq:curv-bound"></a><span class="math display">\begin{equation}
+ \tag{70}
+    \kappa \le \frac{\sqrt{\bar\kappa_g^2 + (1+U)^2}}{\ell_--a},
+\end{equation}</span> and, without arm (<span class="math inline">\(a=0\)</span>, <span class="math inline">\(U=0\)</span>), <span class="math inline">\(1/\ell\le\kappa\le\sqrt{1+\bar\kappa_g^2}/\ell_-\)</span>. Since <span class="math inline">\(U = O(\varepsilon)\)</span>, the bound is <span class="math inline">\(\sqrt{1+\bar\kappa_g^2}/\ell_- + O(\varepsilon)\)</span>, uniformly on the box. The bound degenerates only when <span class="math inline">\(\Delta\theta_-\to0\)</span>, <span class="math inline">\(\Delta\phi_-\to0\)</span>, or <span class="math inline">\(\mathscr J\)</span> reaches a pole, which is unavoidable by the exact tip and bottom values above; and, when <span class="math inline">\(a&gt;0\)</span>, the bound on <span class="math inline">\(\alpha&#39;&#39;\)</span> cannot be dispensed with, since <span class="math inline">\(u_{\sigma\sigma}\)</span>, which contains <span class="math inline">\(\alpha&#39;&#39;\)</span> linearly, enters <a href="#eq:curv-formula">(63)</a> through <span class="math inline">\(\abs{1+u_\sigma^2-u_{\sigma\sigma}}\)</span>. The purpose of this bound is to control the curvature of the trajectory by the bounds of the design parameters alone: in the optimization above, the lower bound on <span class="math inline">\(\ell\)</span> and the bounds on <span class="math inline">\(\Delta\varphi\)</span> of Table <a href="#tab:opt_descr">3</a> play the role of <span class="math inline">\(\ell_-\)</span> and <span class="math inline">\(\Delta\phi_\pm\)</span>, with <span class="math inline">\(\Delta\theta_\pm = \Delta\theta\)</span> and <span class="math inline">\(\theta_{0\pm} = \theta_0\)</span> fixed. Without arm, this gives a bound valid for every design of the box. With the arm, the bound also involves the bounds <span class="math inline">\(A_1\)</span> and <span class="math inline">\(A_2\)</span> on the arm law, which are not design parameters but properties of the periodic orbit: they are evaluated on the computed orbit, which makes the bound an a posteriori check rather than an a priori estimate. On the optimized cycle, <span class="math inline">\(A_1 = 1.01\)</span> and <span class="math inline">\(A_2 = 1.33\)</span>, and the smallest radius of curvature computed along the cycle, arm included, is 1.72 m. Evaluated on the whole box of Table <a href="#tab:opt_descr">3</a>, the bound <a href="#eq:curv-bound">(70)</a> only guarantees a radius of 8.3 mm: it holds, but it is far from sharp, as the box contains narrow eights (<span class="math inline">\(\Delta\phi_- = 10^\circ\)</span>) for which <span class="math inline">\(v_*\)</span> is small and the bound, of order <span class="math inline">\(1/v_*^3\)</span>, is large. Evaluated at the optimized design itself (<span class="math inline">\(\ell_- = \ell\)</span>, <span class="math inline">\(\Delta\phi_\pm = \Delta\phi\)</span>), it guarantees 0.58 m.</p>
+<p>With <span class="math inline">\(K = \sqrt{1+\kappa_g^2}\)</span>, for a fixed eight and a fixed arm law with bounded <span class="math inline">\(\alpha&#39;,\alpha&#39;&#39;\)</span>, <a id="eq:curv-first-order"></a><span class="math display">\begin{equation}
+ \tag{71}
+    \ell\,\kappa = K\,(1-\varepsilon g) - \varepsilon\,\frac{g_{\sigma\sigma}}{K} + O(\varepsilon^2)
+\end{equation}</span> uniformly in <span class="math inline">\(\tau\)</span>: the arm rescales the arm-free curvature by <span class="math inline">\(\ell/r\)</span> and adds the contribution of the second derivative of <span class="math inline">\(g\)</span> (hence of <span class="math inline">\(\alpha&#39;&#39;\)</span>) along the eight.</p>
+<p>For the optimized eight of Table <a href="#tab:opt_results">4</a> (<span class="math inline">\(\Delta\theta=6.0^\circ\)</span>, <span class="math inline">\(\Delta\phi=16.6^\circ\)</span>, <span class="math inline">\(\theta_0=65.0^\circ\)</span>), the exact value above gives <span class="math inline">\(\kappa_g(\pi/2)\simeq5.99\)</span>, hence <span class="math inline">\(\ell\kappa(\pi/2) = \sqrt{1+\kappa_g(\pi/2)^2} \simeq 6.07\)</span> at the lobe tips for <span class="math inline">\(a=0\)</span>. This value at the tip is exact: it follows from the formulas above, with no approximation. The tips are not necessarily where the turn is sharpest: sampling <span class="math inline">\(\tau\)</span> on a fine grid gives <span class="math inline">\(\max_\tau\ell\kappa\simeq16.77\)</span>, reached at <span class="math inline">\(\tau\simeq2.200\)</span> and, by symmetry, at <span class="math inline">\(\tau+\pi\)</span>; the smallest radius of curvature of the trajectory is thus about <span class="math inline">\(\ell/16.77\)</span>, <em>i.e.</em> about 1.6 m for the optimized length <span class="math inline">\(\ell=27.0\,\mathrm{m}\)</span>. For <span class="math inline">\(a&gt;0\)</span>, see the a posteriori check above.</p>
+<table id="tab:parameter_comparison">
+<caption><strong>Table 5:</strong> Comparison of initial and optimized parameters</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Parameter</th>
+<th style="text-align: center;">Initial guess</th>
+<th style="text-align: center;">Dynamic optimization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\ell\)</span> (m)</td>
+<td style="text-align: right;">31.0</td>
+<td style="text-align: right;">26.9679</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(I\)</span> (kg m<sup>2</sup>)</td>
+<td style="text-align: right;">1300.0</td>
+<td style="text-align: right;">351.628</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(b\)</span> (N m s °<sup>−1</sup>)</td>
+<td style="text-align: right;">50.4091</td>
+<td style="text-align: right;">12.8643</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(\Delta\varphi\)</span> (°)</td>
+<td style="text-align: right;">50.0</td>
+<td style="text-align: right;">16.6158</td>
+</tr>
+<tr>
+<td style="text-align: left;">Period (s)</td>
+<td style="text-align: right;">2.82808</td>
+<td style="text-align: right;">0.949267</td>
+</tr>
+<tr>
+<td style="text-align: left;">Objective <span class="math inline">\(P\)</span> (kW)</td>
+<td style="text-align: right;">9.63888</td>
+<td style="text-align: right;">12.2534</td>
+</tr>
+<tr>
+<td style="text-align: left;">Min tension (kN)</td>
+<td style="text-align: right;">3.35558</td>
+<td style="text-align: right;">5.74767</td>
+</tr>
+<tr>
+<td style="text-align: left;">Max tension (kN)</td>
+<td style="text-align: right;">8.85565</td>
+<td style="text-align: right;">10.8269</td>
+</tr>
+<tr>
+<td style="text-align: left;">Max acceleration (m s<sup>−2</sup>)</td>
+<td style="text-align: right;">517.084</td>
+<td style="text-align: right;">938.602</td>
+</tr>
+</tbody>
+</table><details class="web-code"><summary>Code that produced this table</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L925-L930">src/optimization.jl (region opt_tables)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Tables
+    table_descr, table_opt = latex_tables(p_start, p_ref, lower, upper)
+    push!(files, write_table(&quot;table2&quot;, table_descr), write_table(&quot;table3&quot;, table_opt))
+    @warn &quot;table4: values to be checked vs. Alain&#39;s computation&quot;
+    push!(files, write_table(&quot;table4&quot;, comparison_table(p_start, p_ref)))
+    push!(files, write_table(&quot;numbers&quot;, numbers_tex(; p_start, p_ref, opt_iter=opt_ref.iter, winds, sweep, dtheta, dtheta_opt, dtheta_lost)))</code></pre></details><figure id="fig:opt-dtheta" data-latex-placement="thpb">
+<img src="figs/optimization_dtheta.png" />
+<figcaption><strong>Figure 14:</strong> Average power (left, normalized by its value <span class="math inline">\(P^*\)</span> at the nominal <span class="math inline">\(\Delta\theta=6.0^\circ\)</span>) and min–max line tension (right) as <span class="math inline">\(\Delta\theta\)</span> varies, with <span class="math inline">\(\Theta\)</span> held at the optimum (points) and re-optimized at each angle (line with triangles, shaded envelope). <span class="math inline">\(\Theta\)</span> is re-optimized by continuation from the nominal angle, in warm-started steps of at most 0.5 °; below the nominal angle, the continuation is lost at <span class="math inline">\(3.9^\circ\)</span>, so that no re-optimized value is shown at smaller angles. With <span class="math inline">\(\Theta\)</span> held, the power peaks at the nominal angle and loses 94 % at <span class="math inline">\(20^\circ\)</span>; re-optimized, it decreases steadily above the nominal angle and loses 32.5 % at <span class="math inline">\(20^\circ\)</span>.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L911-L917">src/optimization.jl (region opt_dtheta)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    dtheta_angles = collect(range(DTHETA_RANGE..., length=fast ? 3 : 10))
+    @info &quot;opt: Δθ sweep with Θ fixed, $(length(dtheta_angles)) angles&quot;
+    dtheta = dtheta_study(p_ref, dtheta_angles)
+
+    dsweep = dtheta_opt_sweep(p_ref, SYMS, dtheta_angles, lower, upper;
+        nominal=rad2deg(p_ref.Δθ), iters=it_dtheta, step=fast ? 3.0 : DTHETA_STEP)
+    dtheta_opt, dtheta_lost = dsweep.stats, dsweep.lost_below</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L945-L946">src/optimization.jl (region fig_dtheta)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    fig_dtheta = plot_dtheta(dtheta, dtheta_opt, GUIDES, rad2deg(p_ref.Δθ))
+    append!(files, save_figure(fig_dtheta, &quot;optimization_dtheta&quot;))</code></pre></details><figure id="fig:opt-landscape" data-latex-placement="thpb">
+<img src="figs/optimization_landscape.png" />
+<figcaption><strong>Figure 15:</strong> Average power as the optimization parameters vary. Along these one-dimensional slices, the objective is smooth around the optimum; this does not exclude other local optima.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L921-L921">src/optimization.jl (region opt_landscape)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    LANDSCAPE = landscape(p_ref, SYMS; lower, upper, npoints=fast ? 5 : 21)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/optimization.jl#L951-L952">src/optimization.jl (region fig_landscape)</a>, see also <a href="code/src-optimization-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    fig_land = plot_landscape(LANDSCAPE, GUIDES)
+    append!(files, save_figure(fig_land, &quot;optimization_landscape&quot;))</code></pre></details></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="section-3.html">« 3 Analysis of the dynamics: equilibria and periodic orbits</a><a class="docs-footer-nextpage" href="appendix-A.html">A 10D model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

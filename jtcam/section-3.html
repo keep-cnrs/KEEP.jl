@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="referrer" content="no-referrer"/><title>3 Analysis of the dynamics: equilibria and periodic orbits · Rocking arm model for kite power generation</title><meta name="title" content="3 Analysis of the dynamics: equilibria and periodic orbits · Rocking arm model for kite power generation"/><meta property="og:title" content="3 Analysis of the dynamics: equilibria and periodic orbits · Rocking arm model for kite power generation"/><meta property="twitter:title" content="3 Analysis of the dynamics: equilibria and periodic orbits · Rocking arm model for kite power generation"/><meta name="description" content="Documentation for Rocking arm model for kite power generation."/><meta property="og:description" content="Documentation for Rocking arm model for kite power generation."/><meta property="twitter:description" content="Documentation for Rocking arm model for kite power generation."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script><link href="assets/paper.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">Rocking arm model for kite power generation</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><a class="tocitem" href="intro.html">Introduction</a></li><li><a class="tocitem" href="section-1.html">1 Mathematical model of KEEP</a></li><li><a class="tocitem" href="section-2.html">2 Estimation of power take-off</a></li><li class="is-active"><a class="tocitem" href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a><ul class="internal"><li><a class="tocitem" href="#sec:analysis-equilibria"><span>3.1 Equilibria</span></a></li><li><a class="tocitem" href="#sec:analysis-cycles"><span>3.2 Periodic orbits</span></a></li></ul></li><li><a class="tocitem" href="section-4.html">4 Optimization</a></li><li><span class="tocitem">Appendices</span><ul><li><a class="tocitem" href="appendix-A.html">A 10D model</a></li><li><a class="tocitem" href="appendix-B.html">B Explicit dynamics</a></li><li><a class="tocitem" href="appendix-C.html">C Estimate of the eight length</a></li><li><a class="tocitem" href="appendix-D.html">D Curvature of the kite trajectory: computations and proofs</a></li></ul></li><li><a class="tocitem" href="references.html">References</a></li><li><span class="tocitem">Code</span><ul><li><a class="tocitem" href="reproduce.html">Reproducing the results</a></li><li><a class="tocitem" href="code/main-jl.html">main.jl</a></li><li><a class="tocitem" href="code/src-helpers-jl.html">src/helpers.jl</a></li><li><a class="tocitem" href="code/src-modelling-jl.html">src/modelling.jl</a></li><li><a class="tocitem" href="code/src-numerics_10d-jl.html">src/numerics_10d.jl</a></li><li><a class="tocitem" href="code/src-analysis-jl.html">src/analysis.jl</a></li><li><a class="tocitem" href="code/src-optimization-jl.html">src/optimization.jl</a></li><li><a class="tocitem" href="code/figs-configuration-tex.html">figs/configuration.tex</a></li><li><a class="tocitem" href="code/figs-cone_eight-tex.html">figs/cone_eight.tex</a></li><li><a class="tocitem" href="api.html">KEEP functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="section-3.html">3 Analysis of the dynamics: equilibria and periodic orbits</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/keep-cnrs/KEEP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="sec:analysis"><a class="docs-heading-anchor" href="#sec:analysis">3 Analysis of the dynamics: equilibria and periodic orbits</a><a id="sec:analysis-1"></a><a class="docs-heading-anchor-permalink" href="#sec:analysis" title="Permalink"></a></h1><p>This section describes the dynamics of the four-dimensional system <span class="math inline">\(\dot{\vb x} = f(\vb x)\)</span> of Section <a href="section-1.html#sec:model-eom">1.4</a> for one set of parameters, the one of Table <a href="section-2.html#tab:params">1</a>. The inertia of the arm is <span class="math inline">\(I = 1300\,\mathrm{kg}\,\mathrm{m}^{2}\)</span>, the initial guess of the optimization of Section <a href="section-4.html#sec:optimization">4</a>: the results of this section describe the device before optimization, which the optimized design of Section <a href="section-4.html#sec:optimization">4</a> is compared with. At this inertia, the braking coefficient <span class="math inline">\(b\)</span> satisfies the condition <a href="section-2.html#pto_optimality_constraint">(47)</a>, <span class="math inline">\(b = I\omega\)</span>, that maximizes the average power <a href="section-2.html#eq:power_PTO">(41)</a> of the one-dimensional model at fixed <span class="math inline">\(I\)</span>, where <span class="math inline">\(\omega = 2\pi/T\)</span> is now the angular frequency of the limit cycle of the full system with <span class="math inline">\(\dot\tau &gt; 0\)</span> (see Section <a href="#sec:analysis-cycles">3.2</a>) rather than the estimate <a href="section-2.html#eq:Omega_PTO">(45)</a>. As the period <span class="math inline">\(T\)</span> depends on <span class="math inline">\(b\)</span>, this condition is a fixed-point equation, solved by iterating <span class="math inline">\(b \leftarrow 2\pi I/T(b)\)</span>. All the trajectories are integrated with the order-9 Verner method <span class="citation" data-cites="Verner2010">(<a href="references.html#ref-Verner2010">Verner 2010</a>)</span>, as implemented in DifferentialEquations.jl <span class="citation" data-cites="rackauckas2017differentialequations">(<a href="references.html#ref-rackauckas2017differentialequations">Rackauckas and Nie 2017</a>)</span>, with absolute and relative tolerances <span class="math inline">\(10^{-9}\)</span> unless specified otherwise.</p><h2 id="sec:analysis-equilibria"><a class="docs-heading-anchor" href="#sec:analysis-equilibria">3.1 Equilibria</a><a id="sec:analysis-equilibria-1"></a><a class="docs-heading-anchor-permalink" href="#sec:analysis-equilibria" title="Permalink"></a></h2><p>The equilibria, or steady states, of the system are the states <span class="math inline">\(\vb x_0 = (\vb q_0, 0)\)</span> with zero velocity and zero acceleration, that is the solutions of <a id="eq:equilibria"></a><span class="math display">\begin{equation}
+ \tag{52}
+    \ddot{\vb q}(\vb q_0, \dot{\vb q}= 0) = 0 \in \mathbf{R}^2.
+\end{equation}</span> At such a state, the arm is at rest and the generator exerts no torque, so that <a href="section-1.html#eq:ddalpha">(31)</a> reduces to <span class="math inline">\(a\lambda F_\ell = 0\)</span>: either the lines are slack, or the lever arm <a href="section-1.html#eq:lever-arm">(28)</a> of the tension vanishes. In the latter case, the kite lies on one of the edges <span class="math inline">\(\Gamma_\pm\)</span> of the band of reachable positions, the fold curves <span class="math inline">\(\alpha = \phi(\tau)\)</span> (arm pointing towards the kite, downwind arm) and <span class="math inline">\(\alpha = \phi(\tau) + \pi\)</span> (arm pointing away from the kite, upwind arm) of Section <a href="section-1.html#sec:model-geometry">1.1</a>. The arm and the lines are then in the same vertical plane. Slack lines are excluded: off the fold curves, <span class="math inline">\(F_\ell = 0\)</span> at rest requires, by <a href="appendix-B.html#eq:K1">(115)</a>–<a href="appendix-B.html#eq:K2">(116)</a>, that the force <span class="math inline">\(\vb F_a + \vb F_g\)</span> on the kite be normal to the cone, whereas on a grid of <span class="math inline">\(721\times721\)</span> configurations its tangential part is at least <span class="math inline">\(0.56\)</span> times its norm. The equilibria therefore lie on the fold curves, which are nullclines of <span class="math inline">\(\ddot\alpha\)</span> at zero velocity, since <span class="math inline">\(\lambda = 0\)</span> there. Along each fold curve, the equilibria are the zeros of the single function <span class="math inline">\(g_\pm(\tau) = \ddot\tau(\vb q(\tau), 0)\)</span>, with <span class="math inline">\(\vb q(\tau) = (\phi(\tau), \tau)\)</span> or <span class="math inline">\((\phi(\tau)+\pi, \tau)\)</span>; by <a href="appendix-B.html#eq:K1">(115)</a>–<a href="appendix-B.html#eq:K2">(116)</a> with <span class="math inline">\(\lambda = 0\)</span>, they are the configurations where the weight and the aerodynamic force are balanced by the tension of the lines and the reaction of the cone. They are bracketed by the sign changes of <span class="math inline">\(g_\pm\)</span> on a grid of <span class="math inline">\(3600\)</span> values of <span class="math inline">\(\tau\)</span>, and refined by a scalar root finder; the same <span class="math inline">\(8\)</span> equilibria are found by a nonlinear solver on the full system <a href="#eq:equilibria">(52)</a> started from <span class="math inline">\(100\)</span> values of <span class="math inline">\(\tau\)</span> on each fold curve and completed by symmetry. Their tensions, given by <a href="section-1.html#eq:eom_regular">(32)</a>, lie between 144 N and 266 N.</p>
+<p>The solutions of <a href="#eq:equilibria">(52)</a> lie at the intersections of the nullclines of <span class="math inline">\(\ddot\alpha\)</span> and of <span class="math inline">\(\ddot\tau\)</span>, shown in Fig. <a href="#fig:equilibria-phase-space">5</a>: the nullclines of <span class="math inline">\(\ddot\tau\)</span> cross the torus <span class="math inline">\(\mathbf{T}^2\)</span> of configurations horizontally, those of <span class="math inline">\(\ddot\alpha\)</span> vertically, and they meet at <span class="math inline">\(8\)</span> points. The symmetry <a href="section-1.html#eq:symmetry">(34)</a> maps an equilibrium <span class="math inline">\((\alpha, \tau)\)</span> onto the equilibrium <span class="math inline">\((-\alpha, \tau + \pi)\)</span>, with the kite on the other side of the plane of the wind, so that the equilibria come in <span class="math inline">\(8/2\)</span> pairs. They realize the eight combinations of three binary features: the arm points downwind or upwind; the kite is near the centre of the eight or near one of its tips; it is on the left or on the right of the plane of the wind. Their configurations are drawn in Fig. <a href="#fig:equilibria-eight-circle">6</a>, and Table <a href="#tab:equilibria">2</a> gives their positions and the eigenvalues of the Jacobian of <span class="math inline">\(f\)</span>. The two members of a pair have the same spectrum, since <span class="math inline">\(\sigma\)</span> is linear and conjugates the vector field to itself; as the vector field is analytic, the Jacobians are computed by <span data-acronym-label="ad" data-acronym-form="singular+short">ad</span> at the equilibria themselves, and the spectra of the two members agree to rounding error.</p>
+<p>All the equilibria are unstable. The two pairs with the kite near the centre of the eight have a real eigenvalue between <span class="math inline">\(11.4\)</span> and 12.9  s, which repels the trajectories on a time scale of a tenth of a second; the two pairs with the kite near a tip have a pair of complex eigenvalues with real part between <span class="math inline">\(1.49\)</span> and 1.53  s, an unstable oscillation. With an upwind arm, each equilibrium has one more unstable eigenvalue, real and small, than its downwind counterpart. None of the equilibria is a possible operating point of the device, which motivates the study of the periodic motions below. At every equilibrium, the eigenvector of the most unstable eigenvalue moves the kite along the eight, in <span class="math inline">\(\tau\)</span> and <span class="math inline">\(\dot\tau\)</span>, while the arm stays at rest to first order: the main instability is that of the kite on its prescribed path, not that of the arm. The additional, slow, unstable eigenvalue of the upwind equilibria is, on the contrary, a mode of the arm: the lines pull the tip of an arm pointing upwind, away from the kite, towards the pivot, and a small rotation of the arm is amplified, as for an inverted pendulum, whereas they stabilize an arm pointing downwind, towards the kite; with the small tension at rest and the large inertia of the arm, this instability is slow. Near the centre of the eight, it is static: the tangential component of the aerodynamic force and of the weight vanishes at the equilibrium, and a small displacement of the kite along the eight creates a tangential component in the direction of the displacement, which amplifies it on a time scale of a tenth of a second. Near a tip, it is an unstable oscillation along the eight: the motion of the kite changes its apparent wind, hence its aerodynamic force, in phase with its velocity, so that the aerodynamic force feeds the motion, as in crosswind flight.</p>
+<table id="tab:equilibria">
+<caption><strong>Table 2:</strong> Equilibria of the system for the parameters of Table <a href="section-2.html#tab:params">1</a>, by pairs exchanged by the symmetry <a href="section-1.html#eq:symmetry">(34)</a>: one representative <span class="math inline">\((\alpha, \tau)\)</span> of each pair (in degrees, <span class="math inline">\(0 \leq \tau &lt; 180\)</span>), eigenvalues of the Jacobian of <span class="math inline">\(f\)</span> (in  s) and number of eigenvalues with positive real part.</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><span>Arm</span></th>
+<th style="text-align: left;"><span>Kite</span></th>
+<th style="text-align: center;"><span><span class="math inline">\((\alpha, \tau)\)</span></span></th>
+<th style="text-align: left;"><span>Eigenvalues</span></th>
+<th style="text-align: center;"><span>Unstable</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">downwind</td>
+<td style="text-align: left;">centre</td>
+<td style="text-align: center;"><span class="math inline">\((5.0, 5.7)\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(-2.12,\ -0.34,\ -0.10,\ 11.38\)</span></td>
+<td style="text-align: center;">1</td>
+</tr>
+<tr>
+<td style="text-align: left;">downwind</td>
+<td style="text-align: left;">tip</td>
+<td style="text-align: center;"><span class="math inline">\((50.0, 89.7)\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(-2.03,\ -0.19,\ 1.49 \pm 3.17\,i\)</span></td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">upwind</td>
+<td style="text-align: left;">centre</td>
+<td style="text-align: center;"><span class="math inline">\((-175.6, 5.1)\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(-2.30,\ -0.33,\ 0.09,\ 12.89\)</span></td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">upwind</td>
+<td style="text-align: left;">tip</td>
+<td style="text-align: center;"><span class="math inline">\((-130.0, 89.0)\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(-2.36,\ 0.14,\ 1.53 \pm 3.42\,i\)</span></td>
+<td style="text-align: center;">3</td>
+</tr>
+</tbody>
+</table><details class="web-code"><summary>Code that produced this table</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L617-L618">src/analysis.jl (region table5)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    pairs = equilibrium_spectra(ss, vbp; is_down, is_center)
+    push!(files, write_table(&quot;table5&quot;, equilibria_table(pairs)))</code></pre></details><figure id="fig:equilibria-phase-space" data-latex-placement="thpb">
+<img src="figs/equilibria_phase_space.png" />
+<figcaption><strong>Figure 5:</strong> Zero-velocity accelerations and equilibria. The grey arrows show the direction of the field <span class="math inline">\(\ddot{\vb q}(\vb q, \dot{\vb q}= 0)\)</span>; the orange and blue curves are the nullclines of <span class="math inline">\(\ddot\alpha\)</span> and of <span class="math inline">\(\ddot\tau\)</span>, respectively. The equilibria lie at their intersections: white markers for a downwind arm, black ones for an upwind arm, circles when the kite is near the centre of the eight and diamonds when it is near a tip. The background is light grey when the arm points downwind and light red when it points upwind.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L429-L432">src/analysis.jl (region setup_analysis)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ## Determine optimal parameters using kinetic model
+    p0 = PMP.build_para()
+    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-9, rtol=1e-9, maxiter=50)  # errors if not converged
+    vbp = PMP.build_vbpara(p0)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L441-L473">src/analysis.jl (region equilibria_style)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    #! format: off
+    my_theme = (;
+        downwind        = (; c=plot_color(:grey, 0.08)),
+        upwind          = (; c=plot_color(:red, 0.08)),
+        streamlines     = (; c=:black, alpha=0.7, lw=default(:lw) / 6),
+        heads           = (; c=:black, alpha=0.5, lw=0),
+        nullcline_tau   = (; c=1, ls=:solid),
+        nullcline_alpha = (; c=2, ls=:solid),
+        eq_legend       = (; c=:black, shape=:circle, ms=default(:ms), msw=20),
+    )
+
+    # Equilibrium characteristics: the symmetry (α, τ) -&gt; (-α, τ+π) flips the kite
+    # left↔right (φ = φ0 + Δφ·sin(τ)) and preserves the arm wind region and the
+    # center/side zone, so the 8 equilibria realize all 2×2×2 combinations.
+    φkite(τ) = vbp.φ0 + vbp.Δφ * sin(τ)                     # kite azimuth (PM4.τ_to_θφ)
+    is_down(q) = cos(q[1]) &gt; 0                              # arm downwind
+    is_left(q) = φkite(q[2]) &gt; vbp.φ0                       # kite left of window center
+    is_center(q) = abs(φkite(q[2]) - vbp.φ0) &lt; vbp.Δφ / 2   # closer to φ0 than to ±Δφ
+
+    &quot;Marker style from the equilibrium characteristics: fill = arm wind, shape = zone, stroke = kite side.&quot;
+    ss_style(q) = (
+        c = is_down(q) ? :white : :black,
+        markerstrokecolor = is_down(q) ? :black : :white,
+        shape = is_center(q) ? :circle : :diamond,
+        ms = default(:ms),
+        markerstrokewidth = is_down(q) ? 8 : 10,
+        # markerstrokewidth = 10,
+    )
+    #! format: on
+
+    theme = my_theme
+
+    f = q -&gt; SteadyState.ddq_partial(q, vbp)</code></pre><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L477-L526">src/analysis.jl (region equilibria<em>phase</em>space)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    # Canvas &amp; Layout
+    δ = 0
+    plot(xlims=(-180 - δ, 180 + δ), ylims=(-180 - δ, 180 + δ), aspect_ratio=:equal,
+        xticks=([-180, 0, 180], [&quot;-180&quot;, &quot;0&quot;, &quot;180&quot;]),
+        yticks=([-180, 0, 180], [&quot;-180&quot;, &quot;0&quot;, &quot;180&quot;]),
+        xlabel=&quot;α (deg)&quot;, ylabel=&quot;τ (deg)&quot;,
+        grid=false, framestyle=:semi, legend=:outerright, colorbar=false)
+    # Background wind spans
+    vspan!([-180, -90]; theme.upwind..., label=&quot;Upwind arm&quot;)
+    vspan!([90, 180]; theme.upwind...)
+    vspan!([-90, 90]; theme.downwind...) #, label=&quot;Downwind arm&quot;)
+
+    # Streamlines &amp; Arrowheads
+    line_x, line_y, ax, ay, au, av = streamlines(f, (-π, π), (-π, π))
+    plot!(rad2deg.(line_x), rad2deg.(line_y); theme.streamlines...)
+
+    ax, ay = rad2deg.(ax), rad2deg.(ay)
+    L, W = rad2deg(0.2), rad2deg(0.06)
+    heads = [Shape([(s[1] + L / 2 * u, s[2] + L / 2 * v),
+        (s[1] - L / 2 * u - W * v, s[2] - L / 2 * v + W * u),
+        (s[1] - L / 2 * u + W * v, s[2] - L / 2 * v - W * u)])
+             for (s, u, v) in zip(zip(ax, ay), au, av)]
+    plot!(heads; theme.heads...)
+
+    # Nullclines (splatting reuses line properties for both contour and the GR legend fix)
+    N = 20
+    αs = range(-π, π, N + 1)
+    τs = range(-π, π, 2N + 1)
+    dd = [f((α, τ)) for τ in τs, α in αs]
+
+    contour!(rad2deg.(αs), rad2deg.(τs), last.(dd); levels=[0], theme.nullcline_tau...)
+    contour!(rad2deg.(αs), rad2deg.(τs), first.(dd); levels=[0], theme.nullcline_alpha...)
+    plot!([NaN], [NaN]; theme.nullcline_tau..., label=&quot;D²(τ) = 0&quot;)
+    plot!([NaN], [NaN]; theme.nullcline_alpha..., label=&quot;D²(α) = 0&quot;)
+
+    # Equilibria
+    ss = SteadyState.all_steady_states(vbp; N=EQ_SEEDS)
+
+    styles = ss_style.(ss)
+    scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
+        c=getproperty.(styles, :c),
+        markerstrokecolor=getproperty.(styles, :markerstrokecolor),
+        shape=getproperty.(styles, :shape),
+        ms=getproperty.(styles, :ms),
+        markerstrokewidth=getproperty.(styles, :markerstrokewidth))
+    scatter!([NaN], [NaN]; theme.eq_legend..., label=&quot;Equilibrium&quot;)
+    plot!(widen=1.06)
+    plot!(leftmargin=6Plots.mm, bottommargin=5Plots.mm, rightmargin=5Plots.mm,
+        topmargin=5Plots.mm, size=plot_size(1, 1.14))
+    append!(files, save_figure(current(), &quot;equilibria_phase_space&quot;))</code></pre></details><figure id="fig:equilibria-eight-circle" data-latex-placement="thpb">
+<img src="figs/equilibria_eight_circle.png" />
+<figcaption><strong>Figure 6:</strong> Configurations of the equilibria, top view, for a downwind (left) and an upwind (right) arm, with the markers of Fig. <a href="#fig:equilibria-phase-space">5</a>. The eight is projected on the horizontal plane without the correction of the radial distance <span class="math inline">\(r\)</span> by the angle of the arm. At every equilibrium, the projections of the arm and of the lines on the horizontal plane are aligned.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L530-L540">src/analysis.jl (region equilibria<em>eight</em>circle)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    ss_downwind = [_ss for _ss in ss if cos(_ss[1]) &gt; 0]
+    ss_upwind = [_ss for _ss in ss if cos(_ss[1]) &lt;= 0]
+    p_downwind = VIZ.plot_eight_circle(ss_downwind, vbp; plot_kwargs=(; color=:black, lw=2),
+        marker_kwargs=ss_style.(ss_downwind), project_eight=true)
+    plot!(title=&quot;Downwind arm&quot;, background_color_subplot=theme.downwind.c)
+    p_upwind = VIZ.plot_eight_circle(ss_upwind, vbp; plot_kwargs=(; color=:black, lw=2),
+        marker_kwargs=ss_style.(ss_upwind), project_eight=true)
+    plot!(title=&quot;Upwind arm&quot;, background_color_subplot=theme.upwind.c)
+
+    plot(p_downwind, p_upwind; layout=(1, 2), size=plot_size(16 / 15, 2))
+    append!(files, save_figure(current(), &quot;equilibria_eight_circle&quot;))</code></pre></details><h2 id="sec:analysis-cycles"><a class="docs-heading-anchor" href="#sec:analysis-cycles">3.2 Periodic orbits</a><a id="sec:analysis-cycles-1"></a><a class="docs-heading-anchor-permalink" href="#sec:analysis-cycles" title="Permalink"></a></h2><p>Starting from the configuration <span class="math inline">\(\vb q= (0, 0)\)</span> at rest except for the kite, <span class="math inline">\(\vb x_0^\pm = (0, 0, 0, \pm1\,\mathrm{rad}\,\mathrm{s}^{-1})\)</span>, the trajectory settles after a few seconds into a periodic motion, along which the kite runs indefinitely along the eight in the direction given by the sign of <span class="math inline">\(\dot\tau(0)\)</span> and the arm swings back and forth (Fig. <a href="#fig:timeseries">7</a>). The angle <span class="math inline">\(\tau\)</span> is then monotone, and a period is a lap of the eight, along which <span class="math inline">\(\tau\)</span> increases or decreases by <span class="math inline">\(2\pi\)</span> while <span class="math inline">\(\alpha\)</span>, <span class="math inline">\(\dot\alpha\)</span> and <span class="math inline">\(\dot\tau\)</span> return to their initial values.</p>
+<figure id="fig:timeseries" data-latex-placement="thpb">
+<img src="figs/time_series_4D.png" />
+<figcaption><strong>Figure 7:</strong> Time series of the state over 10 s from <span class="math inline">\(\vb x_0^+\)</span>. After a few seconds the same pattern repeats: the trajectory approaches a limit cycle.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L544-L548">src/analysis.jl (region time<em>series</em>4D)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    u0 = PM4.build_u(; dτ=DTAU_INIT)
+    sol = PM4.integrate(u0, TS_DURATION, vbp; save_everystep=true)
+
+    sim_4D_fig = plot_time_series(sol)
+    append!(files, save_figure(sim_4D_fig, &quot;time_series_4D&quot;))</code></pre></details><p>We study these motions on the Poincaré section <span class="math display">\begin{equation}
+    \Sigma = \{\vb x \in \mathbf{T}^2 \times \mathbf{R}^2 \mid \tau = 0 \bmod 2\pi\},
+\tag{53}\end{equation}</span> which every trajectory along which <span class="math inline">\(\tau\)</span> is monotone crosses once per lap. Let <span class="math inline">\(\varphi^t\)</span> be the flow of <span class="math inline">\(f\)</span>, and <span class="math inline">\(\Delta t(\vb x) = \min\{t &gt; 0 \mid \varphi^t(\vb x) \in \Sigma\}\)</span> the time to the next crossing; the first return map is <span class="math display">\begin{equation}
+    P : \vb x \in \Sigma \mapsto \varphi^{\Delta t(\vb x)}(\vb x) \in \Sigma,
+\tag{54}\end{equation}</span> and <span class="math inline">\(\Sigma\)</span> is parametrized by <span class="math inline">\((\alpha, \dot\alpha, \dot\tau)\)</span>. A periodic orbit with one lap per period is a fixed point of <span class="math inline">\(P\)</span>; equivalently, its initial state <span class="math inline">\(\vb x(0) = (\alpha_0, 0, \dot\alpha_0, \dot\tau_0)\)</span> and its period <span class="math inline">\(T\)</span> solve the boundary value problem <a id="eq:cycle-bvp"></a><span class="math display">\begin{equation}
+ \tag{55}
+    \vb x(T) = \vb x(0) + (0, \pm 2\pi, 0, 0), \qquad \dot{\vb x} = f(\vb x),
+\end{equation}</span> four equations for the four unknowns <span class="math inline">\((\alpha_0, \dot\alpha_0, \dot\tau_0, T)\)</span>, the sign being that of <span class="math inline">\(\dot\tau_0\)</span>. The crossings of <span class="math inline">\(\Sigma\)</span> are located during the integration by an event function (the continuous callbacks of DifferentialEquations.jl) and evaluated on the dense output of the integrator. A limit cycle is computed in two steps: the trajectory from <span class="math inline">\(\vb x_0^\pm\)</span> is integrated until two successive crossings agree within <span class="math inline">\(10\times10^{-9}\)</span>, and this approximation of the fixed point is refined by Newton’s method on <a href="#eq:cycle-bvp">(55)</a>, the Jacobian being obtained by forward-mode <span data-acronym-label="ad" data-acronym-form="singular+short">ad</span> through the integrator.</p>
+<p>The iterates <span class="math inline">\(\vb x_{i+1} = P(\vb x_i)\)</span> converge to the fixed point <span class="math inline">\(\vb x_\infty\)</span> exponentially (Fig. <a href="#fig:limit_cycle_convergence">8</a>): the distance to the limit is divided by about <span class="math inline">\(10^{2.13}\)</span> (<span class="math inline">\(\dot\tau &gt; 0\)</span>) or <span class="math inline">\(10^{2.16}\)</span> (<span class="math inline">\(\dot\tau &lt; 0\)</span>) at each lap, until it stalls at the integration tolerance. This rate is explained by the Floquet multipliers of the cycles, the eigenvalues of the monodromy matrix <span class="math inline">\(\partial\varphi^T/\partial\vb x\)</span> at <span class="math inline">\(\vb x_\infty\)</span>, computed by <span data-acronym-label="ad" data-acronym-form="singular+short">ad</span> through the integrator. One multiplier is trivially <span class="math inline">\(1\)</span>, the derivative along the flow, which the computation recovers to within <span class="math inline">\(10^{-8}\)</span>; the other three are the eigenvalues of the derivative of <span class="math inline">\(P\)</span>. The largest of them is real, of modulus <span class="math inline">\(8.5 \times 10^{-3}\)</span> (<span class="math inline">\(\dot\tau &gt; 0\)</span>) and <span class="math inline">\(8.0 \times 10^{-3}\)</span> (<span class="math inline">\(\dot\tau &lt; 0\)</span>), that is <span class="math inline">\(10^{-2.07}\)</span> and <span class="math inline">\(10^{-2.10}\)</span>: it sets the asymptotic rate of convergence. The other two form a complex pair of smaller modulus, <span class="math inline">\(10^{-2.40}\)</span> and <span class="math inline">\(10^{-2.36}\)</span>; over the few laps before the distance reaches the tolerance, this faster, oscillating component still contributes, so that the observed rates are slightly above the asymptotic ones and vary from one lap to the next. Both cycles are therefore strongly attracting: a perturbation is damped by more than two orders of magnitude at each lap.</p>
+<figure id="fig:limit_cycle_convergence" data-latex-placement="thpb">
+<img src="figs/limit_cycle_convergence.png" />
+<figcaption><strong>Figure 8:</strong> Convergence to the fixed point of the first return map, for <span class="math inline">\(\dot\tau &gt; 0\)</span> (left) and <span class="math inline">\(\dot\tau &lt; 0\)</span> (right): distance from the <span class="math inline">\(i\)</span>-th crossing of <span class="math inline">\(\Sigma\)</span> to the limit, as a function of the number of laps of the eight (a lap is a sweep of <span class="math inline">\(\tau\)</span> over <span class="math inline">\(2\pi\)</span>). The linear trend in log scale shows an exponential convergence: at each lap, the distance to the limit is divided by about <span class="math inline">\(10^{2.13}\)</span> (<span class="math inline">\(\dot\tau &gt; 0\)</span>) or <span class="math inline">\(10^{2.16}\)</span> (<span class="math inline">\(\dot\tau &lt; 0\)</span>), until it stalls near the integration tolerance, set at <span class="math inline">\(10^{-13}\)</span>.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L552-L559">src/analysis.jl (region limit<em>cycle</em>convergence)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    (p_conv_p, slope_p) = plot_convergence_panel(vbp, +1, 1; ntrace=0, legend=false)
+    (p_conv_m, slope_m) = plot_convergence_panel(vbp, -1, 2; ntrace=0)
+    plot!(p_conv_p, leftmargin=11Plots.mm)
+    plot!(p_conv_m, leftmargin=5Plots.mm)
+    plot!(p_conv_p, ylabel=&quot;Distance to limit&quot;)
+    conv_two = plot(p_conv_p, p_conv_m; layout=(1, 2), size=SIZE_FULL)
+    plot!(bottommargin=7Plots.mm)
+    append!(files, save_figure(conv_two, &quot;limit_cycle_convergence&quot;))</code></pre></details><p>The two limit cycles, one for each direction of travel of the kite along the eight, are close but distinct (Fig. <a href="#fig:yz_limit_cycle">9</a>). Their periods are 2.83 s (<span class="math inline">\(\dot\tau &gt; 0\)</span>) and 2.71 s (<span class="math inline">\(\dot\tau &lt; 0\)</span>), and their average powers 9.64 kW and 9.03 kW. Along them, the arm swings by at most 67° and 63° from the downwind direction, within the operating limit <span class="math inline">\(\abs{\alpha} \leq \pi/2\)</span> of Section <a href="section-2.html#sec:1D-PTO">2</a>. The cycle with <span class="math inline">\(\dot\tau &gt; 0\)</span> is the starting point of the optimization of Section <a href="section-4.html#sec:optimization">4</a>. The symmetry <a href="section-1.html#eq:symmetry">(34)</a> preserves the sign of <span class="math inline">\(\dot\tau\)</span>, so that it maps each cycle onto a cycle with the same direction of travel, and does not exchange the two cycles. No other symmetry of the system relates them. A spatial symmetry of the model is an isometry that fixes the pivot <span class="math inline">\(O\)</span> and preserves gravity, the wind field <span class="math inline">\(\vb w(z)\)</span>, the circle <span class="math inline">\(\mathscr{A}\)</span> of the arm and the eight <span class="math inline">\(\mathscr{E}\)</span>. Preserving <span class="math inline">\(\vu z\)</span> and the altitude <span class="math inline">\(z\)</span>, on which the shear depends, it is a rotation about <span class="math inline">\(\vu z\)</span> or a reflection through a vertical plane; preserving the direction <span class="math inline">\(\vu x\)</span> of the wind, it is the identity or the reflection through <span class="math inline">\((O,\vu x,\vu z)\)</span>, which induces <span class="math inline">\(\sigma\)</span>. Both keep the direction of travel along <span class="math inline">\(\mathscr{E}\)</span>, since <span class="math inline">\(\sigma\)</span> shifts <span class="math inline">\(\tau\)</span> by <span class="math inline">\(\pi\)</span>. A map of <span class="math inline">\(\mathscr{E}\)</span> onto itself that reverses its direction, <span class="math inline">\(\tau\mapsto\pi-\tau\)</span> or <span class="math inline">\(\tau\mapsto-\tau\)</span>, exchanges <span class="math inline">\(\theta_0+\delta\)</span> with <span class="math inline">\(\theta_0-\delta\)</span>, that is a kite climbing through the centre of the eight with a kite diving through it; it is not induced by an isometry, as gravity and the shear distinguish the two. Time reversal, <span class="math inline">\(t\mapsto-t\)</span>, which also reverses the direction of travel, is not a symmetry either, because of the dissipation by the generator and by the aerodynamic drag. Each cycle is in fact invariant under <span class="math inline">\(\sigma\)</span>: <span class="math inline">\(\sigma(\vb x(t)) = \vb x(t + T/2)\)</span>, to within <span class="math inline">\(10^{-9}\)</span> along the cycle, so that the second half of a lap is the mirror image of the first through the plane of the wind. The lines remain taut along both cycles, as required in Section <a href="section-1.html#sec:model-forces">1.3</a>, with a tension between 3.36 kN and 8.86 kN (<span class="math inline">\(\dot\tau &gt; 0\)</span>), and between 3.42 kN and 9.59 kN (<span class="math inline">\(\dot\tau &lt; 0\)</span>). The cycle with <span class="math inline">\(\dot\tau &gt; 0\)</span>, along which the kite dives through the centre of the eight and climbs on its sides, has the longer period and produces the larger power. Over a lap, gravity does no net work, so that the power of the generator equals that of the aerodynamic force, <span class="math inline">\(\vb F_a\vdot\dot{\vb r} = \vb F_a\vdot\vb w - \vb F_a\vdot\vb w_a\)</span>: the power taken from the wind minus the power dissipated by the drag (the lift is normal to the apparent wind). Diving at the tips of the eight, the kite of the cycle with <span class="math inline">\(\dot\tau &lt; 0\)</span> is accelerated there by gravity: its mean speed near the tips is 35.7 m s<sup>−1</sup>, against 32.9 m s<sup>−1</sup> for <span class="math inline">\(\dot\tau &gt; 0\)</span>, and 40.5 m s<sup>−1</sup> against 38.7 m s<sup>−1</sup> over the lap. The faster kite meets a stronger apparent wind, and takes more power from the wind, 49.3 kW against 44.8 kW, but its drag dissipates more, 40.3 kW against 35.2 kW: the extra speed costs more than it brings, and the slower cycle, with <span class="math inline">\(\dot\tau &gt; 0\)</span>, delivers the larger power.</p>
+<figure id="fig:yz_limit_cycle" data-latex-placement="thpb">
+<img src="figs/yz_limit_cycles.png" />
+<figcaption><strong>Figure 9:</strong> Projection of the trajectory of the kite on the <span class="math inline">\(YZ\)</span> plane for the two limit cycles, with opposite directions of travel (the arrows give the direction of motion of the kite). The inset, a zoom, shows that the two paths are distinct.</figcaption>
+</figure><details class="web-code"><summary>Code that produced this figure</summary><p><a href="https://github.com/keep-cnrs/KEEP.jl/blob/6f20ab54be7b1dad4ea39d0b0173a178d815ede7/applications/jtcam-tex/src/analysis.jl#L563-L612">src/analysis.jl (region yz<em>limit</em>cycles)</a>, see also <a href="code/src-analysis-jl.html">the full file</a>.</p><pre><code class="language-julia hljs">    r_vec = (t, sol) -&gt; PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
+    lc_p = LC.compute_limit_cycle(PM4.build_u(; dτ=+DTAU_INIT), vbp; save_everystep=true)
+    lc_m = LC.compute_limit_cycle(PM4.build_u(; dτ=-DTAU_INIT), vbp; save_everystep=true)
+    (lc_p === nothing || lc_m === nothing) &amp;&amp; error(&quot;no limit cycle from x0±&quot;)
+    function compute_lens(lc_p, lc_m, τ, δ_factor; idxs=2:3)
+        # τ(t) is monotone along a cycle and spans TAU0 ± 2π: find the time where
+        # the τ state hits τ mod 2π, mapped into the cycle&#39;s τ range.
+        function phase_time(sol, τ)
+            t0, t1 = sol.prob.tspan
+            lo, hi = minmax(sol(t0)[2], sol(t1)[2])
+            τ_target = clamp(τ + 2π * ceil((lo - τ) / 2π), lo, hi)
+            return find_zero(t -&gt; sol(t)[2] - τ_target, (t0, t1))
+        end
+        yz(sol, t) = r_vec(t, sol)[idxs]
+        r_p = yz(lc_p, phase_time(lc_p, τ))
+        r_m = yz(lc_m, phase_time(lc_m, τ))
+        c = (r_p + r_m) / 2
+        δ = δ_factor * norm(r_p - r_m)
+        return c, δ
+    end
+
+    function yz_split(sol, n_splits)
+        t = range(sol.prob.tspan..., 300)
+        yz = [r_vec(t, sol)[2:3] for t in t]
+        Δt = (t[end] - t[1]) / (n_splits + 1)
+        for i in 1:n_splits
+            t_split = (i - 0.2) * Δt
+            ind = searchsortedfirst(t, t_split)
+            insert!(yz, ind + i - 1, [NaN, NaN])
+        end
+        return yz
+    end
+    n_splits = 4
+    # arrows = [permutedims(repeat([true], n_splits - 1)) false]
+    plot(aspect_ratio=:equal, xlabel=&quot;y (m)&quot;, ylabel=&quot;z (m)&quot;, xtick=-40:10:40, ytick=10:5:20)
+    plot!(invert(yz_split(lc_m, n_splits))..., lw=4, c=2, arrows=true)
+    plot!(invert(yz_split(lc_p, n_splits))..., lw=2, c=1, arrows=true)
+    plot!([NaN], [NaN], c=1, label=&quot;D(τ) &gt; 0&quot;)
+    plot!([NaN], [NaN], c=2, label=&quot;D(τ) &lt; 0&quot;)
+    plot!([0], [26])
+    c, δ = compute_lens(lc_p, lc_m, 2.6, 3)  # lens focus phase τ was set by hand
+    lens!([c[1] - δ, c[1] + δ], [c[2] - δ, c[2] + δ], inset=(1, bbox(0.3, 0.05, 0.3, 0.4)), lw=1.5, lc=:grey)
+    l = plot!().inset_subplots[1]
+    xticks_ = (c[1]-δ):δ:(c[1]+δ)
+    yticks_ = (c[2]-δ):δ:(c[2]+δ)
+    xticks!(l, xticks_, [f&quot;{t:.1f}&quot; for t in xticks_])
+    yticks!(l, yticks_, [f&quot;{t:.1f}&quot; for t in yticks_])
+    plot!(l, tickfontsize=TICKFONTSIZE - 1)
+    plot!(; leftmargin=5Plots.mm, bottommargin=5Plots.mm, size=plot_size(2 / 3, 1))
+    append!(files, save_figure(current(), &quot;yz_limit_cycles&quot;))</code></pre></details><p>No other limit cycle was found. 200 initial states sampled on <span class="math inline">\(\Sigma\)</span> by a Halton sequence, with <span class="math inline">\(\alpha \in [-\pi, \pi]\)</span> and <span class="math inline">\(\abs{\dot\alpha}, \abs{\dot\tau} \leq 10\,\mathrm{rad}\,\mathrm{s}^{-1}\)</span>, are integrated with the coarser tolerance <span class="math inline">\(\sqrt{10^{-9}}\)</span> until their crossings of <span class="math inline">\(\Sigma\)</span> settle; the settled states are clustered, and the centroid of each cluster is refined as above. This yields <span class="math inline">\(2\)</span> limit cycles, the two above. The bound on the velocities corresponds to speeds of the arm and of the kite that the generator and the aerodynamic drag quickly damp. The search only finds fixed points of the first return map: it does not detect cycles with several laps of the eight per period, nor cycles along which <span class="math inline">\(\tau\)</span> is not monotone and that do not cross <span class="math inline">\(\Sigma\)</span> once per lap. This inventory is a numerical exploration, not a proof of uniqueness.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="section-2.html">« 2 Estimation of power take-off</a><a class="docs-footer-nextpage" href="section-4.html">4 Optimization »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Saturday 28 November 2026 11:20">Saturday 28 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
