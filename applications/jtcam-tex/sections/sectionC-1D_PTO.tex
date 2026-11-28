@@ -1,13 +1,13 @@
 \section{Estimation of power take-off} \label{sec:1D-PTO}
-A simple 1D dynamic model is derived in order to estimate the \ac{pto} by the KEEP device, that is the mechanical power extracted from the rotation of the arm by the generator, modelled as a viscous torque \(-b\dot\alpha\) (average of \(b\dot\alpha^2\)). Significant assumptions are made. An \(\omega\)-pulsation harmonic couple around \(\vu z\), caused by the tether attached to the end of the arm, is modelled by \(C_M\,\cos(\omega\,t)\), where \(C_M=F_s\,a \sin \theta_0\) and \(F_s\) is a constant tension in the line. Thus, the variation of the aerodynamics forces along the kite’s figure-of-eight trajectory is averaged and projected onto the horizontal plane (\(z=0\)). The Newton's second law for the arm \ref{eq:newton_arm} yields
+A simple 1D dynamic model is derived in order to estimate the \ac{pto} by the KEEP device, that is the mechanical power extracted from the rotation of the arm by the generator, modelled as a viscous torque \(-b\dot\alpha\) (average of \(b\dot\alpha^2\)). Significant assumptions are made. An \(\omega\)-pulsation harmonic couple around \(\vu z\), caused by the tether attached to the end of the arm, is modelled by \(C_M\,\cos(\omega\,t)\), where \(C_M=F_s\,a \sin \theta_0\) and \(F_s\) is a constant tension in the line. Thus, the variation of the aerodynamics forces along the kite’s figure-of-eight trajectory is averaged and projected onto the horizontal plane (\(z=0\)). The Newton's second law for the arm \eqref{eq:newton_arm} yields
 \begin{equation} \label{eq:newton_arm_PTO}
     I \ddot\alpha = C_M\,\cos(\omega\,t) -b \dot\alpha.
 \end{equation}
-The following non dimensional parameters \(\overline{b}=b/(I\,\omega)\), \(\overline{C_M}=C_M/(I\,\omega^2)\) and \(\tau=\omega\,t\) are defined. The derivative of \(\alpha\) with respect to \(\tau\) is denoted by \(\alpha'\), such that \(\alpha'=\dot{\alpha}/\omega\). The Newton's second law for the arm \ref{eq:newton_arm_PTO} simplifies as follows
+The following non dimensional parameters \(\overline{b}=b/(I\,\omega)\), \(\overline{C_M}=C_M/(I\,\omega^2)\) and \(\tau=\omega\,t\) are defined. The derivative of \(\alpha\) with respect to \(\tau\) is denoted by \(\alpha'\), such that \(\alpha'=\dot{\alpha}/\omega\). The Newton's second law for the arm \eqref{eq:newton_arm_PTO} simplifies as follows
 \begin{equation} \label{eq:newton_arm_PTO_adim}
     \alpha''+\overline{b}\, \alpha' = \overline{C_M}\,\cos(\tau).
 \end{equation}
-The steady-state harmonic solution of \ref{eq:newton_arm_PTO_adim} is
+The steady-state harmonic solution of \eqref{eq:newton_arm_PTO_adim} is
 \begin{equation} \label{eq:sol_alpha_PTO}
     \alpha = -\frac{\overline{C_M}}{B}\,\cos(\tau+\delta),
 \end{equation}
@@ -23,11 +23,11 @@ A maximum tension condition is imposed on the cable whilst seeking to preserve t
 \begin{equation} \label{eq:C_M_PTO}
     C_M=T_s\, S\,a \sin(\theta_0).
 \end{equation}
-Furthermore, the pulsation \(\omega\) introduced in the simple formulation \ref{eq:newton_arm_PTO} can be determined using a zero-mass model of the  kite \cite{Leloup2014OE}. We consider line length \(\ell\) that are much greater than the arm length \(a\), so that \(r=\ell\) is a reasonable assumption. Futhermore, assuming a constant kite speed \(V_k=\lVert \dot{\boldsymbol{r}} \rVert\) along its figure-of-eight trajectory, equal to the value at the center \((x,y,z)=(\ell\,\sin(\theta_0),0,\ell\,\cos(\theta_0))\), it can be shown that 
+Furthermore, the pulsation \(\omega\) introduced in the simple formulation \eqref{eq:newton_arm_PTO} can be determined using a zero-mass model of the  kite \cite{Leloup2014OE}. We consider line length \(\ell\) that are much greater than the arm length \(a\), so that \(r=\ell\) is a reasonable assumption. Futhermore, assuming a constant kite speed \(V_k=\lVert \dot{\boldsymbol{r}} \rVert\) along its figure-of-eight trajectory, equal to the value at the center \((x,y,z)=(\ell\,\sin(\theta_0),0,\ell\,\cos(\theta_0))\), it can be shown that 
 \begin{equation} \label{eq:Vk_PTO}
     V_k=w_\ell\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1},
 \end{equation}
-where \(G=C_L/C_D\) is the glide ratio of the kite. According to \ref{eq:sphere_Model_Deriv} and \ref{eq:traject_Model_Deriv}, the total length of the figure-of-eight trajectory \(L_{81}\) on the unit sphere (\(\ell=1\)) is given by
+where \(G=C_L/C_D\) is the glide ratio of the kite. According to \eqref{eq:sphere_Model_Deriv} and \eqref{eq:traject_Model_Deriv}, the total length of the figure-of-eight trajectory \(L_{81}\) on the unit sphere (\(\ell=1\)) is given by
 \begin{equation} \label{eq:L81_PTO}
     L_{81}=\int \limits_{\tau=0}^{\tau=2\pi} \sqrt{\left[2 \, \Delta\theta\, \cos(2\,\tau)\right]^2+{\sin(\theta_0 + \Delta\theta \sin(2\tau))}^2\,\left[\Delta\phi\, \cos(\tau)\right]^2} \dd{\tau},
 \end{equation}
@@ -40,7 +40,7 @@ As detailed in appendix \ref{app8}, one has the following estimate:
 L_{81}=4\Delta\phi\sin\theta_0+\frac{8\,\Delta\theta^2}{\Delta\phi\sin\theta_0}\Bigl[\ln\frac{2\Delta\phi\sin\theta_0}{\Delta\theta}-\frac56-\frac2{15}\Delta\phi^2\sin^2\theta_0\Bigr]+o(\Delta\theta^2).
 \end{equation}
 Assuming that the values of the aerodynamics parameters \(G\), \(w_r\) and \(z_r\), of the geometry parameters \(a\), \(\ell\), \(\theta_0\), \(\Delta \theta\) and \(\Delta \phi\), as well as those of the kite properties \(S\) and \(T_s\), have been selected, the independent parameters \(b\) and \(I\) can be optimized.
-At fixed inertia \(I\), the last term of the relationship (\ref{eq:power_PTO}) reaches its maximum value for \(\overline{b}=1\), that is
+At fixed inertia \(I\), the last term of the relationship \eqref{eq:power_PTO} reaches its maximum value for \(\overline{b}=1\), that is
 \begin{equation} \label{pto_optimality_constraint}
     b=I\,\omega,
 \end{equation}
@@ -58,7 +58,7 @@ As long as \(I_{\min} < \sqrt2\,C_M/(\pi\omega^2)\), which holds here, the condi
 \begin{equation} \label{eq:opti_b_I_PTO}
     I = I_{\min}, \qquad b = \frac{2\,C_M}{\pi\,\omega}\sqrt{1-\varepsilon^2}, \qquad \varepsilon = \frac{\pi\,\omega^2 I_{\min}}{2\,C_M},
 \end{equation}
-where \(C_M\) and \(\omega\) are given by \ref{eq:C_M_PTO} and \ref{eq:Omega_PTO} respectively, which leads to the following average power:
+where \(C_M\) and \(\omega\) are given by \eqref{eq:C_M_PTO} and \eqref{eq:Omega_PTO} respectively, which leads to the following average power:
 \begin{equation} \label{eq:opti_power_PTO_final}
     W_a =\frac{\pi\,C_M\,\omega}{4}\sqrt{1-\varepsilon^2}.
 \end{equation}
@@ -67,7 +67,7 @@ Thus, the power take-off per unit area of kite \(pto\) by the KEEP device can be
 \begin{equation} \label{eq:pto_PTO}
     pto=\frac{W_a}{S}=\left(\frac{\pi^2\,\sin(\theta_0)\,\sqrt{\left(1+G^2\right)\,{\sin(\theta_0)}^2-1}}{2\,L_{81}}\right)\,\left(\frac{T_s\,a\,w_r}{\ell}\right)\,\left(\frac{\ell\,\cos(\theta_0)}{z_r}\right)^{1/7}\sqrt{1-\varepsilon^2}.
 \end{equation}
-The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), \(\varepsilon = \PtoEps\), and the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\) (\SI{\PtoPowerZero}{\kilo\watt\per\square\meter} as \(I_{\min}\to0\)), regardless of whether expression \ref{eq:L81_PTO} or \ref{eq:L81_PTO_approx} is used for $L_{81}$. This estimate assumes a glide ratio \(G = \GlideRef\) (Table~\ref{tab:params}); with \(G = \GlideLow\), a value more typical of soft kites, it drops to \(\SI{\PtoPowerGlideLow}{\kilo\watt\per\square\meter}\).
+The maximum power take-off varies almost linearly with the glide ratio of the kite. The linear dependence of \(pto\) on wind speed \(w_r\) is due to the structural constraint \(T_s\). Without this constraint, the dependence of \(pto\) on wind speed \(w_r\) is normally of the third order, since the aerodynamic pressures – and therefore the wing loading  – are of the second order. The \(pto\) appears to increase linearly as the arm length \(a\) increases. The shorter the length of the line \(\ell\), the higher \(pto\) is, even if the wind speed at the height of the kite decreases. However, the inertia of the kite is not taken into account in this estimate of the power take-off. Taking it into account could alter the value of the pulsation \(\omega\) and, consequently, lead to an optimal value for the length of the line. Taking the nominal parameters of Table~\ref{tab:params} with \(T_s = \SI{\PtoTs}{\newton\per\square\meter}\), \(\varepsilon = \PtoEps\), and the KEEP device achieves a maximum power take-off of about \(\SI{\PtoPower}{\kilo\watt\per\square\meter}\) (\SI{\PtoPowerZero}{\kilo\watt\per\square\meter} as \(I_{\min}\to0\)), regardless of whether expression \eqref{eq:L81_PTO} or \eqref{eq:L81_PTO_approx} is used for $L_{81}$. This estimate assumes a glide ratio \(G = \GlideRef\) (Table~\ref{tab:params}); with \(G = \GlideLow\), a value more typical of soft kites, it drops to \(\SI{\PtoPowerGlideLow}{\kilo\watt\per\square\meter}\).
 % QUESTION (PR #78, abavoil): justification and reference for G = 7 (code comment: L/D between 4 and 6) The values required for the moment of inertia \(I\) of the arm and the resistance \(b\) of the rotor are \(\SI{\PtoI}{\kilogram\meter\squared}\) and approximately \(\SI{\PtoB}{\newton\meter\second\per\degree}\) respectively.
 
 
