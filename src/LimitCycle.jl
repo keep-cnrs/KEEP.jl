@@ -22,7 +22,7 @@ What should go in there :
 =#
 
 using DiffEqCallbacks: ContinuousCallback
-using OrdinaryDiffEqVerner: terminate!
+using OrdinaryDiffEqVerner: terminate!, SciMLBase
 using StaticArrays
 using Clustering: dbscan
 using Setfield
@@ -215,6 +215,10 @@ Return its shooting parameters [α0, dα0, dτ0, T]."""
 function compute_limit_cycle(u0, vbp; tf=1e9, tol=DEFAULT_TOLERANCE, refine=true, kwargs...)
     cb = build_poincare_callback(10tol)
     sol = PM4.integrate(u0, tf, vbp; callback=cb, save_end=false, tol=tol)
+    if !SciMLBase.successful_retcode(sol)
+        @error "compute_limit_cycle: the settling integration failed" retcode = sol.retcode t = sol.t[end]
+        return nothing
+    end
     shooting = build_shooting(sol)
     shooting === nothing && return nothing
     if refine
