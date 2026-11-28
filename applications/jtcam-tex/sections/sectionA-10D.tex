@@ -67,7 +67,7 @@ such that \eqref{eq:loop_closure_vector} rewrites to
 \begin{equation} \label{eq:loop_closure_function}
     \vb g(\vq) = 0_{\R^3}
 \end{equation}
-We have a five dimensional state (\emph{cf.} \ref{eq:state_vector}) subject to three algebraic constraints (\emph{cf.} \ref{eq:loop_closure_function}), thus the system has two \ac{dof}.
+We have a five dimensional state (\emph{cf.} \eqref{eq:state_vector}) subject to three algebraic constraints (\emph{cf.} \eqref{eq:loop_closure_function}), thus the system has two \ac{dof}.
 
 \begin{remark} 
 The set of acceptable positions for $K$ is the intersection between a filled torus (filled \emph{spindle} torus if the lines are longer than the arm, \emph{i.e.} $\ell > a$) and an eight-shaped cone.
@@ -178,7 +178,7 @@ from which we compute $\vb F_\ell$, directed by $-\hat{\boldsymbol{\ell}}$:
 \begin{equation} \label{eq:f_lines-10D}
     \vb F_\ell = \frac{-I \ddot \alpha - b \dot \alpha}{a \sin(\theta_\ell) \sin(\phi_\ell)} \hat{\boldsymbol{\ell}}.
 \end{equation}
-In the above, the lever arm of the tension is $a \sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \ref{eq:lhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
+In the above, the lever arm of the tension is $a \sin(\theta_\ell) \sin(\phi_\ell)$. For $\sin(\theta_\ell)$ to be zero, the kite would have to fly underground directly below the tip of the arm, which won't happen, or directly above it, which also won't happen if $\theta_0 - \Delta \theta > 0$, \emph{cf}. \eqref{eq:lhat-10D}, which is verified for realistic values of $\theta_0$ and $\Delta \theta$.
 % TODO better explanation?
 % TODO define when it breaks: when does proj_xy(K) equal A?
 With a typical choice of parameters the kite will never fly directly above the tip of the arm, thus $\sin(\theta_\ell) > 0$ at all times.
@@ -203,8 +203,8 @@ Newton's second law applied to the kite's center of mass gives
 \end{equation}
 %
 At this point, we need to choose two equations to keep, while the others will be used at substitutions.
-For their nice symmetry, we keep \ref{eq:f_cone_constraint_10D} and use the others to express $\vb F_c$ in terms of $\vq, \dq$, and $\ddq$.
-From \ref{eq:newton_kite_10D}, we have that
+For their nice symmetry, we keep \eqref{eq:f_cone_constraint_10D} and use the others to express $\vb F_c$ in terms of $\vq, \dq$, and $\ddq$.
+From \eqref{eq:newton_kite_10D}, we have that
 \begin{equation} \label{eq:f_cone_newton_10D}
     \vb F_c = m \ddot{\vb r} - \vb F_a - \vb F_g - \vb F_\ell.
 \end{equation}
@@ -242,10 +242,10 @@ The acceleration of the kite $\ddot{\vb r}$ obtained by differentiating twice it
 %
 % TODO continue developing to have the full expression of ddot OK?
 %
-The three forces $\vb F_g$, $\vb F_a(\vq, \dq)$, and a$\vb F_\ell(\vq, \dq, \ddq)$ are developed in \ref{eq:f_grav_10D}, \ref{eq:f_aero_10D}, and \ref{eq:f_lines-10D} respectively.
+The three forces $\vb F_g$, $\vb F_a(\vq, \dq)$, and a$\vb F_\ell(\vq, \dq, \ddq)$ are developed in \eqref{eq:f_grav_10D}, \eqref{eq:f_aero_10D}, and \eqref{eq:f_lines-10D} respectively.
 
-We have written every quantity in \ref{eq:f_cone_newton_10D} explicitly in terms of $\vq$, $\dq$, and $\ddq$, thus \ref{eq:f_cone_constraint_10D} is a system of two second order \ac{ode}s in $\vq \in \R^5$.
-By combining \ref{eq:f_cone_constraint_10D} and \ref{eq:loop_closure_function}, we obtain the following system of two implicit second order \ac{ode}s and three algebraic equations (or constraints):
+We have written every quantity in \eqref{eq:f_cone_newton_10D} explicitly in terms of $\vq$, $\dq$, and $\ddq$, thus \eqref{eq:f_cone_constraint_10D} is a system of two second order \ac{ode}s in $\vq \in \R^5$.
+By combining \eqref{eq:f_cone_constraint_10D} and \eqref{eq:loop_closure_function}, we obtain the following system of two implicit second order \ac{ode}s and three algebraic equations (or constraints):
 %
 \begin{equation}\begin{cases}
     \vb F_c(\vq, \dq, \ddq) \cdot {\pdv{\vb r}{R}}(\vq) = 0 \\
@@ -272,7 +272,7 @@ with
 \end{equation}
 
 \subsection{Numerical solving}
-The system found in \ref{eq:dae} consists of two \ac{ode}s and three algebraic equations of $\vq : t \mapsto \vq(t) \in \R^5$, therefore it is a \ac{dae}.
+The system found in \eqref{eq:dae} consists of two \ac{ode}s and three algebraic equations of $\vq : t \mapsto \vq(t) \in \R^5$, therefore it is a \ac{dae}.
 The first step toward a solution is to reduce it to a system of \ac{ode}s, which is called index reduction.
 It consists in differentiating the algebraic equations with respect to time until we have a system of \ac{ode}s, while adding initial conditions to keep the original algebraic equations valid at all times.
 The algebraic equation $\vb g(\vq) = 0$ is reduced to

@@ -75,7 +75,7 @@ function param_table(p)
         Parameter(:z0, "z_0", "Wind reference altitude", raw"\meter", nothing),
         Parameter(:w0, "w_0", "Wind reference speed", raw"\meter\per\second", nothing),
         Parameter(:b, "b", "Arm braking coefficient",
-            raw"\newton\meter\second\per\degree", f"{p.b / rad2deg(1):.9g}"),
+            raw"\newton\meter\second\per\degree", f"{p.b / rad2deg(1):.4g}"),  # 4 digits: fixed point b = I ω
         Parameter(:θ0, raw"\theta_0", "Lemniscate mean polar angle",
             raw"\degree", f"{rad2deg(p.θ0):.0f}"),
         Parameter(:Δθ, raw"\Delta\theta", "Lemniscate polar half-height",
@@ -206,6 +206,9 @@ end
 
 ## Convergence rate of the two cycles (helpers)
 const LC_CONV_TOL = 1e-13
+const EQ_SEEDS = 100      # initial values of τ per fold curve for SteadyState.all_steady_states
+const DTAU_INIT = 1.0     # |dτ(0)| (rad/s) of the initial states x0± (KEEP's LC.compute_limit_cycle default)
+const TS_DURATION = 10    # duration (s) of the time series of fig:timeseries
 const CB = LC.build_poincare_callback(eps(1.0))
 
 function get_slope(distances; tol_start, tol_end)
@@ -295,12 +298,14 @@ function equilibrium_spectra(ss, vbp; is_down, is_center)
         # weight of the arm (α, dα) in the unstable eigenvectors: the text says they
         # move the kite along the eight, the arm staying at rest to first order
         E = eigen(state_jacobian((ss[r][1], ss[r][2], 0.0, 0.0), vbp))
-        arm = maximum(findall(z -> real(z) > 0, E.values)) do k
-            v = E.vectors[:, k]
-            max(abs(v[1]), abs(v[3])) / maximum(abs, v)
-        end
+        armw(k) = (v = E.vectors[:, k]; max(abs(v[1]), abs(v[3])) / maximum(abs, v))
+        iun = findall(z -> real(z) > 0, E.values)
+        kdom = iun[argmax(real.(E.values[iun]))]
+        arm = armw(kdom)                                    # dominant unstable mode
+        others = setdiff(iun, findall(==(E.values[kdom]), E.values), findall(==(conj(E.values[kdom])), E.values))
+        armslow = isempty(others) ? NaN : minimum(armw, others)  # extra slow unstable mode (upwind)
         push!(pairs, (; q=ss[r], down=is_down(ss[r]), center=is_center(ss[r]), λ,
-            nunstable=count(z -> real(z) > 0, λ), remax=maximum(real, λ), arm))
+            nunstable=count(z -> real(z) > 0, λ), remax=maximum(real, λ), arm, armslow))
     end
     sort!(pairs; by=p -> (!p.down, !p.center))
     return pairs
@@ -423,7 +428,7 @@ function run_analysis(; fast::Bool=false)
     #region setup_analysis
     ## Determine optimal parameters using kinetic model
     p0 = PMP.build_para()
-    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-3)
+    p0.b = PMP.optimal_torque_slope(p0; sense=(+), tol=1e-9, rtol=1e-9, maxiter=50)  # errors if not converged
     vbp = PMP.build_vbpara(p0)
     #endregion
 
@@ -505,7 +510,7 @@ function run_analysis(; fast::Bool=false)
     plot!([NaN], [NaN]; theme.nullcline_alpha..., label="D²(α) = 0")
 
     # Equilibria
-    ss = SteadyState.all_steady_states(vbp)
+    ss = SteadyState.all_steady_states(vbp; N=EQ_SEEDS)
 
     styles = ss_style.(ss)
     scatter!(rad2deg.(first.(ss)), rad2deg.(last.(ss));
@@ -536,8 +541,8 @@ function run_analysis(; fast::Bool=false)
     #endregion
 
     #region time_series_4D
-    u0 = PM4.build_u(; dτ=1)
-    sol = PM4.integrate(u0, 10, vbp; save_everystep=true)
+    u0 = PM4.build_u(; dτ=DTAU_INIT)
+    sol = PM4.integrate(u0, TS_DURATION, vbp; save_everystep=true)
 
     sim_4D_fig = plot_time_series(sol)
     append!(files, save_figure(sim_4D_fig, "time_series_4D"))
@@ -556,8 +561,9 @@ function run_analysis(; fast::Bool=false)
 
     #region yz_limit_cycles
     r_vec = (t, sol) -> PM4.compute_OK(PM4.compute_Rτ(sol(t), sol.prob.p), sol.prob.p)
-    lc_p = LC.compute_limit_cycle(vbp; sense=(+), save_everystep=true)
-    lc_m = LC.compute_limit_cycle(vbp; sense=(-), save_everystep=true)
+    lc_p = LC.compute_limit_cycle(PM4.build_u(; dτ=+DTAU_INIT), vbp; save_everystep=true)
+    lc_m = LC.compute_limit_cycle(PM4.build_u(; dτ=-DTAU_INIT), vbp; save_everystep=true)
+    (lc_p === nothing || lc_m === nothing) && error("no limit cycle from x0±")
     function compute_lens(lc_p, lc_m, τ, δ_factor; idxs=2:3)
         # τ(t) is monotone along a cycle and spans TAU0 ± 2π: find the time where
         # the τ state hits τ mod 2π, mapped into the cycle's τ range.
@@ -613,7 +619,9 @@ function run_analysis(; fast::Bool=false)
     #endregion
     length(ss) == 8 || @warn "the text describes 8 equilibria" n = length(ss)
     all(p -> p.nunstable > 0, pairs) || @warn "the text says that all equilibria are unstable"
-    all(p -> p.arm < 1e-2, pairs) || @warn "the text says the unstable modes of the equilibria are along the eight" getproperty.(pairs, :arm)
+    all(p -> p.arm < 1e-2, pairs) || @warn "the text says the dominant unstable mode of every equilibrium is along the eight" getproperty.(pairs, :arm)
+    all(p -> p.down ? isnan(p.armslow) : p.armslow > 0.5, pairs) ||
+        @warn "the text says the extra unstable mode of the upwind equilibria is a mode of the arm" getproperty.(pairs, :armslow)
     pick(down, center) = only(filter(p -> p.down == down && p.center == center, pairs))
     all(c -> pick(false, c).nunstable == pick(true, c).nunstable + 1, (true, false)) ||
         @warn "the text says that an upwind equilibrium has one more unstable eigenvalue than its downwind counterpart"
@@ -703,6 +711,10 @@ function run_analysis(; fast::Bool=false)
         "\\newcommand{\\LcSpeedMinus}{$(f"{eb[2].V:.1f}")}",
         "\\newcommand{\\LcSpeedTipPlus}{$(f"{eb[1].Vtip:.1f}")}",
         "\\newcommand{\\LcSpeedTipMinus}{$(f"{eb[2].Vtip:.1f}")}",
+        "\\newcommand{\\EqSeeds}{$EQ_SEEDS}",
+        "\\newcommand{\\DtauInit}{$(f"{DTAU_INIT:g}")}",
+        "\\newcommand{\\TsDuration}{$TS_DURATION}",
+        "\\newcommand{\\ArmLength}{$(f"{p0.a:g}")}",
         "\\newcommand{\\InvSeeds}{$n_inv}",
         "\\newcommand{\\InvVmax}{$vmax_inv}",
         "\\newcommand{\\InvCount}{$(length(lcs))}",

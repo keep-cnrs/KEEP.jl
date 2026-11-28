@@ -31,6 +31,10 @@ on:
         description: 'Fast mode: reduced iteration limits and grids (smoke test, not the paper results)'
         type: boolean
         default: true
+      check:
+        description: 'Web: fail if the regenerated tables differ from the committed ones (off only for a preview while the committed tables lag behind the code)'
+        type: boolean
+        default: true
 
 defaults:
   run:
@@ -123,7 +127,7 @@ jobs:
       - uses: julia-actions/cache@v2
       - name: Check the regenerated tables against the committed ones
         if: needs.figures.result == 'success' && env.DEPLOY == 'true'
-        run: julia web/check_results.jl
+        run: julia web/check_results.jl || [ "${{ github.event_name == 'workflow_dispatch' && !inputs.check }}" = "true" ]
       - name: TeX Live (main.aux for the numbering, TikZ figures) and pdftocairo
         run: |
           sudo apt-get update
