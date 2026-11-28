@@ -595,7 +595,7 @@ function numbers_tex(; p_start, p_ref, opt_iter, winds, sweep, dtheta, dtheta_op
     # power peaks below the nominal angle
     isfinite(dtheta_lost) && @warn "Δθ caption: the continuation is lost at $(dtheta_lost) deg; reword the caption"
     all(isfinite, Popt) || @warn "Δθ caption: re-optimized values missing" Popt
-    ibest = argmax(x -> isfinite(x) ? x : -Inf, Popt)
+    ibest = argmax(i -> isfinite(Popt[i]) ? Popt[i] : -Inf, eachindex(Popt))  # an index
     ang[ibest] < ang[i0] || @warn "Δθ caption: the re-optimized power no longer peaks below the nominal angle" ang[ibest]
     pto = pto_estimate(p_start)
     cc = curvature_check(p_ref)
