@@ -147,19 +147,23 @@ function _dynamics_verified(u, p, t=0)
 
     # torque_function takes a dimensionless dα
     torque = torque_function(dα * T, p) * M * L^2 * T^-2
-    l_tension = rhat ⋅ (SA[0, 0, 1] × OA) + 1e-100  # Avoid division by zero for q = (0, 0)
-    A_tension = -(p.I * M * L^2) / l_tension * rhat * SA[1, 0]'
-    b_tension = -torque / l_tension * rhat
-
-    D_OK_D_Rτ = D_OK * D_Rτ
-    A = D_OK_D_Rτ .* M .- A_tension
-    b = (ddOK * M +
-        D_OK * ddRτ * M +
-        -b_tension - Fgrav - Faero
-    )
+    # Unknowns (ddα, ddτ, Fℓ), with Fℓ the line tension (force -Fℓ rhat on the kite):
+    #   kite, projected on the tangent plane of the cone (columns of D_OK):
+    #     D_OK' (M (D_OK D_Rτ ddq + D_OK ddRτ + ddOK) + Fℓ rhat) = D_OK' (Fgrav + Faero)
+    #   arm: I ddα = aλ Fℓ - torque, with aλ = rhat ⋅ (ez × OA) the lever arm of the lines.
+    # Solving for (ddα, ddτ, Fℓ) jointly is regular everywhere (no division by the lever
+    # arm, which vanishes on the fold curves α = φ, φ + π where the equilibria lie).
+    aλ = rhat ⋅ (SA[0, 0, 1] × OA)
+    I_ = p.I * M * L^2
+    K = D_OK' * (D_OK * D_Rτ) .* M
+    t = D_OK' * rhat
+    S = @SMatrix [K[1, 1] K[1, 2] t[1]
+                  K[2, 1] K[2, 2] t[2]
+                  I_ zero(I_) -aλ]
+    rhs2 = D_OK' * (Fgrav + Faero - M * (D_OK * ddRτ + ddOK))
+    x = S \ SA[rhs2[1], rhs2[2], -torque]
     instantaneous_power = torque * dα
-    ddq = (D_OK' * A) \ (-D_OK' * b)
-    return SA[dq[1], dq[2], ddq[1], ddq[2], instantaneous_power]
+    return SA[dq[1], dq[2], x[1], x[2], instantaneous_power]
 end
 
 @doc raw"""
@@ -218,7 +222,7 @@ function _kinematics(α, τ, p)
     rhatpp = -nrhatp2 * rhat + (θpp - φp^2 * sθ * cθ) * eθ +
              (φpp * sθ + 2θp * φp * cθ) * eφ
 
-    return (; R, Δ, HR, R_α, R_τ, rhat, ahat, rhatp, rhatpp, nrhatp2,
+    return (; α, R, Δ, HR, R_α, R_τ, rhat, ahat, rhatp, rhatpp, nrhatp2,
         θ, φ, θp, φp, A, ELL)
 end
 
@@ -274,45 +278,53 @@ function dynamics(u, p, t=0)
 
     k = _kinematics(α, τ, p)
     F_a, F_g, torque, Rdot = _forces(k, dq, p)
+    ddα, ddτ, _ = _accelerations_tension(k, F_a + F_g, torque, Rdot, dq, p)
+    return SA[dα, dτ, ddα, ddτ, torque * dα]
+end
 
-    # + 1e-100 mirrors the guard on `l_tension` in `_dynamics_verified`: μ vanishes on
-    # the section seed (α = 0, τ = TAU0), where the arm balance is a removable singularity
-    mu = k.A * k.R / k.ELL * sin(k.θ) * sin(k.φ - α) + 1e-100
-    κ = p.I * M * L^2 / mu
-    Mmat = @SMatrix [M*k.R_α+κ*k.Δ/k.ELL  M*k.R_τ
-                     -κ*k.Δ/k.ELL*k.R_τ   M*k.R^2*k.nrhatp2]
+@doc raw"""
+Accelerations and line tension from the kinematics `k`, the external force `F = F_a + F_g`
+on the kite, the generator torque and ``\dot R``. Returns `(ddα, ddτ, Fℓ)`.
 
-    h1 = -M * (dot(dq, k.HR * dq) - k.R * dτ^2 * k.nrhatp2) +
-         k.rhat ⋅ F_a + k.rhat ⋅ F_g - torque * k.Δ / (mu * k.ELL)
-    h2 = -M * (k.R * (2Rdot * dτ * k.nrhatp2 + k.R * dτ^2 * (k.rhatp ⋅ k.rhatpp))) +
-         (k.R * k.rhatp) ⋅ F_a + (k.R * k.rhatp) ⋅ F_g +
-         torque * k.Δ * k.R_τ / (mu * k.ELL)
-
-    ddq = Mmat \ SA[h1, h2]
-    return SA[dα, dτ, ddq[1], ddq[2], torque * dα]
+The three unknowns satisfy the projections of Newton's law for the kite on ``\hat r`` and
+``\hat r'`` (the tangent plane of the cone), and the arm balance
+``I\ddot\alpha = a\lambda F_\ell - \text{torque}``, where
+``a\lambda = a\,\hat\ell\cdot(\hat z\times\hat a)`` is the lever arm of the lines. It vanishes on
+the fold curves ``\alpha = \varphi, \varphi + \pi``, so the arm balance is solved for
+``\ddot\alpha`` (dividing by ``I > 0``), never for ``F_\ell``: the remaining ``2\times 2``
+system in ``(\ddot\tau, F_\ell)`` has determinant
+``-m r \|\hat r'\|^2 R/\ell - m R r_\tau^2/(r\ell) - m^2 a^2 \ell r \|\hat r'\|^2\lambda^2/(I R) < 0``
+everywhere, so the vector field and the tension are smooth on the whole state space.
+"""
+function _accelerations_tension(k, F, torque, Rdot, dq, p)
+    L, M, _ = lmt(p)
+    dτ = dq[2]
+    r, Δ, ℓ, a, v2 = k.R, k.Δ, k.ELL, k.A, k.nrhatp2   # Δ = √(p² + ℓ² - a²)
+    I_ = p.I * M * L^2
+    aλ = a * (r / ℓ) * sin(k.θ) * sin(k.φ - k.α)      # lever arm of the lines
+    lhat = (r * k.rhat - a * k.ahat) / ℓ
+    c1 = -M * (dot(dq, k.HR * dq) - r * v2 * dτ^2) + k.rhat ⋅ F
+    c2 = -M * (2Rdot * v2 * dτ + r * (k.rhatp ⋅ k.rhatpp) * dτ^2) + k.rhatp ⋅ F
+    N = @SMatrix [M*k.R_τ Δ/ℓ+M*k.R_α*aλ/I_
+                  M*r*v2 lhat⋅k.rhatp]
+    ddτ, Fl = N \ SA[c1 + M * k.R_α * torque / I_, c2]
+    ddα = (aλ * Fl - torque) / I_
+    return ddα, ddτ, Fl
 end
 
 
 """
 [For post-processing]
 
-Given u, p and possibly du, compute the line tension
+Given u and p, compute the line tension Fℓ (N), exact everywhere, including on the fold
+curves where the lever arm of the lines vanishes (see [`_accelerations_tension`](@ref)).
 """
-function compute_line_tension(u, p; du=PM4.dynamics(u, p, 0))
-    L, M, T = lmt(p)
-    α = u[1]
-    dα = u[3]
-    ddα = du[3]
-    αhat = PM4.compute_αhat(α)
-    OA = p.a * αhat
-    OK = PM4.compute_OK(PM4.compute_Rτ(u, p), p)
-    rhat = normalize(OK - OA)
-    torque = torque_function(dα * T, p) * M * L^2 * T^-2
-    l_tension = rhat ⋅ (SA[0, 0, 1] × OA) + 1e-100
-    A_tension = -p.I * M * L^2 / l_tension * rhat * SA[1, 0]'
-    b_tension = -torque / l_tension * rhat
-    F_tension = A_tension[:, 1] * ddα + b_tension
-    return -F_tension ⋅ rhat
+function compute_line_tension(u, p)
+    α, τ = u[1], u[2]
+    dq = SA[u[3], u[4]]
+    k = _kinematics(α, τ, p)
+    F_a, F_g, torque, Rdot = _forces(k, dq, p)
+    return _accelerations_tension(k, F_a + F_g, torque, Rdot, dq, p)[3]
 end
 
 @doc raw"""
